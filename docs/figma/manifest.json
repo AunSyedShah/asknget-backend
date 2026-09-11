@@ -1,0 +1,236 @@
+{
+  "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
+  "page": "Web UI Design",
+  "version": "2397968989373819673",
+  "lastModified": "2026-09-11T13:50:30Z",
+  "screens": [
+    {
+      "name": "Landing Page",
+      "node_id": "186:4247",
+      "file": "Landing_Page__186-4247.txt",
+      "lines": 186
+    },
+    {
+      "name": "Categories",
+      "node_id": "192:4750",
+      "file": "Categories__192-4750.txt",
+      "lines": 179
+    },
+    {
+      "name": "Product Details - Desc",
+      "node_id": "203:6868",
+      "file": "Product_Details_Desc__203-6868.txt",
+      "lines": 77
+    },
+    {
+      "name": "Product Details - Usage",
+      "node_id": "225:3191",
+      "file": "Product_Details_Usage__225-3191.txt",
+      "lines": 77
+    },
+    {
+      "name": "Product Details - Reviews",
+      "node_id": "225:3505",
+      "file": "Product_Details_Reviews__225-3505.txt",
+      "lines": 126
+    },
+    {
+      "name": "Cart",
+      "node_id": "237:1063",
+      "file": "Cart__237-1063.txt",
+      "lines": 45
+    },
+    {
+      "name": "Track Order",
+      "node_id": "256:5097",
+      "file": "Track_Order__256-5097.txt",
+      "lines": 11
+    },
+    {
+      "name": "My Account - Personal Info",
+      "node_id": "262:5539",
+      "file": "My_Account_Personal_Info__262-5539.txt",
+      "lines": 67
+    },
+    {
+      "name": "My Account - Wishlist",
+      "node_id": "292:8769",
+      "file": "My_Account_Wishlist__292-8769.txt",
+      "lines": 42
+    },
+    {
+      "name": "My Account - Manage Addresses",
+      "node_id": "297:10207",
+      "file": "My_Account_Manage_Addresses__297-10207.txt",
+      "lines": 32
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "311:2993",
+      "file": "My_Account_Payments_Methods__311-2993.txt",
+      "lines": 26
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "312:3402",
+      "file": "My_Account_Payments_Methods__312-3402.txt",
+      "lines": 29
+    },
+    {
+      "name": "About Us",
+      "node_id": "312:4902",
+      "file": "About_Us__312-4902.txt",
+      "lines": 24
+    },
+    {
+      "name": "Contact Us",
+      "node_id": "312:5192",
+      "file": "Contact_Us__312-5192.txt",
+      "lines": 27
+    },
+    {
+      "name": "Signup - Create Account",
+      "node_id": "447:7950",
+      "file": "Signup_Create_Account__447-7950.txt",
+      "lines": 27
+    },
+    {
+      "name": "Email OTP Verification",
+      "node_id": "466:8619",
+      "file": "Email_OTP_Verification__466-8619.txt",
+      "lines": 6
+    },
+    {
+      "name": "Mobile OTP Verification",
+      "node_id": "466:8885",
+      "file": "Mobile_OTP_Verification__466-8885.txt",
+      "lines": 6
+    },
+    {
+      "name": "Basic Informtaion",
+      "node_id": "467:8904",
+      "file": "Basic_Informtaion__467-8904.txt",
+      "lines": 63
+    },
+    {
+      "name": "Business  Informtaion",
+      "node_id": "474:6463",
+      "file": "Business_Informtaion__474-6463.txt",
+      "lines": 76
+    },
+    {
+      "name": "Representative",
+      "node_id": "482:6727",
+      "file": "Representative__482-6727.txt",
+      "lines": 50
+    },
+    {
+      "name": "Banking Info",
+      "node_id": "482:6910",
+      "file": "Banking_Info__482-6910.txt",
+      "lines": 50
+    },
+    {
+      "name": "Review & Submit",
+      "node_id": "482:7047",
+      "file": "Review_Submit__482-7047.txt",
+      "lines": 49
+    },
+    {
+      "name": "Application Submitted",
+      "node_id": "491:7302",
+      "file": "Application_Submitted__491-7302.txt",
+      "lines": 26
+    },
+    {
+      "name": "Application Approved",
+      "node_id": "519:7432",
+      "file": "Application_Approved__519-7432.txt",
+      "lines": 23
+    },
+    {
+      "name": "Activate  Account",
+      "node_id": "519:7681",
+      "file": "Activate_Account__519-7681.txt",
+      "lines": 13
+    },
+    {
+      "name": "Application Status",
+      "node_id": "497:6677",
+      "file": "Application_Status__497-6677.txt",
+      "lines": 34
+    },
+    {
+      "name": "More Info Required",
+      "node_id": "506:6921",
+      "file": "More_Info_Required__506-6921.txt",
+      "lines": 25
+    },
+    {
+      "name": "Update Application",
+      "node_id": "515:7161",
+      "file": "Update_Application__515-7161.txt",
+      "lines": 33
+    },
+    {
+      "name": "Activate Seller Account",
+      "node_id": "519:7537",
+      "file": "Activate_Seller_Account__519-7537.txt",
+      "lines": 17
+    },
+    {
+      "name": "Add New Address Popup",
+      "node_id": "302:11047",
+      "file": "Add_New_Address_Popup__302-11047.txt",
+      "lines": 31
+    },
+    {
+      "name": "Add New Card Popup",
+      "node_id": "312:4671",
+      "file": "Add_New_Card_Popup__312-4671.txt",
+      "lines": 22
+    },
+    {
+      "name": "My Account - My Orders",
+      "node_id": "267:6566",
+      "file": "My_Account_My_Orders__267-6566.txt",
+      "lines": 61
+    },
+    {
+      "name": "My Account - Ongoing Orders",
+      "node_id": "284:7470",
+      "file": "My_Account_Ongoing_Orders__284-7470.txt",
+      "lines": 45
+    },
+    {
+      "name": "My Account - Completed Orders",
+      "node_id": "284:7773",
+      "file": "My_Account_Completed_Orders__284-7773.txt",
+      "lines": 37
+    },
+    {
+      "name": "My Account - Cancelled Orders",
+      "node_id": "284:8096",
+      "file": "My_Account_Cancelled_Orders__284-8096.txt",
+      "lines": 37
+    },
+    {
+      "name": "Checkout",
+      "node_id": "244:3220",
+      "file": "Checkout__244-3220.txt",
+      "lines": 70
+    },
+    {
+      "name": "Order Placed",
+      "node_id": "256:5077",
+      "file": "Order_Placed__256-5077.txt",
+      "lines": 7
+    },
+    {
+      "name": "Logout Popup",
+      "node_id": "312:4875",
+      "file": "Logout_Popup__312-4875.txt",
+      "lines": 7
+    }
+  ]
+}

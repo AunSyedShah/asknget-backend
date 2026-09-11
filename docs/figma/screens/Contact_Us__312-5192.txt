@@ -1,0 +1,27 @@
+[Contact Us]
+  [I:Button | State=Default]
+    T: Submit
+  [I:Input Fields | Property 1=Icon Input]
+    T: Select Subject
+      T: Select
+  [I:Input Fields | Property 1=Icon Input]
+    T: Your Query
+      T: Write here...
+  [I:Input Fields | Property 1=Default]
+    T: First Name
+      T: John
+  [I:Input Fields | Property 1=Default]
+    T: Phone
+      T: +92 300 1234567
+  [I:Input Fields | Property 1=Default]
+    T: Last Name
+      T: Ali
+  [I:Input Fields | Property 1=Default]
+    T: Email
+      T: john.ali@gmail.com
+  T: Send a Message
+    [Socials]
+        T: (+92)  300 -1234567
+        T: info.classyshop@gmail.com
+    T: Contact Info
+    T: Say something to start live chat.

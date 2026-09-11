@@ -1,0 +1,13 @@
+[Activate  Account]
+    T: Seller Portal
+    [I:Button | State=Default]
+      T: Go to Seller Dashboard
+          T: Your Seller Account Is Active
+          T: Welcome to asknget. Your seller account is now active and ready for business.
+                  T: Add Your Product
+                  T: Start building your catalogue.
+                  T: Setup Delivery
+                  T: Configure how your orders are shipped.
+                  T: Complete Profile
+                  T: Add your store information.
+          T: Quick Start

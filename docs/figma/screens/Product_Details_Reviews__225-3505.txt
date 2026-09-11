@@ -1,0 +1,126 @@
+[Product Details - Reviews]
+  [Product Image]
+  [Produvt Details]
+    T: Beauty
+    [Product Name]
+      T: NARS BB Cream
+        T: In Stock
+    [Price]
+      T: $25. 99
+      T: $40.99
+    T: Lightweight, buildable coverage that helps even the appearance of skin tone while creating a smooth, natural looking finish.
+    [Rating]
+      T: 4.9  | 320 Reviews
+    [Size]
+      T: Select Size
+          T: 15 ml
+          T: 30 ml
+          T: 50 ml
+          T: 75 ml
+    [Shade]
+      T: Choose your shade
+          T: Ivory
+          T: Natural
+          T: Caramel
+          T: Deep Honey
+    [Quantity]
+      T: Quanity
+      [Quantity Selector\]
+          T: 1
+      [I:Button | State=Default]
+        T: Add to Cart
+      [I:Button | State=Secondary]
+        T: Buy Now
+      [Wishlist]
+  [I:Product Details Tabs | State=Reviews]
+      T: Description
+      T: How to Use
+      T: Reviews
+  [Rating]
+      T: 4.9 out of 5
+      [Stars]
+      T: ( 205 Reviews )
+        T: 5   Star
+        T: 4   Star
+        T: 3   Star
+        T: 2   Star
+        T: 1   Star
+  [Reviews List]
+      T: Reviews List
+      [Sort by]
+        T: Sort by :    New
+      [Review - 1]
+        [Review - 1]
+                T: Ayesha K.
+                T: Verified Purchase
+            T: 1 hour ago
+            T: Really comfortable to wear throughout the day and easy to blend. I would love to see even more shade options, but the formula works beautifully for my everyday routine.
+            [Ratings]
+              [Stars]
+              T: 4.9
+      [Review - 2]
+        [Review - 1]
+                T: Ayesha K.
+                T: Verified Purchase
+            T: 1 hour ago
+            T: The finish is beautiful and natural. I usually don't like heavy base products, and this gives me a fresh look while still covering small imperfections. It blends smoothly into my skin and keeps my makeup looking fresh and comfortable throughout the day.
+            [Ratings]
+              [Stars]
+              T: 4.9
+      [Review - 3]
+        [Review - 1]
+                T: Ayesha K.
+                T: Verified Purchase
+            T: 1 hour ago
+            T: Lightweight and incredibly easy to blend. It evens out my skin tone beautifully while giving a fresh, natural finish that doesn't feel heavy throughout the day.
+            [Ratings]
+              [Stars]
+              T: 4.9
+  [Add Review]
+      T: Add your review
+      T: Your  email address will not be piublished. Required fields are marked*
+      [Name]
+        T: Name *
+          T: Ex. Sarah Mitchell
+      [Email]
+        T: Email *
+          T: example@gmail.com
+    [Review]
+      T: Add your detailed review *
+        T: Write here...
+    [Rating]
+      T: Your rating *
+      [Stars]
+    [Image Upload]
+      T: Photo / Video  ( Optional )
+            T: Drag a photo or video
+            T: Browse
+  [I:Button | State=Default]
+    T: Submit Review
+  [Other Products]
+    T: You may also like
+      [I:Other Products | State=Chocolate Balls]
+          T: Food
+            T: $ 75.12
+            T: $ 95.12
+            T: Chocolate Balls
+      [I:Other Products | State=Pink Bear]
+          T: Essentials
+            T: $ 75.12
+            T: $ 95.12
+            T: Pink Bear
+      [I:Other Products | State=Bag]
+          T: Bag
+            T: $ 75.12
+            T: $ 95.12
+            T: Dior Bag
+      [I:Other Products | State=White Bear]
+          T: Essentials
+            T: $ 75.12
+            T: $ 95.12
+            T: Teddy Bear
+      [I:Other Products | State=Nails]
+          T: Beauty
+            T: $ 75.12
+            T: $ 95.12
+            T: Acrylic Nails

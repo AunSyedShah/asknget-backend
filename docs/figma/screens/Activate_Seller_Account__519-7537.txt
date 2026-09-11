@@ -1,0 +1,17 @@
+[Activate Seller Account]
+    T: Seller Portal
+  [Back Arrow]
+    T: Back
+    T: Activate Your Seller Account
+    T: You're almost ready to start selling on asknget.
+  [I:Button | State=Default]
+    T: Activate & Start Selling
+          [I:Input Fields | Property 1=Default]
+            T: Store Display Name
+              T: Huda Beauty
+          [I:Input Fields | Property 1=Default]
+            T: Store URL
+              T: asknget.com/store/huda-beauty
+    T: Store Setup
+      T: I agree to the asknget Seller Agreement and marketplace policies.
+      T: I confirm that my business information remains accurate and up to date.

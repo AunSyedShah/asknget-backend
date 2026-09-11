@@ -1,0 +1,23 @@
+[Application Approved]
+          T: Application ID
+          T: ASK-SLR-004821
+          T: Store Name
+          T: Huda Beauty
+          T: Application Status
+          T: Approved
+        T: You're Approved!
+        T: Congratulations! Your seller application has been approved. / Your account is ready to be activated.
+    T: Next Steps
+        T: Complete your seller profile
+          T: 1
+        T: Add your first products
+          T: 2
+        T: Set up inventory
+          T: 3
+        T: Configure delivery
+          T: 4
+        T: Start receiving orders
+          T: 5
+  [I:Button | State=Default]
+    T: Activate Seller Account
+    T: Seller Portal

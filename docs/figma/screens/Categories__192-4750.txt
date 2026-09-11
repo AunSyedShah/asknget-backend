@@ -1,0 +1,179 @@
+[Categories]
+      [I:Featured 1 | State=Sports]
+          T: Sports
+            T: $ 95.12
+            T: Christian Dior Bag
+      [I:Featured 2 | State=Shoes]
+        [I:Best Sellers | State=State11]
+          T: 40% Off
+          T: Shoes
+            T: $ 95.12
+            T: Jimmy Choo Heels
+      [I:Featured 3 | State=Makeup]
+          T: Makeup
+            T: $ 95.12
+            T: NARS BB Cream
+      [I:Featured 4 | State=Accessories]
+          T: Accessories
+            T: $ 95.12
+            T: Black Earbuds
+      [I:Best Sellers | State=Crockery]
+          T: Crockery
+            T: $ 120.12
+            T: $ 145.12
+            T: Golden Teapot
+      [I:Best Sellers | State=Led Console]
+          T: Electronics
+            T: $ 75.12
+            T: $ 85.12
+            T: LED Console
+      [I:Best Sellers | State=Selfie Stick]
+          T: Digital Accessories
+            T: $ 45.12
+            T: $ 55.12
+            T: Selfie Stick
+      [I:Best Sellers | State=Perfume]
+        [I:Best Sellers | State=State11]
+          T: 40% Off
+          T: Beauty
+            T: $ 92.12
+            T: $ 99.12
+            T: Coco Chanel Perfume
+      [I:Categories | State=Jewellery]
+          T: Jewellery
+            T: $ 75.12
+            T: $ 95.12
+            T: Silver Jewellery
+      [I:Categories | State=Bags]
+          T: Bags
+            T: $ 95.12
+            T: Christian Dior Bag
+      [I:Categories | State=Home & Lidestyle]
+          T: Home & Lifestyle
+            T: $ 95.12
+            T: Dinning Table
+      [I:Categories | State=Accessories]
+          T: Accessories
+            T: $ 95.12
+            T: Black Earbuds
+  [Filters]
+    T: Filters Options
+    [Categories]
+      T: Categories
+          T: All
+          T: 800 items
+          T: Fashion
+          T: 128 items
+          T: Electronics
+          T: 90 items
+          T: Crockery
+          T: 45 items
+          T: Jewellery
+          T: 120 items
+          T: Beauty
+          T: 50 items
+          T: Sports
+          T: 120 items
+          T: Mobile Accessories
+          T: 89
+          T: Digital Accessories
+          T: 90
+    [Price Range]
+      T: Price Range
+        T: $45.00 - $150.00
+        [Indicator]
+    [Colors]
+      T: Colors
+          T: Green
+          T: Cream
+          T: Black
+          T: Red
+          T: Yellow
+          T: Orange
+    [Brands]
+      T: Brands
+          T: ZARA
+          T: NARS
+          T: Philips
+          T: Luminarc
+          T: Michael Kors
+          T: L'Oréal Paris
+          T: Sports
+          T: Samsung
+    [Availability]
+      T: Availibility
+          T: In Stock
+          [mingcute:checkbox-fill]
+          T: Out of Stock
+  [Search bar]
+      T: Search Products
+      [Icon]
+  [Sory by + No Showing on screen]
+    T: Showing 1 - 12 0f 120 results
+    [Sort by]
+      T: Sort by :    New
+  [Pagination]
+    [I:Pagination | State=pagination control (Back)]
+      T: Back
+    [I:Pagination | State=Default 1]
+      T: 1
+    [I:Pagination | State=Default 2]
+      T: 2
+    [I:Pagination | State=Default 3]
+      T: 3
+    [I:Pagination | State=Default 4]
+      T: 4
+    [I:Pagination | State=Default 5]
+      T: 5
+    [I:Pagination | State=pagination control (Next)]
+      T: Next
+  [I:Category Items | State=Sports]
+      T: Sports
+        T: $ 95.12
+        T: Christian Dior Bag
+  [I:Category Items | State=Shoes]
+    [I:Best Sellers | State=State11]
+      T: 40% Off
+      T: Shoes
+        T: $ 95.12
+        T: Jimmy Choo Heels
+  [I:Category Items | State=Makeup]
+      T: Makeup
+        T: $ 95.12
+        T: NARS BB Cream
+  [I:Category Items | State=Jewellery]
+      T: Jewellery
+        T: $ 95.12
+        T: Silver Jewellery
+  [I:Category Items | State=Accessories]
+      T: Accessories
+        T: $ 95.12
+        T: Black Earbuds
+  [I:Category Items | State=Table]
+      T: Home & Lifestyle
+        T: $ 95.12
+        T: Dinning Table
+  [I:Category Items | State=Electronics]
+      T: Electronics
+        T: $ 95.12
+        T: LED Console
+  [I:Category Items | State=Bag]
+      T: Bags
+        T: $ 95.12
+        T: Christian Dior Bag
+  [I:Category Items | State=Selfie Stick]
+      T: Accessories
+        T: $ 95.12
+        T: Selfie Stick
+  [I:Category Items | State=Perfume]
+      T: Beauty
+        T: $ 95.12
+        T: Chanel Perfume
+  [I:Category Items | State=Chocolate Balls]
+      T: Food
+        T: $ 95.12
+        T: Chocolate Balls
+  [I:Category Items | State=Crockery]
+      T: Crockery
+        T: $ 95.12
+        T: Golden Teapot

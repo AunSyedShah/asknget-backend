@@ -1,0 +1,6 @@
+[Mobile OTP Verification]
+        T: Verify Your Mobile Number
+        T: Enter the 6-digit code sent to your mobile number.
+        T: Didn't receive the code? Resend code in 00:45
+      [I:Button | State=Default]
+        T: Verify Number

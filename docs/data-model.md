@@ -3,6 +3,8 @@
 Source: Figma file `dAGMv3hUJXkyW4QmJPw20Q` ("asknget"), page **Web UI Design**, 38 screens, last modified 2026-09-11.
 Status: **v0.1 draft** — derived purely from the design. Items marked ❓ are open questions for the team lead (collected in §10).
 
+> **Design drift:** the Figma changes often (8 revisions on 2026-09-11 alone). Before planning or implementing against any screen, run `python docs/figma/snapshot.py --check`; if it reports a change, re-snapshot and `git diff docs/figma/` to see exactly which labels/fields/flows moved, then update this document. Treat the design as a hypothesis — flag inconsistencies rather than encoding them.
+
 asknget is a **multi-vendor marketplace**: a buyer storefront (catalog → cart → checkout → orders) plus a **seller onboarding / KYC application flow** (5-step registration → review → approval → store activation). No admin or seller-dashboard screens exist in the design yet, so those are only sketched where the buyer/seller screens imply them.
 
 ---

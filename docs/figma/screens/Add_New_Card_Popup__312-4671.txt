@@ -1,0 +1,22 @@
+[I:Add New Card Popup]
+    [I:Button | State=Default]
+      T: Add Card
+    [I:Button | State=TErtiory Button]
+      T: Cancel
+    T: Card Type
+        T: VISA
+        T: Mastercard
+        T: Other
+    T: Set as default payment method
+  [I:Input Fields | Property 1=Default]
+    T: Card Holder Name *
+      T: John Ali
+  [I:Input Fields | Property 1=Default]
+    T: Card Number *
+      T: 123 456 789 1920
+  [I:Input Fields | Property 1=Icon Input]
+    T: Expiry Date
+      T: 08/26
+  [I:Input Fields | Property 1=Default]
+    T: CVV *
+      T: 123

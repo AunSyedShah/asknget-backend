@@ -1,0 +1,11 @@
+[Track Order]
+      [I:Input Fields | Property 1=Default]
+        T: Enter Order ID
+          T: Find in your order confirmation mail
+      [I:Input Fields | Property 1=Default]
+        T: Email Address
+          T: Enter email you used during checkout
+      [I:Button | State=Default]
+        T: Track Order
+      T: DO YOU NEED HELP?
+      T: Call us + (92) 300 1234567 or drop us a message at info@classyshop.com

@@ -1,0 +1,25 @@
+[More Info Required]
+    T: Seller Portal
+  [Back Arrow]
+    T: Back
+    T: Seller Application
+    T: Application ID: ASK-SLR-004821
+        T: Your application needs additional information before  we can complete the verification process.
+        T: We Need More Information
+        T: Action Required
+        T: Please upload a clearer copy of your company registration document and update your business address.
+        T: Reviewer Message
+  [I:Button | State=Default]
+    T: Update & Resubmit
+        T: Required Updates
+        T: Edit
+          [I:Button | State=Secondary]
+            T: Replace Document
+              T: Current Document: company-registration.pdf
+              T: Company Registration Document
+              T: 1
+          [I:Button | State=Secondary]
+            T: Update Address
+              T: Your business address needs to be updated
+              T: Business Address
+              T: 2

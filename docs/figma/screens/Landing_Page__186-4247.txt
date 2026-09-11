@@ -1,0 +1,186 @@
+[Landing Page]
+  [Banner]
+    [Indicator]
+        T: New Collection 2026
+          T: Carry What Matters
+          T: Thoughtfully designed bags made for everyday movement, wherever the day takes you.
+        [I:Button | State=Default]
+          T: Shop Now
+  [Shopping Benefits]
+      [Delivery]
+        [I:Shopping Benefits | Hover State=Order]
+          T: Free International Delivery
+          T: Enjoy free delivery on qualifying orders,  straight to your doorstep with ease.
+      [Return]
+        [I:Shopping Benefits | Hover State=Return]
+          T: Easy Returns
+          T: Changed your mind? No worries.  Return eligible items within 30 days.
+      [Payments]
+        [I:Shopping Benefits | Hover State=Payment]
+          T: Secure Payments
+          T: Shop with confidence using secure payment options, with your information safely protected.
+      [Order Track]
+        [I:Shopping Benefits | Hover State=Order Track]
+          T: Order Tracking
+          T: Stay updated at every step of your order, from dispatch to delivery.
+      [Support]
+        [I:Shopping Benefits | Hover State=Support]
+          T: 24/7 Customer Support
+          T: Need help with your order or account?  Our support team is here whenever you need us.
+  [Newsletter]
+        T: Stay In the Loop
+          T: Get the good stuff first
+          T: New arrivals, exclusive offers, seasonal edits and more curated for you, delivered straight to your inbox.
+      [I:Input placeholder | State=Default]
+        [I:Button | State=Default]
+          T: Subscribe Now
+        T: Enter Your Email
+  [Featured Products]
+    [Featured]
+      T: Featured Products
+        T: View All
+      [I:Featured 1 | State=Sports]
+          T: Sports
+            T: $ 95.12
+            T: Christian Dior Bag
+      [I:Featured 2 | State=Shoes]
+        [I:Best Sellers | State=State11]
+          T: 40% Off
+          T: Shoes
+            T: $ 95.12
+            T: Jimmy Choo Heels
+      [I:Featured 3 | State=Makeup]
+          T: Makeup
+            T: $ 95.12
+            T: NARS BB Cream
+      [I:Featured 4 | State=Jewellery]
+          T: Jewellery
+            T: $ 95.12
+            T: Silver Jewellery
+      [I:Featured 5 | State=Accessories]
+          T: Accessories
+            T: $ 95.12
+            T: Black Earbuds
+  [Top Discounted]
+    [Featured]
+      T: Top Discounted
+        T: View All
+      [Banner - 01]
+            T: TECH ESSENTIALS
+            T: Upgrade your everyday
+            T: Smart accessories designed to keep your everyday connected.
+            T: UP TO 50% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Tech
+      [Banner -02]
+            T: HOME EDIT
+            T: Make every moment beautiful
+            T: Discover stylish crockery, kitchen essentials and pieces made for everyday living.
+            T: UP TO 30% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Home
+      [Banner - 03]
+          T: NEW SEASON
+          T: Refresh your everyday style
+          T: From effortless essentials to statement pieces, find your next favourite look.
+          T: UP TO 30% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Fashion
+      [Banner - 4]
+          T: Beauty Edit
+          T: Your routine, reimagined
+          T: Discover skincare, makeup and beauty essentials for every kind of day.
+          T: UP TO 35% OFF
+          [I:Tertiory Button | State=Default]
+            T: Explore Beauty
+  [Top Discounted]
+    [Featured]
+      T: Top Discounted
+        T: View All
+      [Banner - 01]
+            T: TECH ESSENTIALS
+            T: Upgrade your everyday
+            T: Smart accessories designed to keep your everyday connected.
+            T: UP TO 50% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Tech
+      [Banner -02]
+            T: HOME EDIT
+            T: Make every moment beautiful
+            T: Discover stylish crockery, kitchen essentials and pieces made for everyday living.
+            T: UP TO 30% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Home
+      [Banner - 03]
+          T: NEW SEASON
+          T: Refresh your everyday style
+          T: From effortless essentials to statement pieces, find your next favourite look.
+          T: UP TO 30% OFF
+          [I:Tertiory Button | State=Default]
+            T: Shop Fashion
+      [Banner - 4]
+          T: Beauty Edit
+          T: Your routine, reimagined
+          T: Discover skincare, makeup and beauty essentials for every kind of day.
+          T: UP TO 35% OFF
+          [I:Tertiory Button | State=Default]
+            T: Explore Beauty
+  [Best sellers]
+    [Featured]
+      T: Best Sellers
+        T: View All
+      [I:Best Sellers | State=Horlicks]
+          T: Food
+            T: $ 95.12
+            T: Horlicks
+      [I:Best Sellers | State=Teddy Bear]
+          T: Essentials
+            T: $ 95.12
+            T: White Teddy Bear
+      [I:Best Sellers | State=Bag]
+          T: Bags
+            T: $ 95.12
+            T: Dior Bag
+      [I:Best Sellers | State=Chocolate Balls]
+          T: Food
+            T: $ 95.12
+            T: Chocolate
+      [I:Best Sellers | State=Dairy Milk]
+          T: Food
+            T: $ 95.12
+            T: Dairy Milk
+  [New Arrived]
+    [Featured]
+      T: New Arrived
+        T: View All
+      [I:New Arrived | State=Lapstick]
+          T: Makeup
+            T: $ 95.12
+            T: CHANEL Lipstick
+      [I:New Arrived | State=Acrylic Nails]
+          T: Makeup
+            T: $ 95.12
+            T: Acrylic Nails
+      [I:New Arrived | State=Mascara]
+          T: Makeup
+            T: $ 95.12
+            T: NARS Climax Mascara
+      [I:New Arrived | State=Chocolate Balls]
+          T: Food
+            T: $ 95.12
+            T: Chocolate Balls
+      [I:New Arrived | State=Nailpaint]
+          T: Makeup
+            T: $ 95.12
+            T: CHANEL Nail Paint
+    [Featured]
+      T: Shop by Categories
+        T: View All
+        T: Beauty
+        T: Fashion
+        T: Sports
+        T: Food
+        T: Crockery
+        T: Electronics
+        T: Jewellery
+        T: Accessories

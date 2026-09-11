@@ -1,0 +1,7 @@
+[I:Logout Popup]
+    T: Are you sure you want to logout?
+    T: You will need to login again to access your account
+    [I:Button | State=Default]
+      T: Logout
+    [I:Button | State=TErtiory Button]
+      T: Cancel

@@ -1,0 +1,26 @@
+[My Account - Payments Methods]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Default]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Active]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+  [I:Button | State=Default]
+    T: Add New Card
+    T: Payment Methods
+    T: Manage your saved payments methods
+        T: VISA ....2389
+        T: Expires 08/26
+        T: Mastercard ....2345
+        T: Expires 08/26
+        T: Paypal....2930
+        T: Expires 08/26

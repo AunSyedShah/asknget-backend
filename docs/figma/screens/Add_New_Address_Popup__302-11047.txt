@@ -1,0 +1,31 @@
+[I:Add New Address Popup]
+    [I:Button | State=Default]
+      T: Save Address
+    [I:Button | State=TErtiory Button]
+      T: Cancel
+  [I:Input Fields | Property 1=Default]
+    T: Delivery Instructions *
+      T: Call before delivery...
+    T: Address Type
+        T: Home
+        T: Office
+        T: Other
+    T: Set as default address
+  [I:Input Fields | Property 1=Default]
+    T: Full Name *
+      T: John Ali
+  [I:Input Fields | Property 1=Default]
+    T: Phone *
+      T: +92 300 1234567
+  [I:Input Fields | Property 1=Default]
+    T: Street Address *
+      T: 24 Garden Avenue
+  [I:Input Fields | Property 1=Default]
+    T: Unit /Floor (optional)
+      T: e.g. 4th floor, Unit A
+  [I:Input Fields | Property 1=Icon Input]
+    T: City
+      T: Lahore
+  [I:Input Fields | Property 1=Default]
+    T: Postal Code *
+      T: 54003

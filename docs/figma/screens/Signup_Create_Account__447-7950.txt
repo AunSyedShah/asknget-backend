@@ -1,0 +1,27 @@
+[Signup - Create Account]
+        T: Create your seller account
+        T: Start selling on asknget and reach customers across multiple shopping categories.
+        T: Account Type
+                T: Individual
+                T: Sell as an individual seller.
+                T: Sole Proprietor
+                T: Sell as a personally owned business.
+                T: Registered Company
+                T: Sell on behalf of a registered business.
+        T: Account Information
+              [I:Input Fields | Property 1=Default]
+                T: Mobile Number
+                  T: Enter your mobile number
+              [I:Input Fields | Property 1=Default]
+                T: Email Address
+                  T: Enter your email
+              [I:Input Fields | Property 1=Default]
+                T: Password
+                  T: Enter your password
+              [I:Input Fields | Property 1=Default]
+                T: Confirm Password
+                  T: Confirm your password
+            T: I agree to the asknget Seller Terms & Conditions and Privacy Policy.
+      [I:Button | State=Default]
+        T: Continue
+      T: Already have a seller account? Sign In

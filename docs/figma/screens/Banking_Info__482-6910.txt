@@ -1,0 +1,50 @@
+[Banking Info]
+    T: Seller Registration
+    T: Complete your details to start selling on asknget.
+  [Stepper]
+    [I:Stepper | State=Review Default]
+        T: 5
+      T: Review
+    [I:Stepper | State=Banking Active]
+        T: 4
+      T: Banking
+    [I:Stepper | State=Representatiove Tick]
+      T: Representative
+    [I:Stepper | State=Business Tick]
+      T: Business Info
+    [I:Stepper | State=Basic Info tick]
+      T: Basic Info
+  [I:Input Fields | Property 1=Default]
+    T: Account Number
+      T: Enter account numbaer
+  [I:Input Fields | Property 1=Default]
+    T: Branch Code
+      T: Enter branch code
+  [I:Input Fields | Property 1=Default]
+    T: Tax Reference Number (optional)
+      T: Enter tax reference number
+    T: Set up your payout account
+    T: Add the bank account where your asknget seller payments will go
+  [I:Input Fields | Property 1=Default]
+    T: Account Holder Name
+      T: Enter account holder name
+  [I:Input Fields | Property 1=Icon Input]
+    T: Account Type
+      T: Select account type
+  [I:Input Fields | Property 1=Icon Input]
+    T: Bank Name
+      T: Select your bank
+  [I:Button | State=TErtiory Button]
+    T: Back
+  [I:Button | State=Default]
+    T: Save & Continue
+      T: Bank Confirmation Document
+      T: Enter your personal details to create your verified seller profile
+      T: Upload a bank confirmation letter or stamped bank statement
+            T: + Upload Document
+          T: PDF, JPG or PNG · Max 10 MB
+      T: Proof of Business / Residential Address
+      T: Upload a valid proof of address
+      T: + Upload Document
+      T: Your banking information is securely handled and used for verification and seller payouts.
+    T: Seller Portal

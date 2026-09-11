@@ -1,0 +1,50 @@
+[Representative]
+    T: Seller Registration
+    T: Complete your details to start selling on asknget.
+  [Stepper]
+    [I:Stepper | State=Review Default]
+        T: 5
+      T: Review
+    [I:Stepper | State=Banking Default]
+        T: 4
+      T: Banking
+    [I:Stepper | State=Representative Active]
+        T: 3
+      T: Representative
+    [I:Stepper | State=Business Tick]
+      T: Business Info
+    [I:Stepper | State=Basic Info tick]
+      T: Basic Info
+  [I:Input Fields | Property 1=Default]
+    T: ID / Passport Number
+      T: Enter ID / passport number
+  [I:Input Fields | Property 1=Default]
+    T: Mobile Number
+      T: Enter mobile number
+  [I:Input Fields | Property 1=Default]
+    T: Email Address
+      T: Enter email address
+    T: Who represents your business?
+    T: Provide the details of the person responsible for this account.
+  [I:Input Fields | Property 1=Default]
+    T: Last Name
+      T: Enter last name
+  [I:Input Fields | Property 1=Default]
+    T: First Name
+      T: Enter first nname
+  [I:Input Fields | Property 1=Icon Input]
+    T: Role / Designation
+      T: Select role
+  [I:Button | State=TErtiory Button]
+    T: Back
+  [I:Button | State=Default]
+    T: Save & Continue
+      T: Company Verification
+      T: Enter your personal details to create your verified seller profile
+      T: Upload your official company registration document.
+            T: + Upload Document
+          T: PDF, JPG or PNG · Max 10 MB
+      T: Additional Directors (if any)
+      T: Do you need to add another director?
+      T: + Add Another Director
+    T: Seller Portal

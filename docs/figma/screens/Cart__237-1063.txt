@@ -1,0 +1,45 @@
+[Cart]
+    [Rows]
+          T: NARS BB Cream
+          T: $25.99
+          [Quantity Selector\]
+              T: 1
+          T: Black Earbuds
+          T: $12.99
+          [Quantity Selector\]
+              T: 1
+          T: Selfie Stick
+          T: $18.99
+          [Quantity Selector\]
+              T: 1
+          T: Apple Watch
+          T: $49.99
+          [Quantity Selector\]
+              T: 1
+  [Order Note]
+    [Order Notes]
+      T: Order Notes (Optional)
+        T: Note about your order. e.g special notes for delivery
+    [Discount Voucher]
+      [I:Button | State=Default]
+        T: Apply
+        T: Discount Voucher
+  [I:Button | State=Secondary]
+    T: Continue Shopping
+  [I:Button | State=Default]
+    T: Proceed to Checkout
+    T: Order Summary
+            T: NARS BB Cream
+          T: $25.99
+            T: Black Earbuds
+          T: $12.99
+            T: Selfie Stick
+          T: $18.99
+            T: Apple Watch
+          T: $49.99
+        T: Shipping Cost
+        T: $ 10.99
+        T: Discount (20%)
+        T: -$20.00
+            T: Total
+            T: $111.94

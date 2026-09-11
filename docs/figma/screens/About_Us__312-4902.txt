@@ -1,0 +1,24 @@
+[About Us]
+  [Shopping Benefits]
+      [Delivery]
+        [I:Shopping Benefits | Hover State=Order]
+          T: Free International Delivery
+          T: Enjoy free delivery on qualifying orders,  straight to your doorstep with ease.
+      [Return]
+        [I:Shopping Benefits | Hover State=Return]
+          T: Easy Returns
+          T: Changed your mind? No worries.  Return eligible items within 30 days.
+      [Payments]
+        [I:Shopping Benefits | Hover State=Payment]
+          T: Secure Payments
+          T: Shop with confidence using secure payment options, with your information safely protected.
+      [Order Track]
+        [I:Shopping Benefits | Hover State=Order Track]
+          T: Order Tracking
+          T: Stay updated at every step of your order, from dispatch to delivery.
+      [Support]
+        [I:Shopping Benefits | Hover State=Support]
+          T: 24/7 Customer Support
+          T: Need help with your order or account?  Our support team is here whenever you need us.
+    T: About Us
+    T: Lorem ipsum, or lipsum as it is sometimes known, is dummy text used in laying out print, graphic or web designs. The passage is attributed to Letraset, a popular manufacturer of dry transfer sheets for text and other design elements. / Lorem ipsum, or lipsum as it is sometimes known, is dummy text used in laying out print, graphic or web designs. The passage is attributed to Letraset, a popular manufacturer of dry transfer sheets for text and other design elements. / Lorem ipsum, or lipsum as it is sometimes known, is dummy text used in laying out print, graphic or web designs. The passage is attributed to Letraset, a popular manufacturer of dry transfer sheets for text and other design elements.

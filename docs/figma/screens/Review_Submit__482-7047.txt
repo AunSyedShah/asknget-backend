@@ -1,0 +1,49 @@
+[Review & Submit]
+    T: Seller Registration
+    T: Complete your details to start selling on asknget.
+  [Stepper]
+    [I:Stepper | State=Review Active]
+        T: 5
+      T: Review
+    [I:Stepper | State=Banking Tick]
+      T: Banking
+    [I:Stepper | State=Representatiove Tick]
+      T: Representative
+    [I:Stepper | State=Business Tick]
+      T: Business Info
+    [I:Stepper | State=Basic Info tick]
+      T: Basic Info
+  [I:Button | State=TErtiory Button]
+    T: Back
+  [I:Button | State=Default]
+    T: Submit
+        T: Personal Information
+        T: Edit
+        T: Name: Ahmad Khan
+        T: Email: ahmad.khan@gmail.com
+        T: Phone: +(92) 300 123 456 789
+        T: Authorized Representative
+        T: Edit
+        T: Name: Ahmad Khan . Director
+        T: Email: ahmad.khan@gmail.com
+        T: Phone: +(92) 300 123 456 789
+        T: Banking Information
+        T: Edit
+        T: Bank: Meezan Bank
+        T: Account: Business Account
+        T: Account Number: .xxxx 1234
+        T: Uploaded Documents
+            T: ID / Passport
+            T: Company Registration
+            T: Bank Confirmation
+            T: Proof of Address
+      T: Edit
+        T: Business Information
+        T: Edit
+        T: Store: Huda Beauty
+        T: Business: Huda Beauty
+        T: Type: Registered Company
+        T: Categories: Fashion - Beauty - Accessories
+      T: I confirm that the information provided is accurate and complete.
+      T: I agree to the asknget Seller Terms & Conditions and Privacy Policy.
+    T: Seller Portal

@@ -1,0 +1,70 @@
+[Checkout]
+  T: Billing Details
+  T: Contact Info
+  T: Delivery Address
+  [I:Input Fields | Property 1=Icon Input]
+    T: City
+      T: Lahore
+  [I:Input Fields | Property 1=Icon Input]
+    T: Postal Code
+      T: 45009
+  [I:Input Fields | Property 1=Default]
+    T: First Name
+      T: John
+  [I:Input Fields | Property 1=Default]
+    T: Email
+      T: john.ali@gmail.com
+  [I:Input Fields | Property 1=Default]
+    T: Phone
+      T: + (92) 300 - 1234567
+  [I:Input Fields | Property 1=Default]
+    T: Delivery Address
+      T: 123, Main Street Chicago, 6060 United States
+  [I:Input Fields | Property 1=Default]
+    T: Special Note (Optional)
+      T: Write here...
+  [I:Input Fields | Property 1=Default]
+    T: Last Name
+      T: Ali
+  [I:Button | State=Default]
+    T: Place Order
+    T: Ship to a different address
+  T: Payment Method
+  [I:Input Fields | Property 1=Default]
+    T: Name on Card
+      T: John Ali
+  [I:Input Fields | Property 1=Default]
+    T: Expiry Date
+      T: 12/26
+  [I:Input Fields | Property 1=Default]
+    T: Card Number
+      T: 1234567890123
+  [I:Input Fields | Property 1=Default]
+    T: CVV
+      T: 178
+    T: Delivery Type
+          T: Standard Delivery
+          T: 5 - 7 working days
+          T: Express Delivery
+          T: 2 - 3 working days
+      T: Bank Transfer
+      T: Paypal
+      T: Google Pay
+      T: Apple Pay
+      T: Add New Card
+    T: Save card for future checkout
+    T: Order Summary
+            T: NARS BB Cream
+          T: $25.99
+            T: Black Earbuds
+          T: $12.99
+            T: Selfie Stick
+          T: $18.99
+            T: Apple Watch
+          T: $49.99
+        T: Shipping Cost
+        T: $ 10.99
+        T: Discount (20%)
+        T: -$20.00
+            T: Total
+            T: $111.94

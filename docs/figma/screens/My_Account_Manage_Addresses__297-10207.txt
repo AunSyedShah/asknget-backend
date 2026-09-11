@@ -1,0 +1,32 @@
+[My Account - Manage Addresses]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Default]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Active]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+    [I:Button | State=Default]
+      T: Add New Address
+      T: Manage Addresses
+      T: Update your personal information and manage your account details.
+              T: Edit
+              T: Home
+        T: House 27, Park Avenue New York, New York 10024
+              T: Edit
+              T: Office
+        T: House 27, Park Avenue New York, New York 10024
+              T: Edit
+              T: Friend’s House
+        T: House 27, Park Avenue New York, New York 10024
+              T: Edit
+              T: University
+        T: House 27, Park Avenue New York, New York 10024

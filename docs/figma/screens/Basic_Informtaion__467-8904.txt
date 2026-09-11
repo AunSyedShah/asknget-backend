@@ -1,0 +1,63 @@
+[Basic Informtaion]
+    T: Seller Registration
+    T: Complete your details to start selling on asknget.
+  [Stepper]
+    [I:Stepper | State=Review Default]
+        T: 5
+      T: Review
+    [I:Stepper | State=Banking Default]
+        T: 4
+      T: Banking
+    [I:Stepper | State=Representative Default]
+        T: 3
+      T: Representative
+    [I:Stepper | State=Business Info Default]
+        T: 2
+      T: Business Info
+    [I:Stepper | State=Basic Info Active]
+        T: 1
+      T: Basic Info
+    T: Tell us about yourself
+    T: Enter your personal details to create your verified seller profile
+    [I:Input Fields | Property 1=Default]
+      T: Last Name
+        T: Enter last name
+    [I:Input Fields | Property 1=Default]
+      T: Date of Birth
+        T: DD / MM / YYYY
+    [I:Input Fields | Property 1=Default]
+      T: ID / Passport
+        T: Enter ID / passport number
+    [I:Input Fields | Property 1=Default]
+      T: First Name
+        T: Enter first name
+    [I:Input Fields | Property 1=Default]
+      T: Phone Number
+        T: Enter your number
+    [I:Input Fields | Property 1=Default]
+      T: Email
+        T: Enter your email
+      T: Identity Verification
+      T: Enter your personal details to create your verified seller profile
+      T: Upload a clear copy of your identification document
+            T: + Upload Document
+          T: PDF, JPG or PNG · Max 10 MB
+      T: Residential Address
+      T: Enter your personal details to create your verified seller profile
+      [I:Input Fields | Property 1=Default]
+        T: Postal Code
+          T: Enter postal code
+      [I:Input Fields | Property 1=Default]
+        T: Address
+          T: Enter your residential address
+      [I:Input Fields | Property 1=Icon Input]
+        T: City
+          T: Select city
+      [I:Input Fields | Property 1=Icon Input]
+        T: Province
+          T: Select province
+  [I:Button | State=TErtiory Button]
+    T: Back
+  [I:Button | State=Default]
+    T: Save & Continue
+    T: Seller Portal

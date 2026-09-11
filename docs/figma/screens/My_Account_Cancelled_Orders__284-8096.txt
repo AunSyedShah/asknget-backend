@@ -1,0 +1,37 @@
+[My Account - Cancelled Orders]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Active]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+        T: Cancelled
+        T: Order #ORD-00121
+          T: Selfie Stick
+          T: QTY: 1 |  Color: Black
+            T: $18.99
+            T: $25.99
+      [I:Button | State=Default]
+        T: Re-Order
+        T: Cancelled
+        T: Order #ORD-00221
+          T: Dinning Table
+          T: QTY: 1 |  Color: Gray
+            T: $95.99
+            T: $125.99
+      [I:Button | State=Default]
+        T: Re-Order
+  [I:Orders Tabs | State=Cancelled]
+    T: All Orders
+    T: Ongoing
+    T: Completd
+      T: Cancelled

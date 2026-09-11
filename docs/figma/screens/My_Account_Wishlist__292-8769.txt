@@ -1,0 +1,42 @@
+[My Account - Wishlist]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Default]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Active]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+    [I:Wishlist Items | State=Table Default]
+      [Wishlist Items]
+        T: Home & Lifestyle
+          T: $ 75.12
+          T: $ 95.12
+          T: Dining Table
+    [I:Wishlist Items | State=Jewellery Default]
+      [Wishlist Items]
+        T: Jewellery
+          T: $ 75.12
+          T: $ 95.12
+          T: Silver Jewellery
+    [I:Wishlist Items | State=Bag Default]
+      [Wishlist Items]
+        T: Bags
+          T: $ 75.12
+          T: $ 95.12
+          T: Christian Dior Bag
+    [I:Wishlist Items | State=Teapot Default]
+      [Wishlist Items]
+        T: Crockery
+          T: $ 75.12
+          T: $ 95.12
+          T: Golden Teapot
+    T: Wishlist
+    T: Update your personal information and manage your account details.

@@ -1,0 +1,29 @@
+[My Account - Payments Methods]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Default]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Active]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+  [I:Input Fields | Property 1=Default]
+    T: Current Password *
+      T: Enter your password
+  [I:Input Fields | Property 1=Default]
+    T: New Password *
+      T: Enter new password
+  [I:Input Fields | Property 1=Default]
+    T: Confirm Password *
+      T: Confirm your password
+  [I:Button | State=Default]
+    T: Update Password
+    T: Password Manager
+    T: Manage your password and keep your account secure.

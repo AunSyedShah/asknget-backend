@@ -1,0 +1,77 @@
+[Product Details - Desc]
+  [Product Image]
+  [Produvt Details]
+    T: Beauty
+    [Product Name]
+      T: NARS BB Cream
+        T: In Stock
+    [Price]
+      T: $25. 99
+      T: $40.99
+    T: Lightweight, buildable coverage that helps even the appearance of skin tone while creating a smooth, natural looking finish.
+    [Rating]
+      T: 4.9  | 320 Reviews
+    [Size]
+      T: Select Size
+          T: 15 ml
+          T: 30 ml
+          T: 50 ml
+          T: 75 ml
+    [Shade]
+      T: Choose your shade
+          T: Ivory
+          T: Natural
+          T: Caramel
+          T: Deep Honey
+    [Quantity]
+      T: Quanity
+      [Quantity Selector\]
+          T: 1
+      [I:Button | State=Default]
+        T: Add to Cart
+      [I:Button | State=Secondary]
+        T: Buy Now
+      [Wishlist]
+  [I:Product Details Tabs | State=Desc]
+      T: Description
+      T: How to Use
+      T: Reviews
+  [Desc]
+      T: Perfecting BB Cream
+      T: A lightweight BB cream designed to provide natural, buildable coverage while helping create a smooth, even-looking complexion. Its comfortable formula blends effortlessly for a fresh, radiant finish.
+      T: Key Benefits
+          T: Natural Coverage
+          T: Provides light-to-medium, buildable coverage that helps even the appearance of skin tone while keeping your natural complexion visible.
+          T: Lightweight & Comfortable
+          T: The smooth, lightweight texture blends easily and feels comfortable on the skin without a heavy or cakey finish.
+          T: Smooth Finish
+          T: Leaves the complexion looking naturally fresh and radiant, making it ideal for simple everyday makeup looks.
+          T: Buildable Formula
+          T: Start with a thin layer for a sheer look, then add more product to areas where you want additional coverage.
+  [Other Products]
+    T: You may also like
+      [I:Other Products | State=Chocolate Balls]
+          T: Food
+            T: $ 75.12
+            T: $ 95.12
+            T: Chocolate Balls
+      [I:Other Products | State=Pink Bear]
+          T: Essentials
+            T: $ 75.12
+            T: $ 95.12
+            T: Pink Bear
+      [I:Other Products | State=Bag]
+          T: Bag
+            T: $ 75.12
+            T: $ 95.12
+            T: Dior Bag
+      [I:Other Products | State=White Bear]
+          T: Essentials
+            T: $ 75.12
+            T: $ 95.12
+            T: Teddy Bear
+      [I:Other Products | State=Nails]
+          T: Beauty
+            T: $ 75.12
+            T: $ 95.12
+            T: Acrylic Nails

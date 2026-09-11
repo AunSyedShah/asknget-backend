@@ -1,0 +1,33 @@
+[Update Application]
+    T: Seller Portal
+  [Back Arrow]
+    T: Back
+    T: Update Your Application
+    T: Make the requested changes below and resubmit your application.
+  [I:Button | State=Default]
+    T: Resubmit Application
+      T: Required Updates
+      T: Edit
+            T: Current Document: company-registration.pdf
+            T: Company Registration Document
+            T: 1
+            T: Upload New Document
+                T: + Upload Document
+                  T: PDF, JPG or PNG - Max 10MB
+            T: New document uploaded
+            [I:Input Fields | Property 1=Default]
+              T: City
+                T: Johannesburg
+            [I:Input Fields | Property 1=Icon Input]
+              T: Province
+                T: Gauteng
+            [I:Input Fields | Property 1=Default]
+              T: Postal Code
+                T: 2001
+          [I:Input Fields | Property 1=Default]
+            T: Address
+              T: 25 Market Street, Johannesburg
+            T: Update your business address
+            T: Business Address
+            T: 2
+      T: I confirm that the updated information is accurate.

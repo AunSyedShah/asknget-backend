@@ -1,0 +1,7 @@
+[I:Order Placed]
+  [I:Button | State=Default]
+    T: Track Order
+  [I:Button | State=Secondary]
+    T: Continue Shopping
+    T: Order Placed!
+    T: Thank You, John Ali your order has been placed. We will keep you update as it moves through preparation and delivery.

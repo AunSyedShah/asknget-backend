@@ -1,0 +1,67 @@
+[My Account - Personal Info]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Active]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Default]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+  [Personal Details]
+      [I:Button | State=TErtiory Button]
+        T: Cancel
+      [I:Button | State=Default]
+        T: Save Changes
+    [I:Input Fields | Property 1=Icon Input]
+      T: Gender
+        T: Male
+    [I:Input Fields | Property 1=Icon Input]
+      T: Country
+        T: Pakistan
+    [I:Input Fields | Property 1=Icon Input]
+      T: City
+        T: Lahore
+    [I:Input Fields | Property 1=Default]
+      T: Full Name
+        T: John Ali
+    [I:Input Fields | Property 1=Default]
+      T: Phone
+        T: + 92 300 1234567
+    [I:Input Fields | Property 1=Default]
+      T: Email
+        T: john.ali@gmail.com
+    [I:Input Fields | Property 1=Default]
+      T: Date of Birth
+        T: 15 May 1999
+    [I:Input Fields | Property 1=Default]
+      T: Profession (Optional)
+        T: 15 May 1999
+    [I:Input Fields | Property 1=Default]
+      T: Address
+        T: 123, Design street, Lahore, Pakistan
+        T: Personal Details
+        T: Update your personal information and manage your account details.
+  [Profile Picture]
+      [I:Button | State=Default]
+        T: Change Photo
+      T: PNG, JPG or GIF. Max size 2MB.
+        T: Profile Picture
+      [Profile]
+        [Cam Icon]
+  [Account Info]
+        T: Account Information
+              T: Member Since
+            T: 20 January 2024
+              T: Account Status
+              T: Active
+              T: Email Verified
+              T: Verified
+            T: Phone Verified
+            T: Verified

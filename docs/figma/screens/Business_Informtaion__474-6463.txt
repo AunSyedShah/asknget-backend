@@ -1,0 +1,76 @@
+[Business  Informtaion]
+    T: Seller Registration
+    T: Complete your details to start selling on asknget.
+  [Stepper]
+    [I:Stepper | State=Review Default]
+        T: 5
+      T: Review
+    [I:Stepper | State=Banking Default]
+        T: 4
+      T: Banking
+    [I:Stepper | State=Representative Default]
+        T: 3
+      T: Representative
+    [I:Stepper | State=Business Info Active]
+        T: 2
+      T: Business Info
+    [I:Stepper | State=Basic Info tick]
+      T: Basic Info
+  [I:Input Fields | Property 1=Default]
+    T: Company Registration Number
+      T: Enter registration number
+  [I:Input Fields | Property 1=Default]
+    T: VAT Number (Optional)
+      T: Enter VAT number
+  [I:Input Fields | Property 1=Default]
+    T: Business Address
+      T: Enter business address
+  [I:Input Fields | Property 1=Default]
+    T: Company Registration Number
+      T: Enter registration number
+  [I:Input Fields | Property 1=Default]
+    T: Business Email
+      T: Enter email address
+  [I:Input Fields | Property 1=Default]
+    T: Business Phone Number
+      T: Enter phone number
+  [I:Input Fields | Property 1=Default]
+    T: Brief Store Description
+      T: Tell customers what your store offers...
+    T: Tell us about your business
+    T: Add your business details so customers can identify your store
+    T: Product Categories
+    T: Select the categories you intend to sell
+  [I:Input Fields | Property 1=Default]
+    T: Legal Business Name
+      T: Enter legal name
+  [I:Input Fields | Property 1=Default]
+    T: Store / Display Name
+      T: Enter display/ store name
+  [I:Input Fields | Property 1=Icon Input]
+    T: Business Type
+      T: Select business type
+  [I:Button | State=TErtiory Button]
+    T: Back
+  [I:Button | State=Default]
+    T: Save & Continue
+    [I:Input Fields | Property 1=Default]
+      T: Pickup / Warehouse Address
+        T: Enter pickup / warehouse address
+      T: Same as business address
+    [I:Input Fields | Property 1=Default]
+      T: Returns Address
+        T: Enter returns address
+      T: Same as business address
+  T: 0 / 250 characters
+      T: Fashion
+      T: Beauty
+      T: Electronics
+      T: Groceries
+      T: Jewellery
+      T: Sports
+      T: Home & Dining
+      T: Accessories
+      T: Mobile Accessories
+      T: Other
+    T: Seller Portal
