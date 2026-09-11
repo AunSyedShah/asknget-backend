@@ -1,0 +1,47 @@
+"""Root django-ninja API, mounted at /api/v1/.
+
+Each app exposes Router(s) in `<app>/api.py`; mount them here so Swagger
+(/api/v1/docs) shows the whole surface. Add new routers at the bottom.
+"""
+
+from django.http import Http404
+from ninja import NinjaAPI
+from ninja.errors import ValidationError
+
+from accounts.api import auth_router, me_router
+
+api = NinjaAPI(
+    title="asknget API",
+    version="1.0.0",
+    description="Multi-vendor marketplace: buyer storefront + seller onboarding.",
+    urls_namespace="api_v1",
+)
+
+
+@api.exception_handler(Http404)
+def on_404(request, exc):
+    return api.create_response(request, {"detail": "Not found"}, status=404)
+
+
+@api.exception_handler(ValidationError)
+def on_validation_error(request, exc):
+    """Flatten pydantic errors to {"detail": "...", "errors": [...]} so clients
+    can show one message and still highlight fields."""
+    def field_path(loc):
+        parts = [str(p) for p in loc[1:]]  # loc[0] is body/query/path/form
+        if parts and parts[0] in ("payload", "data"):
+            parts = parts[1:]
+        return ".".join(parts) or None
+
+    errors = [{"field": field_path(e["loc"]), "message": e["msg"].removeprefix("Value error, ")} for e in exc.errors]
+    summary = "; ".join(f"{e['field']}: {e['message']}" if e["field"] else e["message"] for e in errors)
+    return api.create_response(request, {"detail": summary, "errors": errors}, status=422)
+
+
+@api.get("/health", tags=["meta"], summary="Liveness probe")
+def health(request):
+    return {"status": "ok"}
+
+
+api.add_router("/auth", auth_router)
+api.add_router("/me", me_router)
