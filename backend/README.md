@@ -19,6 +19,12 @@ backend/
 └── pyproject.toml        # managed with uv
 ```
 
+## Documentation
+
+- **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
+  `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
+- Data model: [`../docs/data-model.md`](../docs/data-model.md). Live API docs: `/api/v1/docs`.
+
 ## Setup
 
 ```bash
