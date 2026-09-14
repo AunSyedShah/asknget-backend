@@ -477,3 +477,7 @@ REST-style JSON; auth via access + refresh JWT.
 10. **Delivery instructions** on the address popup is marked required (*) — likely a design slip; confirm optional.
 11. **Canonical category list** — seller form vs buyer filters vs landing tiles disagree (Groceries vs Food, Home & Dining vs Home & Lifestyle, Mobile vs Digital Accessories).
 12. **Seller dashboard** (products, inventory, delivery setup, payouts) — referenced by "Quick Start" but not designed. Separate phase?
+13. **"More Info" stage on Application Status** — drawn as a permanent 3rd stage. Backend renders it `skipped` when the reviewer never asked for more info; confirm that's the intent.
+14. **Who moves `submitted → under_review`** — today an explicit admin "start review" call; should opening the application do it automatically?
+15. **Colour filter source** — backend feeds "Colors" from option types named Color/Colour (not makeup Shades). Confirm.
+16. **Guest checkout** is implemented (cart token + order number/email tracking) pending Q2's answer; easy to disable if the decision is members-only.

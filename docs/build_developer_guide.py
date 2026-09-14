@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.2"
+VERSION = "0.3"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -207,10 +207,13 @@ story += [
         ["Auth: register, login, JWT, refresh, logout", "Implemented", "/api/v1/auth/*"],
         ["OTP verification (email, SMS), password change/reset", "Implemented", "SMS provider is a console stub until an SMS gateway is chosen"],
         ["Profile, avatar, addresses, payment methods", "Implemented", "/api/v1/me/*"],
-        ["Seller application, documents, status, store activation", "Planned", "Next sprint; models exist, endpoints do not yet"],
-        ["Catalogue: categories, products, filters, PDP, reviews", "Planned", "Models exist"],
-        ["Cart, vouchers, checkout, orders, tracking", "Planned", "Models exist; payment provider TBD"],
-        ["Banners, newsletter, contact form", "Planned", "Models exist"],
+        ["Seller application (5 steps, autosave), documents, submit/resubmit, status timeline, store activation", "Implemented", "/api/v1/seller/*, /api/v1/lookups/*"],
+        ["Admin KYC review: queue, request-info, approve/reject, document review", "Implemented", "/api/v1/admin/seller-applications/* (staff JWT)"],
+        ["Catalogue: categories, products + filters, PDP, related, reviews, wishlist", "Implemented", "/api/v1/categories, /products/*, /me/wishlist"],
+        ["Cart (members + guests), vouchers, delivery methods, checkout", "Implemented", "/api/v1/cart/*, /checkout - order is created pending_payment"],
+        ["My Orders, cancel, re-order, public tracking, admin order status", "Implemented", "/api/v1/me/orders/*, /orders/track, /admin/orders/*"],
+        ["Banners, newsletter, contact form, site info", "Implemented", "/api/v1/banners, /newsletter/subscribe, /contact, /site-info"],
+        ["Payment provider: card tokenisation, capture, webhooks, 'save card'", "Planned", "Next sprint. Checkout records the chosen method only; orders stay unpaid until then."],
         ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "Requested by team lead; not in Figma; schema proposal pending"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
@@ -305,7 +308,8 @@ cp .env.example .env                     # then edit .env (see below)
 cd asknget                               # the Django project root (contains manage.py)
 uv run python manage.py migrate          # create the database schema
 uv run python manage.py seed_lookups     # categories, brands, banks, delivery methods
-uv run python manage.py createsuperuser  # admin login for http://127.0.0.1:8000/admin/
+uv run python manage.py seed_demo        # demo accounts, store, 13 products, vouchers (dev only)
+uv run python manage.py createsuperuser  # optional: your own admin login
 uv run python manage.py runserver        # http://127.0.0.1:8000
 """),
     P("Environment variables (backend/.env)", "h2"),
@@ -338,6 +342,14 @@ uv run python manage.py migrate
 uv add <package>                             # add a dependency (updates pyproject + uv.lock)
 python ../docs/figma/snapshot.py --check     # has the Figma design changed since we last looked?
 """),
+    P("Demo accounts (after seed_demo; password DemoPass123!)", "h2"),
+    table([
+        ["Email", "Role", "Use it for"],
+        ["customer@asknget.demo", "Customer", "Browse, cart, checkout, My Orders, wishlist (has a saved address)"],
+        ["seller@asknget.demo", "Active seller", "Seller portal with an approved, active store ('Huda Beauty') and 13 products"],
+        ["admin@asknget.demo", "Staff / superuser", "Django admin and every /api/v1/admin/* endpoint (KYC review, order status)"],
+    ], (44 * mm, 28 * mm, 100 * mm)),
+    P("Vouchers seeded: <font face='Courier'>SAVE20</font> (20% over $50) and <font face='Courier'>WELCOME5</font> ($5, once per user)."),
     NOTE("OTP emails are printed to the runserver console in development (console email backend); SMS codes are logged. "
          "Look at the terminal running <font face='Courier'>runserver</font> to find the 6-digit code while testing."),
 ]
@@ -391,7 +403,7 @@ story += [
     PageBreak(),
     P("6. API flows by user journey", "h1"),
     P("Each table reads top to bottom: what the user does on the screen, which API the frontend calls, and what the backend does. "
-      "Endpoints marked <i>planned</i> are designed but not yet implemented."),
+      "Every endpoint below is live in Swagger except the payment-provider steps, which are marked <i>next sprint</i>."),
 
     P("6.1 Customer sign-up and verification", "h2"),
     flow([
@@ -450,39 +462,100 @@ story += [
         ["Set default / delete", "POST .../{id}/default, DELETE .../{id}", "Same semantics as addresses"],
     ]),
 
-    P("6.7 Seller sign-up and KYC application (planned)", "h2"),
+    P("6.7 Seller sign-up and KYC application", "h2"),
     flow([
         ["'Create your seller account' (account type radio + form + terms checkbox)", "POST /auth/seller/register {email, phone, password, confirm_password, account_type, accept_terms: true}",
-         "Implemented. Creates user (is_seller) + draft application + terms audit rows; returns tokens. 422 if accept_terms is false."],
-        ["Email and mobile OTP screens", "Same as 6.1", "Implemented"],
-        ["Stepper steps 1-4, 'Save & Continue'", "PUT /seller/application/step/{1..4} (planned)", "Autosaves the step; validates only that step; advances current_step"],
-        ["'+ Upload Document' (ID, company registration, bank letter, proof of address)", "POST /seller/application/documents (multipart, type) (planned)", "PDF/JPG/PNG up to 10 MB; versions kept"],
-        ["'+ Add Another Director'", "POST /seller/application/directors (planned)", ""],
-        ["Step 5 'Submit'", "POST /seller/application/submit (planned)", "Requires both confirmation checkboxes; status draft -> submitted; issues application number ASK-SLR-xxxxxx"],
-        ["Application Status page", "GET /seller/application/status (planned)", "Timeline: submitted -> under_review -> (more_info_required | approved | rejected)"],
-        ["'Update & Resubmit' after reviewer request", "POST .../documents/{id}/replace, PUT step, POST /seller/application/resubmit (planned)", "Resolves the open info request; back to under_review"],
-        ["'Activate & Start Selling'", "POST /seller/store/activate {display_name, slug, agreements} (planned)", "Creates/activates the store; slug becomes asknget.com/store/&lt;slug&gt;"],
+         "Creates user (is_seller) + draft application + terms audit rows; returns tokens. 422 if accept_terms is false."],
+        ["Email and mobile OTP screens", "Same as 6.1", ""],
+        ["Wizard opens / resumes", "GET /seller/application", "Everything: current_step, per-step complete/missing_fields/missing_documents, all saved values (ID and account numbers masked), documents, can_submit"],
+        ["Dropdowns (business type, role, account type, bank)", "GET /lookups/seller, GET /lookups/banks?country=PK, GET /categories", "Public; option lists live in one place on the backend"],
+        ["Step 1-4 'Save & Continue' (also on blur / autosave)", "PATCH /seller/application/steps/basic-info | business-info | representative | banking",
+         "Partial: send only the fields on screen; nothing is required until submit. Returns the full application so the stepper can re-render. 409 once submitted."],
+        ["'+ Upload Document' (ID, company registration, bank letter, proof of address)", "POST /seller/application/documents (multipart: type, file)",
+         "PDF/JPG/PNG up to 10 MB. Re-uploading the same type creates version n+1; old version kept for reviewers."],
+        ["'+ Add Another Director'", "POST /seller/application/directors, PATCH|DELETE .../directors/{id}", "Up to 10"],
+        ["Step 5 'Submit'", "POST /seller/application/submit {confirm_accuracy: true, accept_terms: true}",
+         "422 lists exactly what is missing per step; otherwise draft -> submitted, application number ASK-SLR-xxxxxx issued, returns the status payload"],
+        ["Application Submitted / Status page", "GET /seller/application/status",
+         "application_number, status, status_headline, 5-stage timeline (done | current | pending | skipped), events, open_info_request"],
+        ["'We Need More Information' banner + 'Required Updates' list", "GET /seller/application (open_info_request.items[])",
+         "Each item is a document to replace or a field group to edit; `resolved` flips as the seller acts"],
+        ["'Update & Resubmit'", "POST .../documents (same type), PATCH the step, then POST /seller/application/resubmit {confirm_accuracy: true}",
+         "422 until every item is resolved; then more_info_required -> resubmitted and the application locks again"],
+        ["'Activate Your Seller Account' - Store URL check", "GET /seller/store/slug-available?slug=huda-beauty", "Returns available + a free suggestion"],
+        ["'Activate & Start Selling'", "POST /seller/store/activate {display_name?, slug?, accept_seller_agreement: true, confirm_info_accurate: true}",
+         "Only when approved; store becomes active at asknget.com/store/&lt;slug&gt;; application -> active"],
+    ]),
+    NOTE("Per account type: <b>individual</b> sellers skip the Representative step and the company-registration document; "
+         "sole proprietors and registered companies complete all four steps and four documents. This lives in sellers/rules.py and is a one-line change."),
+
+    P("6.8 Admin: KYC review (no screens designed - Swagger or a simple admin UI)", "h2"),
+    flow([
+        ["Review queue", "GET /admin/seller-applications?status=submitted&q=&page=", "Staff JWT. Drafts are excluded; oldest submission first"],
+        ["Open an application", "GET /admin/seller-applications/{id}", "Full detail incl. decrypted ID / account numbers, every document version, info requests, event log"],
+        ["Start review", "POST .../{id}/start-review", "submitted -> under_review; records reviewer"],
+        ["Ask for more information", "POST .../{id}/request-info {message, items: [{kind: document|field_group, target, instruction}]}",
+         "-> more_info_required; flags documents replacement_requested; seller sees the banner"],
+        ["Accept / reject a single document", "POST .../{id}/documents/{docId}/review {status, note}", "Does not change application status"],
+        ["Approve", "POST .../{id}/approve {note?}", "-> approved; creates the Store (pending_activation) with a unique slug"],
+        ["Reject", "POST .../{id}/reject {reason}", "-> rejected (terminal); reason shown to the seller"],
     ]),
 
-    P("6.8 Storefront: browse, cart, checkout, orders (planned)", "h2"),
+    P("6.9 Storefront: browse and product page", "h2"),
     flow([
-        ["Landing page", "GET /banners?placement=hero|top_discount, GET /products/featured|best-sellers|new-arrivals, GET /categories", "Public"],
-        ["Categories page with filters", "GET /products?category=&brand[]=&color[]=&price_min=&price_max=&in_stock=&q=&sort=&page=&per_page=12", "Returns {items, total, page}; 12 per page as in the design"],
-        ["Product page tabs", "GET /products/{slug}, GET /products/{id}/reviews, GET /products/{id}/related", "Options (Size/Shade/Color), variants, benefits, how-to-use steps"],
-        ["'Submit Review'", "POST /products/{id}/reviews (multipart)", "Verified Purchase badge when tied to an order item"],
-        ["Add to cart / quantity", "GET /cart, POST /cart/items, PATCH|DELETE /cart/items/{id}", "Works for guests via a cart session token"],
-        ["'Apply' voucher, order note", "POST /cart/voucher, PATCH /cart {note}", "Recomputes discount"],
-        ["Checkout 'Place Order'", "GET /delivery-methods, POST /checkout", "Creates the order + payment intent; snapshots address, prices, delivery method"],
-        ["Order Placed / Track Order", "POST /orders/track {order_number, email} (public)", "Status timeline"],
-        ["My Orders tabs", "GET /me/orders?status=ongoing|completed|cancelled, POST /me/orders/{id}/cancel, POST /me/orders/{id}/reorder", "Tabs map to status groups"],
-        ["Wishlist heart", "PUT|DELETE /me/wishlist/{productId}, GET /me/wishlist", "Implemented model; endpoint planned"],
+        ["Landing page", "GET /banners?placement=hero|top_discount, GET /products/featured|best-sellers|new-arrivals|top-discounted, GET /categories", "Public. Cards carry is_wishlisted when a Bearer token is sent"],
+        ["Categories page: sidebar", "GET /products/filters", "Category tree with counts, brands, colours, price range - one call"],
+        ["Categories page: grid", "GET /products?category=beauty&brand=nars&color=Black&price_min=&price_max=&in_stock=true&q=&sort=new|price_asc|price_desc|rating|popular&page=1&per_page=12",
+         "{items, total, page, per_page, pages}; category includes sub-categories; repeat brand/color params for multi-select"],
+        ["Product page", "GET /products/{slug}", "Options (Size/Shade/Color) with values, variants (option_value_ids, price, stock), key_benefits, usage_steps, ratings breakdown, store"],
+        ["Pick options -> variant", "client-side", "Find the variant whose option_value_ids match the selected values; disable combos with in_stock=false"],
+        ["Reviews tab", "GET /products/{slug}/reviews?sort=new|top|low&page=, GET /products/{slug}/reviews/summary", "Approved reviews only; names abbreviated ('Ayesha K.')"],
+        ["'Submit Review'", "POST /products/{slug}/reviews (multipart: name?, email?, rating, body, files[])",
+         "Guests must send name + email; members default to their profile. Stored pending; 'Verified Purchase' when the member has a delivered order for it"],
+        ["'You may also like'", "GET /products/{slug}/related", "Same category first, then same brand"],
+        ["Wishlist heart / Wishlist tab", "PUT|DELETE /me/wishlist/{productId}, GET /me/wishlist", "PUT is idempotent"],
+    ]),
+
+    P("6.10 Cart and checkout", "h2"),
+    NOTE("Guests: the first call to any /cart endpoint returns <font face='Courier'>cart_token</font>. Store it (localStorage) and send it as the "
+         "<font face='Courier'>X-Cart-Token</font> header on every cart/checkout call. When the user signs in, send both the Bearer token and the header once - "
+         "the guest cart merges into their account cart and the token is retired."),
+    flow([
+        ["Cart page opens", "GET /cart", "items (with variant_summary, image, stock), order_note, voucher, delivery_method, summary {subtotal, shipping, discount, total}, can_checkout, problems[]"],
+        ["'Add to Cart' / 'Buy Now'", "POST /cart/items {variant_id, qty}", "Merges quantity if already present; clamps to stock; 409 when sold out"],
+        ["Quantity stepper / remove", "PATCH /cart/items/{id} {qty}, DELETE /cart/items/{id}", "409 if qty exceeds stock"],
+        ["'Order Notes', 'Delivery Type'", "PATCH /cart {order_note?, delivery_method_id?}", "Shipping cost in the summary follows the chosen method (default: Standard)"],
+        ["'Discount Voucher -> Apply'", "POST /cart/voucher {code}, DELETE /cart/voucher", "404 unknown; 422 with the reason (expired, minimum not met, already used)"],
+        ["Checkout page: delivery options", "GET /delivery-methods", "'Standard Delivery 5 - 7 working days $10.99', 'Express ...'"],
+        ["'Place Order'", "POST /checkout {contact, address | address_id, ship_to_different_address?, shipping_address?, delivery_method_id, payment_method_type, payment_method_id?, special_note?}",
+         "201 {order, detail}. Re-checks stock under a lock, snapshots everything, reserves stock, redeems the voucher, clears the cart, emails confirmation. Order is pending_payment / unpaid."],
+        ["Card entry / 'Save card for future checkout'", "<i>next sprint</i>", "The PSP SDK will tokenise the card client-side; the API will never see PAN/CVV"],
+        ["'Order Placed!' screen", "use the checkout response", "detail carries the 'Thank You, John Ali...' copy; order.order_number for the confirmation"],
+    ]),
+
+    P("6.11 My Orders and tracking", "h2"),
+    flow([
+        ["Tabs All / Ongoing / Completed / Cancelled", "GET /me/orders?tab=all|ongoing|completed|cancelled&page=", "Each card: order_number, status_label, group, items (qty, variant_summary, prices), can_cancel, can_reorder, items[].can_review"],
+        ["'View Detail' / 'Track Order' (member)", "GET /me/orders/{id}", "Adds addresses, delivery method, totals, events[] timeline (status, label, note, location, time)"],
+        ["'Cancel'", "POST /me/orders/{id}/cancel {reason?}", "Allowed until the order is processing; restores stock; 409 afterwards"],
+        ["'Re-Order'", "POST /me/orders/{id}/reorder", "Puts still-available lines back in the cart and returns the cart; unavailable ones are listed in problems[]"],
+        ["'Leave Review'", "POST /products/{slug}/reviews (6.9)", "items[].can_review is true on delivered, un-reviewed lines"],
+        ["Track Order page (guest)", "POST /orders/track {order_number, email}", "Public; matches the email used at checkout; returns status + events"],
+        ["Ops move an order (no screen)", "POST /admin/orders/{id}/status {status, note?, location?}", "confirmed -> processing -> shipped -> out_for_delivery -> delivered; each writes a timeline event"],
+    ]),
+
+    P("6.12 Support and marketing", "h2"),
+    flow([
+        ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
+        ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
+        ["Footer contact info / 'We Accept'", "GET /site-info", "Values maintained in Django admin (Site settings)"],
     ]),
 ]
 
 # --- 7. Endpoint reference ---------------------------------------------------
 story += [
     PageBreak(),
-    P("7. Endpoint reference (implemented today)", "h1"),
+    P("7. Endpoint reference", "h1"),
     P("All paths are prefixed with <font face='Courier'>/api/v1</font>. 'Auth' = requires <font face='Courier'>Authorization: Bearer</font>."),
     table([
         ["Method + path", "Auth", "Request body", "Success", "Errors"],
@@ -510,9 +583,79 @@ story += [
         ["POST /me/payment-methods", "yes", "PaymentMethodIn", "201 PaymentMethodOut", "422"],
         ["POST /me/payment-methods/{id}/default", "yes", "-", "200 PaymentMethodOut", "404"],
         ["DELETE /me/payment-methods/{id}", "yes", "-", "204", "404"],
+        ["GET /me/wishlist", "yes", "-", "200 [WishlistItemOut]", ""],
+        ["PUT /me/wishlist/{productId}", "yes", "-", "201 WishlistItemOut", "404"],
+        ["DELETE /me/wishlist/{productId}", "yes", "-", "204", ""],
+        ["GET /me/orders?tab=", "yes", "-", "200 Page[OrderSummaryOut]", ""],
+        ["GET /me/orders/{id}", "yes", "-", "200 OrderDetailOut", "404"],
+        ["POST /me/orders/{id}/cancel", "yes", "CancelIn?", "200 OrderDetailOut", "404, 409"],
+        ["POST /me/orders/{id}/reorder", "yes", "-", "200 CartOut", "404"],
         ["GET /health", "-", "-", "200 {status: ok}", ""],
     ], (52 * mm, 14 * mm, 34 * mm, 42 * mm, 30 * mm)),
+    P("Seller portal (Bearer token of a seller account)", "h2"),
+    table([
+        ["Method + path", "Auth", "Request body", "Success", "Errors"],
+        ["GET /seller/application", "seller", "-", "200 ApplicationOut", "404"],
+        ["PATCH /seller/application/steps/basic-info", "seller", "BasicInfoIn", "200 ApplicationOut", "409, 422"],
+        ["PATCH /seller/application/steps/business-info", "seller", "BusinessInfoIn", "200 ApplicationOut", "409, 422"],
+        ["PATCH /seller/application/steps/representative", "seller", "RepresentativeIn", "200 ApplicationOut", "409, 422"],
+        ["PATCH /seller/application/steps/banking", "seller", "BankingIn", "200 ApplicationOut", "409, 422"],
+        ["POST /seller/application/directors", "seller", "DirectorIn", "201 DirectorOut", "409, 422"],
+        ["PATCH|DELETE /seller/application/directors/{id}", "seller", "DirectorIn", "200 DirectorOut | 204", "404, 409"],
+        ["GET /seller/application/documents", "seller", "-", "200 [DocumentOut]", ""],
+        ["POST /seller/application/documents", "seller", "multipart type + file", "201 DocumentOut", "409, 422"],
+        ["POST /seller/application/submit", "seller", "SubmitIn", "200 ApplicationStatusOut", "409, 422"],
+        ["POST /seller/application/resubmit", "seller", "ResubmitIn", "200 ApplicationStatusOut", "409, 422"],
+        ["GET /seller/application/status", "seller", "-", "200 ApplicationStatusOut", "404"],
+        ["GET /seller/store/slug-available?slug=", "seller", "-", "200 SlugAvailableOut", ""],
+        ["POST /seller/store/activate", "seller", "StoreActivateIn", "200 StoreOut", "409, 422"],
+        ["GET /seller/store", "seller", "-", "200 StoreOut", "404"],
+        ["GET /lookups/seller", "-", "-", "200 SellerLookupsOut", ""],
+        ["GET /lookups/banks?country=", "-", "-", "200 [BankOut]", ""],
+    ], (52 * mm, 14 * mm, 34 * mm, 42 * mm, 30 * mm)),
+    P("Catalogue (public; send a Bearer token to get is_wishlisted)", "h2"),
+    table([
+        ["Method + path", "Auth", "Request body", "Success", "Errors"],
+        ["GET /categories", "-", "-", "200 [CategoryOut] (tree)", ""],
+        ["GET /brands", "-", "-", "200 [BrandOut]", ""],
+        ["GET /products/filters", "-", "-", "200 ProductFiltersOut", ""],
+        ["GET /products?...", "optional", "query: ProductQuery", "200 Page[ProductCardOut]", "404 (category), 422"],
+        ["GET /products/featured | best-sellers | new-arrivals | top-discounted", "optional", "?limit=", "200 [ProductCardOut]", ""],
+        ["GET /products/{slug}", "optional", "-", "200 ProductDetailOut", "404"],
+        ["GET /products/{slug}/related", "optional", "?limit=", "200 [ProductCardOut]", "404"],
+        ["GET /products/{slug}/reviews?sort=", "-", "-", "200 Page[ReviewOut]", "404"],
+        ["GET /products/{slug}/reviews/summary", "-", "-", "200 RatingBreakdownOut", "404"],
+        ["POST /products/{slug}/reviews", "optional", "multipart ReviewIn + files[]", "201 ReviewCreatedOut", "404, 409, 422"],
+    ], (52 * mm, 14 * mm, 34 * mm, 42 * mm, 30 * mm)),
+    P("Cart, checkout, tracking, support (guests: X-Cart-Token header)", "h2"),
+    table([
+        ["Method + path", "Auth", "Request body", "Success", "Errors"],
+        ["GET /cart", "optional", "-", "200 CartOut", ""],
+        ["POST /cart/items", "optional", "CartItemIn", "200 CartOut", "404, 409"],
+        ["PATCH|DELETE /cart/items/{id}", "optional", "CartItemPatchIn", "200 CartOut", "404, 409"],
+        ["PATCH /cart", "optional", "CartPatchIn", "200 CartOut", "422"],
+        ["POST|DELETE /cart/voucher", "optional", "VoucherApplyIn", "200 CartOut", "404, 422"],
+        ["GET /delivery-methods", "-", "-", "200 [DeliveryMethodOut]", ""],
+        ["POST /checkout", "optional", "CheckoutIn", "201 OrderPlacedOut", "404, 409, 422"],
+        ["POST /orders/track", "-", "TrackIn", "200 TrackOut", "404"],
+        ["GET /banners?placement=", "-", "-", "200 [BannerOut]", "422"],
+        ["POST /newsletter/subscribe", "-", "NewsletterSubscribeIn", "201 | 200 MessageOut", "422"],
+        ["POST /contact", "optional", "ContactIn", "201 ContactCreatedOut", "422"],
+        ["GET /site-info", "-", "-", "200 SiteInfoOut", ""],
+    ], (52 * mm, 14 * mm, 34 * mm, 42 * mm, 30 * mm)),
+    P("Admin (Bearer token of a staff account)", "h2"),
+    table([
+        ["Method + path", "Auth", "Request body", "Success", "Errors"],
+        ["GET /admin/seller-applications?status=&account_type=&q=", "staff", "-", "200 Page[AdminApplicationListOut]", ""],
+        ["GET /admin/seller-applications/{id}", "staff", "-", "200 AdminApplicationOut", "404"],
+        ["POST .../{id}/start-review | approve | reject | request-info", "staff", "ApproveIn | RejectIn | RequestInfoIn", "200 AdminApplicationOut", "404, 409, 422"],
+        ["POST .../{id}/documents/{docId}/review", "staff", "DocumentReviewIn", "200 DocumentOut", "404"],
+        ["GET /admin/orders?status=&q=", "staff", "-", "200 Page[OrderSummaryOut]", ""],
+        ["GET /admin/orders/{id}", "staff", "-", "200 OrderDetailOut", "404"],
+        ["POST /admin/orders/{id}/status", "staff", "AdminOrderStatusIn", "200 OrderDetailOut", "404, 409"],
+    ], (52 * mm, 14 * mm, 34 * mm, 42 * mm, 30 * mm)),
     P("Key schemas", "h2"),
+    P("Abridged - Swagger has every field. <font face='Courier'>Page[T]</font> means {items: T[], total, page, per_page, pages}."),
     CODE("""
 UserOut {
   id: uuid, email, phone, full_name, first_name, last_name,
@@ -528,6 +671,24 @@ AddressOut { id, type: "home"|"office"|"other", label, full_name, phone, street_
 PaymentMethodOut { id, type: "card"|"paypal"|"apple_pay"|"google_pay"|"bank_transfer",
                    card_brand: "visa"|"mastercard"|"other"|"", card_holder_name, last4,
                    exp_month, exp_year, provider, is_default, display_name, created_at }
+ProductCardOut { id, slug, name, category {id, name, slug}, brand, price_cents, compare_at_price_cents,
+                 discount_percent, currency, image_url, stock_status, rating_avg, rating_count, is_wishlisted? }
+ProductDetailOut = ProductCardOut + { short_description, description_title, description, images[],
+                 option_types[{id, name, values[{id, value, swatch_hex}]}],
+                 variants[{id, sku, option_value_ids[], price_cents, compare_at_price_cents, stock_qty, in_stock}],
+                 key_benefits[{title, body}], usage_steps[{title, body}], store {id, display_name, slug},
+                 ratings {average, count, distribution {5..1}} }
+CartOut { id, cart_token?, items[{id, variant_id, product_slug, product_name, variant_summary, image_url,
+          unit_price_cents, compare_at_price_cents, qty, line_total_cents, available_qty, in_stock}],
+          order_note, voucher {code, type, value, label}?, delivery_method {id, name, eta_label, price_cents}?,
+          summary {subtotal_cents, shipping_cents, discount_cents, total_cents, currency, item_count},
+          can_checkout, problems[] }
+OrderSummaryOut { id, order_number, status, status_label, group: ongoing|completed|cancelled, placed_at,
+          total_cents, currency, payment_method_type, payment_status, items[...OrderItemOut], can_cancel, can_reorder }
+ApplicationOut { id, application_number, account_type, status, status_headline, editable, current_step,
+          steps[{step, name, required, complete, missing_fields[], missing_documents[]}], can_submit,
+          basic_info, business_info, representative, banking (masked), directors[], documents[],
+          open_info_request {message, items[{kind, target, instruction, resolved}]}?, store? }
 """),
 ]
 
@@ -544,7 +705,9 @@ story += [
         ["Enums", "Lower-snake_case strings exactly as listed in Swagger. Unknown values are rejected with 422."],
         ["Optional text fields", "Come back as \"\" (empty string) when unset, not null; nullable dates/numbers come back as null."],
         ["Partial updates", "Use PATCH and send only the keys that changed. Sending null clears a field."],
-        ["Lists", "Small lists (addresses, cards) are plain arrays. Catalogue/orders will be paginated: {items, total, page, per_page} with per_page 12 by default."],
+        ["Lists", "Small lists (addresses, cards, wishlist) are plain arrays. Products, reviews, orders and admin queues are paginated: {items, total, page, per_page, pages}; per_page defaults to 12 (max 100)."],
+        ["Guest cart", "Keep the cart_token from the first /cart response and send it as X-Cart-Token; send it once together with the Bearer token after login to merge."],
+        ["Masked PII", "Sellers see their own ID / account numbers masked (id_passport_number_masked, account_number_last4); only staff endpoints return the full values."],
         ["File uploads", "multipart/form-data with the field named 'file' (avatar) or per the endpoint; size/type limits are enforced server-side and returned as 422."],
         ["Idempotency", "Setting a default twice, or verifying an already-verified email, is safe."],
     ], (34 * mm, 138 * mm)),
@@ -575,11 +738,11 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
     P("Roadmap (subject to sprint planning)", "h2"),
     table([
         ["Order", "Scope", "Depends on"],
-        ["1", "Sellers: application steps, documents, submit/resubmit, status timeline, store activation; admin review endpoints", "Auth (done)"],
-        ["2", "Catalogue read APIs: categories, product listing with filters, PDP, reviews, wishlist", "Seller stores (products belong to stores)"],
-        ["3", "Cart, vouchers, delivery methods, checkout, orders, tracking; payment provider integration", "Catalogue; provider decision"],
-        ["4", "Marketing: banners, newsletter, contact", "-"],
-        ["5", "Vendor sub-roles/permissions, premium tier, vendor-customer messaging", "Product decisions + design"],
+        ["1", "Payment provider: client-side tokenisation, POST /checkout/{id}/pay, webhooks -> payment_status/paid, saved cards, refunds on cancel", "Provider decision (see data-model.md section 10)"],
+        ["2", "Seller dashboard APIs: product CRUD, inventory, delivery setup, order fulfilment per store", "Design (referenced by 'Quick Start' but not drawn)"],
+        ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
+        ["4", "Vendor sub-roles/permissions, premium tier, vendor-customer messaging", "Product decisions + design"],
+        ["5", "Email/SMS providers, background jobs (category counts, rating refresh, cart expiry)", "Infra"],
     ], (14 * mm, 112 * mm, 46 * mm)),
     Spacer(1, 6 * mm),
     P("Repository: https://github.com/AunSyedShah/asknget &nbsp;&nbsp;|&nbsp;&nbsp; Backend README: backend/README.md &nbsp;&nbsp;|&nbsp;&nbsp; "

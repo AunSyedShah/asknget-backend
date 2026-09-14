@@ -23,7 +23,7 @@ backend/
 
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
-- Data model: [`../docs/data-model.md`](../docs/data-model.md). Live API docs: `/api/v1/docs`.
+- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plan and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md) · Live API docs: `/api/v1/docs`.
 
 ## Setup
 
@@ -33,7 +33,8 @@ cp .env.example .env            # then set FIELD_ENCRYPTION_KEY (see comment in 
 cd asknget
 uv run python manage.py migrate
 uv run python manage.py seed_lookups        # categories, brands, banks, delivery methods
-uv run python manage.py createsuperuser
+uv run python manage.py seed_demo           # dev only: demo accounts, store, products, vouchers (password DemoPass123!)
+uv run python manage.py createsuperuser     # optional — seed_demo also creates admin@asknget.demo
 uv run python manage.py runserver
 ```
 
