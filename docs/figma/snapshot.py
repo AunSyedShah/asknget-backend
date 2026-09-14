@@ -7,6 +7,10 @@ Run it before planning or implementing anything that touches a screen; then
 `git diff docs/figma/` shows precisely which labels, fields, options or flows moved.
 
 Requires FIGMA_TOKEN in the environment (personal access token) — never commit it.
+
+Rate limits: `--check` only calls /versions (cheap). A full snapshot calls
+/files/{key}, which on a Starter plan is limited to a handful of calls per day —
+if it returns 429, read the Retry-After header rather than retrying.
 """
 
 import argparse
@@ -14,6 +18,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -46,8 +51,15 @@ def _token() -> str:
 
 def _get(path: str) -> dict:
     req = urllib.request.Request(f"https://api.figma.com/v1{path}", headers={"X-Figma-Token": _token()})
-    with urllib.request.urlopen(req, timeout=120) as res:
-        return json.loads(res.read().decode("utf-8-sig"))
+    try:
+        with urllib.request.urlopen(req, timeout=120) as res:
+            return json.loads(res.read().decode("utf-8-sig"))
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            wait = int(e.headers.get("Retry-After", "0") or 0)
+            sys.exit(f"Figma rate limit hit on {path} (plan tier: {e.headers.get('x-figma-plan-tier', '?')}). "
+                     f"Retry after ~{wait // 3600} h {wait % 3600 // 60} min.")
+        raise
 
 
 def _outline(node: dict, components: dict, depth: int, out: list[str]) -> None:
@@ -72,8 +84,10 @@ def _outline(node: dict, components: dict, depth: int, out: list[str]) -> None:
 
 
 def current_version() -> dict:
-    meta = _get(f"/files/{FILE_KEY}?depth=1")
-    return {"version": meta["version"], "lastModified": meta["lastModified"], "name": meta["name"]}
+    """Latest version id via /versions — a cheap endpoint. `/files/{key}` sits on
+    Figma's low-tier rate limit for Starter plans and can be locked for days."""
+    latest = _get(f"/files/{FILE_KEY}/versions?page_size=1")["versions"][0]
+    return {"version": latest["id"], "lastModified": latest["created_at"], "by": latest["user"]["handle"]}
 
 
 def snapshot() -> None:
@@ -125,7 +139,7 @@ def check() -> int:
     if live["version"] == saved["version"]:
         print(f"Design unchanged since snapshot ({saved['lastModified']}).")
         return 0
-    print(f"DESIGN CHANGED: snapshot {saved['lastModified']} -> live {live['lastModified']}. Re-run snapshot and diff.")
+    print(f"DESIGN CHANGED: snapshot {saved['lastModified']} -> live {live['lastModified']} by {live['by']}. Re-run snapshot and diff.")
     return 1
 
 
