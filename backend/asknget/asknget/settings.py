@@ -56,6 +56,8 @@ OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('OTP_RESEND_COOLDOWN_SECONDS', 
 OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
 SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
+REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
+DEFAULT_CURRENCY = os.environ.get('DEFAULT_CURRENCY', 'USD')  # TODO(design): §10 Q1 — design shows '$'
 
 
 # Application definition

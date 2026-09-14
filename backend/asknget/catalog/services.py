@@ -1,0 +1,275 @@
+"""Catalog read model + reviews + wishlist rules."""
+
+from collections import defaultdict
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Avg, Count, Max, Min, Prefetch, Q
+from ninja.errors import HttpError
+
+from sellers.models import Store
+
+from .models import (
+    Brand,
+    Category,
+    Product,
+    ProductContentSection,
+    ProductImage,
+    ProductOptionType,
+    ProductOptionValue,
+    ProductVariant,
+    Review,
+    ReviewMedia,
+    WishlistItem,
+)
+
+# --------------------------------------------------------------------------- #
+# Categories / brands
+# --------------------------------------------------------------------------- #
+
+
+def category_tree(*, only_active: bool = True) -> list[dict]:
+    qs = Category.objects.all()
+    if only_active:
+        qs = qs.filter(is_active=True)
+    nodes = {c.id: {"id": c.id, "name": c.name, "slug": c.slug, "image_url": c.image.url if c.image else None,
+                    "product_count": c.product_count, "children": [], "_parent": c.parent_id} for c in qs}
+    roots = []
+    for node in nodes.values():
+        parent = nodes.get(node.pop("_parent"))
+        (parent["children"] if parent else roots).append(node)
+    return roots
+
+
+def category_with_descendants(slug: str) -> list[Category]:
+    root = Category.objects.filter(slug=slug, is_active=True).first()
+    if root is None:
+        raise HttpError(404, "Category not found")
+    found, frontier = [root], [root]
+    while frontier:
+        children = list(Category.objects.filter(parent__in=frontier, is_active=True))
+        found += children
+        frontier = children
+    return found
+
+
+def refresh_category_counts() -> None:
+    """Denormalised '128 items' per category (own + descendants). Call from a job or after seeding."""
+    counts = dict(public_products().values_list("category_id").annotate(n=Count("id")).values_list("category_id", "n"))
+    parents = dict(Category.objects.values_list("id", "parent_id"))
+    totals: dict = defaultdict(int)
+    for cat_id, n in counts.items():
+        node = cat_id
+        while node is not None:
+            totals[node] += n
+            node = parents.get(node)
+    for cat in Category.objects.all():
+        Category.objects.filter(pk=cat.pk).update(product_count=totals.get(cat.pk, 0))
+
+
+# --------------------------------------------------------------------------- #
+# Products
+# --------------------------------------------------------------------------- #
+
+
+def public_products():
+    return (
+        Product.objects.filter(status=Product.ProductStatus.ACTIVE, store__status=Store.StoreStatus.ACTIVE)
+        .select_related("category", "brand", "store")
+        .prefetch_related(Prefetch("images", queryset=ProductImage.objects.order_by("-is_primary", "sort_order")))
+    )
+
+
+COLOUR_OPTION_NAMES = ("Color", "Colour")  # option types that feed the "Colors" filter
+
+SORTS = {
+    "new": ("-published_at", "-created_at"),
+    "price_asc": ("price_cents", "name"),
+    "price_desc": ("-price_cents", "name"),
+    "rating": ("-rating_avg", "-rating_count"),
+    "popular": ("-rating_count", "-rating_avg"),
+}
+
+
+def filter_products(qs, f):
+    if f.q:
+        qs = qs.filter(Q(name__icontains=f.q) | Q(short_description__icontains=f.q) | Q(brand__name__icontains=f.q))
+    if f.category:
+        qs = qs.filter(category__in=category_with_descendants(f.category))
+    if f.brand:
+        qs = qs.filter(brand__slug__in=f.brand)
+    if f.color:
+        match = Q()
+        for c in f.color:
+            match |= Q(option_types__values__value__iexact=c)
+        qs = qs.filter(match, option_types__name__in=COLOUR_OPTION_NAMES)
+    if f.price_min is not None:
+        qs = qs.filter(price_cents__gte=f.price_min)
+    if f.price_max is not None:
+        qs = qs.filter(price_cents__lte=f.price_max)
+    if f.in_stock is True:
+        qs = qs.filter(stock_status=Product.StockStatus.IN_STOCK)
+    elif f.in_stock is False:
+        qs = qs.exclude(stock_status=Product.StockStatus.IN_STOCK)
+    if f.store:
+        qs = qs.filter(store__slug=f.store)
+    if f.featured:
+        qs = qs.filter(is_featured=True)
+    if f.best_seller:
+        qs = qs.filter(is_best_seller=True)
+    if f.new_arrival:
+        qs = qs.filter(is_new_arrival=True)
+    return qs.distinct().order_by(*SORTS[f.sort])
+
+
+def filters_payload() -> dict:
+    qs = public_products()
+    price = qs.aggregate(lo=Min("price_cents"), hi=Max("price_cents"))
+    colours = (
+        ProductOptionValue.objects.filter(option_type__product__in=qs, option_type__name__in=COLOUR_OPTION_NAMES)
+        .values("value", "swatch_hex").order_by("value").distinct()
+    )
+    return {
+        "categories": category_tree(),
+        "brands": [b for b in Brand.objects.filter(is_active=True, products__in=qs).distinct()],
+        "colors": list(colours),
+        "price_min_cents": price["lo"] or 0,
+        "price_max_cents": price["hi"] or 0,
+        "currency": settings.DEFAULT_CURRENCY,
+    }
+
+
+def request_wishlist_ids(request) -> set | None:
+    """Wishlisted product ids for the signed-in caller, computed once per request
+    (None for guests so `is_wishlisted` is omitted rather than false)."""
+    if request is None:
+        return None
+    user = getattr(request, "auth", None)
+    if user is None or not hasattr(user, "wishlist_items"):
+        return None
+    cached = getattr(request, "_wishlist_ids", None)
+    if cached is None:
+        cached = set(WishlistItem.objects.filter(user=user).values_list("product_id", flat=True))
+        request._wishlist_ids = cached
+    return cached
+
+
+def get_product(slug: str) -> Product:
+    product = (
+        public_products()
+        .prefetch_related(
+            Prefetch("option_types", queryset=ProductOptionType.objects.prefetch_related("values")),
+            Prefetch("variants", queryset=ProductVariant.objects.filter(is_active=True).prefetch_related("option_values")),
+            "content_sections",
+        )
+        .filter(slug=slug)
+        .first()
+    )
+    if product is None:
+        raise HttpError(404, "Product not found")
+    return product
+
+
+def rating_breakdown(product: Product) -> dict:
+    rows = Review.objects.filter(product=product, status=Review.ReviewStatus.APPROVED).values("rating").annotate(n=Count("id"))
+    dist = {r: 0 for r in (5, 4, 3, 2, 1)}
+    for row in rows:
+        dist[row["rating"]] = row["n"]
+    count = sum(dist.values())
+    avg = round(sum(r * n for r, n in dist.items()) / count, 1) if count else 0.0
+    return {"average": avg, "count": count, "distribution": dist}
+
+
+def related(product: Product, limit: int = 6):
+    """'You may also like': same category first, then same brand, newest."""
+    qs = public_products().exclude(pk=product.pk)
+    same_cat = list(qs.filter(category=product.category).order_by("-rating_count", "-published_at")[:limit])
+    if len(same_cat) < limit and product.brand_id:
+        seen = {p.id for p in same_cat}
+        same_cat += [p for p in qs.filter(brand=product.brand).order_by("-published_at")[:limit] if p.id not in seen][: limit - len(same_cat)]
+    return same_cat
+
+
+# --------------------------------------------------------------------------- #
+# Reviews
+# --------------------------------------------------------------------------- #
+
+REVIEW_SORTS = {"new": ("-created_at",), "top": ("-rating", "-created_at"), "low": ("rating", "-created_at")}
+REVIEW_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+REVIEW_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm"}
+REVIEW_MAX_FILES = 5
+
+
+def public_reviews(product: Product, sort: str = "new"):
+    return Review.objects.filter(product=product, status=Review.ReviewStatus.APPROVED).prefetch_related("media").order_by(*REVIEW_SORTS[sort])
+
+
+def abbreviate(name: str) -> str:
+    """'Ayesha Khan' → 'Ayesha K.' (design never shows full surnames)."""
+    parts = name.split()
+    return f"{parts[0]} {parts[-1][0]}." if len(parts) > 1 else name
+
+
+def _verified_order_item(user, product):
+    """Latest delivered order line for this product, if any → 'Verified Purchase'."""
+    if user is None:
+        return None
+    from orders.models import Order, OrderItem
+
+    return (
+        OrderItem.objects.filter(order__user=user, product=product, order__status=Order.OrderStatus.DELIVERED, review__isnull=True)
+        .order_by("-created_at").first()
+    )
+
+
+@transaction.atomic
+def create_review(product: Product, *, user, name: str | None, email: str | None, rating: int, body: str, files) -> Review:
+    if user is not None:
+        name = name or user.full_name or user.email.split("@")[0]
+        email = email or user.email
+    if not name or not email:
+        raise HttpError(422, "Name and email are required")
+    if user is not None and Review.objects.filter(product=product, user=user).exists():
+        raise HttpError(409, "You have already reviewed this product")
+    if len(files) > REVIEW_MAX_FILES:
+        raise HttpError(422, f"At most {REVIEW_MAX_FILES} photos/videos")
+    for f in files:
+        if f.content_type not in REVIEW_IMAGE_TYPES | REVIEW_VIDEO_TYPES:
+            raise HttpError(422, f"Unsupported file type: {f.content_type}")
+        if f.size > settings.REVIEW_MEDIA_MAX_BYTES:
+            raise HttpError(422, "Each file must be 25 MB or smaller")
+
+    review = Review.objects.create(
+        product=product, user=user, order_item=_verified_order_item(user, product),
+        reviewer_name=name, reviewer_email=email, rating=rating, body=body,
+    )
+    for i, f in enumerate(files):
+        media = ReviewMedia(review=review, sort_order=i, type="image" if f.content_type in REVIEW_IMAGE_TYPES else "video")
+        media.file.save(f.name, f, save=True)
+    return review
+
+
+def refresh_product_rating(product: Product) -> None:
+    agg = Review.objects.filter(product=product, status=Review.ReviewStatus.APPROVED).aggregate(avg=Avg("rating"), n=Count("id"))
+    Product.objects.filter(pk=product.pk).update(rating_avg=round(agg["avg"] or 0, 1), rating_count=agg["n"])
+
+
+# --------------------------------------------------------------------------- #
+# Wishlist
+# --------------------------------------------------------------------------- #
+
+
+def wishlist(user):
+    return WishlistItem.objects.filter(user=user, product__in=public_products()).select_related("product__category", "product__brand").prefetch_related("product__images").order_by("-created_at")
+
+
+def wishlist_add(user, product_id) -> WishlistItem:
+    product = public_products().filter(pk=product_id).first()
+    if product is None:
+        raise HttpError(404, "Product not found")
+    item, _ = WishlistItem.objects.get_or_create(user=user, product=product)
+    return item
+
+
+def wishlist_remove(user, product_id) -> None:
+    WishlistItem.objects.filter(user=user, product_id=product_id).delete()

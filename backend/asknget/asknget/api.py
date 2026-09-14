@@ -9,6 +9,7 @@ from ninja import NinjaAPI
 from ninja.errors import ValidationError
 
 from accounts.api import auth_router, me_router
+from catalog.api import catalog_router, wishlist_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
 
 api = NinjaAPI(
@@ -45,7 +46,9 @@ def health(request):
 
 
 api.add_router("/auth", auth_router)
+me_router.add_router("", wishlist_router)
 api.add_router("/me", me_router)
+api.add_router("", catalog_router)
 api.add_router("/seller", seller_router)
 api.add_router("/lookups", lookups_router)
 api.add_router("/admin/seller-applications", admin_sellers_router)
