@@ -61,7 +61,7 @@ class SellerApplication(TimeStampedModel):
         CURRENT = "current", "Current / Cheque Account"
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="seller_application")
-    application_number = models.CharField(max_length=20, unique=True, blank=True, help_text="e.g. ASK-SLR-004821")
+    application_number = models.CharField(max_length=20, unique=True, null=True, blank=True, help_text="Assigned on submit, e.g. ASK-SLR-004821")
     account_type = models.CharField(max_length=20, choices=AccountType.choices)
     status = models.CharField(max_length=20, choices=ApplicationStatus.choices, default=ApplicationStatus.DRAFT, db_index=True)
     current_step = models.PositiveSmallIntegerField(default=1, help_text="1 Basic · 2 Business · 3 Representative · 4 Banking · 5 Review")

@@ -124,3 +124,24 @@ class AnonymousMarker:
 
     def __bool__(self):
         return True
+
+
+class SellerAuth(JWTAuth):
+    """Seller Portal: any user who started seller onboarding (`is_seller`)."""
+
+    def authenticate(self, request, token: str):
+        user = super().authenticate(request, token)
+        if user is not None and not user.is_seller:
+            raise HttpError(403, "Seller account required")
+        return user
+
+
+class StaffAuth(JWTAuth):
+    """Admin endpoints (KYC review, moderation). Admin has all access, so this is
+    the only gate until sub-roles exist."""
+
+    def authenticate(self, request, token: str):
+        user = super().authenticate(request, token)
+        if user is not None and not user.is_staff:
+            raise HttpError(403, "Staff access required")
+        return user

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -38,6 +39,15 @@ ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1
 # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
 
+# Test runs: throwaway encryption key and a fast password hasher (PBKDF2 makes
+# every user-creating test take ~1 s).
+TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
+if TESTING:
+    from cryptography.fernet import Fernet
+
+    FIELD_ENCRYPTION_KEY = FIELD_ENCRYPTION_KEY or Fernet.generate_key().decode()
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
 # Auth / OTP knobs (asknget.core.auth, accounts.services)
 JWT_ACCESS_TTL_MINUTES = int(os.environ.get('JWT_ACCESS_TTL_MINUTES', 15))
 JWT_REFRESH_TTL_DAYS = int(os.environ.get('JWT_REFRESH_TTL_DAYS', 30))
@@ -45,6 +55,7 @@ OTP_TTL_MINUTES = int(os.environ.get('OTP_TTL_MINUTES', 10))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('OTP_RESEND_COOLDOWN_SECONDS', 45))  # design: "Resend code in 00:45"
 OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
+SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
 
 
 # Application definition
