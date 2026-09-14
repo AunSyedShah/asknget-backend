@@ -186,7 +186,8 @@ class ProductVariant(TimeStampedModel):
 
     def summary(self) -> str:
         """'Size: 30 ml | Shade: Natural' — snapshotted onto order lines."""
-        return " | ".join(f"{v.option_type.name}: {v.value}" for v in self.option_values.select_related("option_type"))
+        values = self.option_values.select_related("option_type").order_by("option_type__sort_order", "option_type__name")
+        return " | ".join(f"{v.option_type.name}: {v.value}" for v in values)
 
 
 class Review(SoftDeleteModel):

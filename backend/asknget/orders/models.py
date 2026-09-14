@@ -18,6 +18,9 @@ class Cart(TimeStampedModel):
     session_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     order_note = models.TextField(blank=True, help_text="'Order Notes (Optional)'")
     voucher = models.ForeignKey("Voucher", on_delete=models.SET_NULL, null=True, blank=True)
+    delivery_method = models.ForeignKey(
+        "DeliveryMethod", on_delete=models.SET_NULL, null=True, blank=True, help_text="Chosen 'Delivery Type'; drives the cart's Shipping Cost"
+    )
     expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta(TimeStampedModel.Meta):
@@ -110,6 +113,8 @@ class Order(TimeStampedModel):
     ONGOING_STATUSES = (OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY)
     COMPLETED_STATUSES = (OrderStatus.DELIVERED,)
     CANCELLED_STATUSES = (OrderStatus.CANCELLED, OrderStatus.REFUNDED)
+    # TODO(design): §10 Q4 — buyer may cancel until the parcel ships.
+    CANCELLABLE_STATUSES = (OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED, OrderStatus.PROCESSING)
 
     class OrderPaymentMethod(models.TextChoices):
         CARD = "card", "Card"
@@ -179,7 +184,7 @@ class Order(TimeStampedModel):
     @property
     def can_cancel(self) -> bool:
         # TODO(design): confirm cancellation window with team lead.
-        return self.status in (self.Status.PENDING_PAYMENT, self.Status.CONFIRMED, self.Status.PROCESSING)
+        return self.status in self.CANCELLABLE_STATUSES
 
 
 class OrderItem(TimeStampedModel):

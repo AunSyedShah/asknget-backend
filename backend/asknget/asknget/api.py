@@ -10,6 +10,7 @@ from ninja.errors import ValidationError
 
 from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
+from orders.api import admin_orders_router, cart_router, checkout_router, my_orders_router, orders_public_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
 
 api = NinjaAPI(
@@ -47,8 +48,13 @@ def health(request):
 
 api.add_router("/auth", auth_router)
 me_router.add_router("", wishlist_router)
+me_router.add_router("", my_orders_router)
 api.add_router("/me", me_router)
 api.add_router("", catalog_router)
+api.add_router("/cart", cart_router)
+api.add_router("/checkout", checkout_router)
+api.add_router("", orders_public_router)
+api.add_router("/admin/orders", admin_orders_router)
 api.add_router("/seller", seller_router)
 api.add_router("/lookups", lookups_router)
 api.add_router("/admin/seller-applications", admin_sellers_router)
