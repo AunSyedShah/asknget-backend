@@ -8,6 +8,8 @@ import re
 from datetime import date
 from typing import Annotated
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email as django_validate_email
 from pydantic import AfterValidator, Field, StringConstraints
 
 _PHONE_RE = re.compile(r"^\+[1-9]\d{6,14}$")  # E.164
@@ -23,7 +25,12 @@ def _normalize_phone(value: str) -> str:
 
 
 def _normalize_email(value: str) -> str:
-    return value.strip().lower()
+    value = value.strip().lower()
+    try:
+        django_validate_email(value)
+    except DjangoValidationError:
+        raise ValueError("Enter a valid email address")
+    return value
 
 
 def _past_date(value: date) -> date:
