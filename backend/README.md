@@ -45,7 +45,7 @@ Without `DATABASE_URL` the project falls back to SQLite; set it to a Postgres UR
 
 ## Running with Docker
 
-Two images: the API (`backend/Dockerfile`, built from this repo) and the official `postgres:17-alpine`.
+Two images: the API (`backend/Dockerfile`, built on Docker Hub's official `astral/uv` image so dependencies are installed by uv from `uv.lock`, and `uv` ships in the container) and the official `postgres:17-alpine`.
 Your code stays where it is — the image *copies* it at build time, and in dev mode the
 working tree is *bind-mounted* into the container so edits reload live.
 
@@ -62,6 +62,7 @@ docker compose exec web python manage.py seed_demo   # optional demo data
 | Rebuild after changing `pyproject.toml` / `uv.lock` / `Dockerfile` | `docker compose up -d --build` |
 | Tail logs | `docker compose logs -f web` (or `db`) |
 | Run any manage.py command | `docker compose exec web python manage.py <cmd>` |
+| Use uv inside the container (same as on your PC) | `docker compose exec web uv run python manage.py <cmd>` · `uv lock`, `uv tree` … |
 | Run the tests against Postgres | `docker compose exec web python manage.py test` |
 | Open a psql shell | `docker compose exec db psql -U asknget -d asknget` |
 | Connect a DB tool from Windows (dev only) | host `127.0.0.1`, port `5432`, credentials from `backend/.env` |

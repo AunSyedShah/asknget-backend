@@ -6,11 +6,17 @@
 # Two stages: `builder` resolves dependencies with uv into /app/.venv (cached
 # between builds unless uv.lock changes); `runtime` copies only that venv plus
 # the source, runs as a non-root user and serves with gunicorn.
+#
+# Base images come from Docker Hub: `astral/uv` (official uv image, Debian
+# trixie + Python 3.13 + uv) and the matching `python` image. Keep the two
+# Debian releases in sync so the venv built in one stage runs in the other.
 
 ARG PYTHON_VERSION=3.13
+ARG UV_VERSION=0.12
+ARG DEBIAN_RELEASE=trixie
 
 # --------------------------------------------------------------------------- #
-FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
+FROM docker.io/astral/uv:${UV_VERSION}-python${PYTHON_VERSION}-${DEBIAN_RELEASE}-slim AS builder
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -24,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 # --------------------------------------------------------------------------- #
-FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+FROM docker.io/library/python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE} AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -39,6 +45,8 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
+# uv itself, so `docker compose exec web uv run|add|lock ...` works like on your PC.
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 COPY --chown=app:app asknget ./asknget
 COPY --chown=app:app docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
