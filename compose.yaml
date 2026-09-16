@@ -1,0 +1,47 @@
+# asknget — production-shaped stack: Postgres + Django API.
+#
+#   docker compose up -d --build        # dev: also loads compose.override.yaml (live reload)
+#   docker compose -f compose.yaml up -d --build   # prod-like: gunicorn, no bind mounts
+#
+# All configuration comes from backend/.env (copy backend/.env.example).
+# Data lives in named volumes, so `docker compose down` keeps it and
+# `docker compose down -v` wipes it.
+
+name: asknget
+
+services:
+  db:
+    image: postgres:17-alpine
+    env_file: backend/.env            # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-asknget} -d $${POSTGRES_DB:-asknget}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    # Uncomment to reach Postgres from tools on your PC (DBeaver, psql):
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  web:
+    build:
+      context: ./backend
+    image: asknget-api:latest
+    env_file: backend/.env            # DATABASE_URL must point at db:5432 (see .env.example)
+    environment:
+      MEDIA_ROOT: /app/asknget/media
+      SERVE_MEDIA: "1"                # Django serves uploads until object storage exists
+    volumes:
+      - media:/app/asknget/media      # user uploads survive image rebuilds
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:

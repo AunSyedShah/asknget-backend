@@ -6,3 +6,7 @@ Thumbs.db
 
 # Local secrets anywhere
 .env
+
+# Python bytecode anywhere
+__pycache__/
+*.pyc

@@ -1,0 +1,14 @@
+# Keep the build context small and secrets out of the image.
+.venv/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+asknget/db.sqlite3
+asknget/media/
+asknget/staticfiles/
+.git/
+.idea/
+.vscode/
+README.md

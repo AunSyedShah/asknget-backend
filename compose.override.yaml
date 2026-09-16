@@ -1,0 +1,24 @@
+# Development overrides — Compose merges this file automatically when you run
+# plain `docker compose up`. Nothing here is used when you pass `-f compose.yaml`.
+#
+# What changes vs. compose.yaml:
+#   - your working tree (backend/asknget) is bind-mounted over the image's copy,
+#     so edits on your PC are live inside the container (runserver auto-reloads)
+#   - Django's dev server instead of gunicorn, DEBUG on
+#   - Postgres published on localhost:5432 for DB tools
+#   - uploads land in ./backend/asknget/media on your disk instead of a volume
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  web:
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      DEBUG: "1"
+      SERVE_MEDIA: "1"
+      MEDIA_ROOT: /app/asknget/media
+    volumes:
+      - ./backend/asknget:/app/asknget
+      - ./backend/asknget/media:/app/asknget/media

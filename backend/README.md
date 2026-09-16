@@ -43,6 +43,49 @@ uv run python manage.py runserver
 
 Without `DATABASE_URL` the project falls back to SQLite; set it to a Postgres URL for anything beyond local experiments.
 
+## Running with Docker
+
+Two images: the API (`backend/Dockerfile`, built from this repo) and the official `postgres:17-alpine`.
+Your code stays where it is — the image *copies* it at build time, and in dev mode the
+working tree is *bind-mounted* into the container so edits reload live.
+
+```bash
+cp backend/.env.example backend/.env    # fill SECRET_KEY, FIELD_ENCRYPTION_KEY, POSTGRES_PASSWORD (+ same password in DATABASE_URL)
+docker compose up -d --build            # dev: Postgres + runserver with live reload on :8000
+docker compose exec web python manage.py seed_demo   # optional demo data
+```
+
+| I want to… | Command |
+|---|---|
+| Start / stop (data kept) | `docker compose up -d` · `docker compose down` |
+| Start **production-shaped** (gunicorn, no bind mount) | `docker compose -f compose.yaml up -d --build` |
+| Rebuild after changing `pyproject.toml` / `uv.lock` / `Dockerfile` | `docker compose up -d --build` |
+| Tail logs | `docker compose logs -f web` (or `db`) |
+| Run any manage.py command | `docker compose exec web python manage.py <cmd>` |
+| Run the tests against Postgres | `docker compose exec web python manage.py test` |
+| Open a psql shell | `docker compose exec db psql -U asknget -d asknget` |
+| Connect a DB tool from Windows (dev only) | host `127.0.0.1`, port `5432`, credentials from `backend/.env` |
+| Back up the database | `docker compose exec db pg_dump -U asknget -Fc asknget > backup.dump` |
+| Restore | `docker compose exec -T db pg_restore -U asknget -d asknget --clean < backup.dump` |
+| Wipe **everything** including data | `docker compose down -v` |
+| Publish the image | `docker tag asknget-api:latest <registry>/asknget-api:<tag> && docker push …` |
+
+How the pieces fit:
+
+- `compose.yaml` is the production shape; `compose.override.yaml` is merged automatically for dev
+  (bind mount, `runserver`, `DEBUG=1`, Postgres published on localhost). Passing `-f compose.yaml`
+  skips the override.
+- `backend/.env` is the single config source for both containers **and** for running without Docker.
+  `DATABASE_URL` host is `db` inside Docker and `localhost` from your PC.
+- On every start the entrypoint waits for Postgres, runs `migrate` and the idempotent `seed_lookups`,
+  then execs gunicorn (or runserver). Set `SKIP_MIGRATE=1` for one-off commands.
+- Data lives in named volumes `asknget_pgdata` (database) and `asknget_media` (uploads); they survive
+  `down`, rebuilds and image upgrades. In dev, uploads go to `backend/asknget/media` on disk instead.
+- Static files (admin, Swagger) are baked into the image and served by whitenoise; uploads are served
+  by Django while `SERVE_MEDIA=1` — move them to object storage or a reverse proxy before real traffic.
+- Behind HTTPS/a proxy set `BEHIND_PROXY=1`, `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`,
+  and put your domain in `ALLOWED_HOSTS`.
+
 ## Conventions
 
 - UUID primary keys, `created_at` / `updated_at` everywhere (`core.models.TimeStampedModel`); soft delete via `SoftDeleteModel` where the design implies history (users' addresses, cards, products, reviews).
