@@ -251,6 +251,7 @@ class Store(TimeStampedModel):
     banner = models.ImageField(upload_to="stores/banners/", null=True, blank=True)
     status = models.CharField(max_length=20, choices=StoreStatus.choices, default=StoreStatus.PENDING_ACTIVATION, db_index=True)
     seller_agreement_accepted_at = models.DateTimeField(null=True, blank=True)
+    low_stock_threshold = models.PositiveSmallIntegerField(default=10, help_text="'Low Stock' when 0 < stock <= this (per-product override allowed)")
     info_reconfirmed_at = models.DateTimeField(null=True, blank=True)
     activated_at = models.DateTimeField(null=True, blank=True)
 

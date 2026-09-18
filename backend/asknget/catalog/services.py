@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch, Q, When
+from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch, Q, Sum, When
 from ninja.errors import HttpError
 
 from sellers.models import Store
@@ -20,6 +20,7 @@ from .models import (
     ProductVariant,
     Review,
     ReviewMedia,
+    StockMovement,
     WishlistItem,
 )
 
@@ -108,9 +109,9 @@ def filter_products(qs, f):
     if f.price_max is not None:
         qs = qs.filter(price_cents__lte=f.price_max)
     if f.in_stock is True:
-        qs = qs.filter(stock_status=Product.StockStatus.IN_STOCK)
+        qs = qs.filter(stock_status__in=Product.AVAILABLE_STOCK_STATUSES)
     elif f.in_stock is False:
-        qs = qs.exclude(stock_status=Product.StockStatus.IN_STOCK)
+        qs = qs.exclude(stock_status__in=Product.AVAILABLE_STOCK_STATUSES)
     if f.store:
         qs = qs.filter(store__slug=f.store)
     if f.featured:
@@ -200,6 +201,55 @@ def related(product: Product, limit: int = 6):
         seen = {p.id for p in same_cat}
         same_cat += [p for p in qs.filter(brand=product.brand).order_by("-published_at")[:limit] if p.id not in seen][: limit - len(same_cat)]
     return same_cat
+
+
+# --------------------------------------------------------------------------- #
+# Stock (single write path, so every change is logged and the derived status is right)
+# --------------------------------------------------------------------------- #
+
+
+def product_stock_qty(product: Product) -> int:
+    return product.variants.filter(is_active=True).aggregate(n=Sum("stock_qty"))["n"] or 0
+
+
+def refresh_stock_status(product: Product) -> str:
+    """Derive in/low/out from variant stock; `preorder` is a manual flag and is kept."""
+    if product.stock_status == Product.StockStatus.PREORDER:
+        return product.stock_status
+    qty = product_stock_qty(product)
+    if qty <= 0:
+        status = Product.StockStatus.OUT_OF_STOCK
+    elif qty <= product.effective_low_stock_threshold():
+        status = Product.StockStatus.LOW_STOCK
+    else:
+        status = Product.StockStatus.IN_STOCK
+    if status != product.stock_status:
+        Product.objects.filter(pk=product.pk).update(stock_status=status)
+        product.stock_status = status
+    return status
+
+
+@transaction.atomic
+def adjust_stock(variant: ProductVariant, *, delta: int | None = None, set_to: int | None = None, reason: str,
+                 actor_user=None, order=None, note: str = "") -> StockMovement:
+    """Change a variant's stock by `delta` or to `set_to` (exactly one). Locks the row,
+    refuses to go negative, logs a StockMovement and refreshes the product's stock status."""
+    if (delta is None) == (set_to is None):
+        raise ValueError("pass exactly one of delta / set_to")
+    locked = ProductVariant.objects.select_for_update().select_related("product__store").get(pk=variant.pk)
+    if set_to is not None:
+        delta = set_to - locked.stock_qty
+    new_qty = locked.stock_qty + delta
+    if new_qty < 0:
+        raise HttpError(409, f"{locked.product.name}: only {locked.stock_qty} left")
+    ProductVariant.objects.filter(pk=locked.pk).update(stock_qty=new_qty)
+    variant.stock_qty = new_qty
+    movement = StockMovement.objects.create(
+        variant=locked, product=locked.product, delta=delta, qty_after=new_qty, reason=reason,
+        note=note[:255], order=order, actor_user=actor_user,
+    )
+    refresh_stock_status(locked.product)
+    return movement
 
 
 # --------------------------------------------------------------------------- #

@@ -41,6 +41,8 @@ def product_text(product: Product) -> str:
     if product.brand_id:
         lines.append(f"Brand: {product.brand.name}")
     lines.append(f"Category: {category_path(product.category)}")
+    if product.tags:
+        lines.append("Tags: " + ", ".join(str(t) for t in product.tags))
     if product.short_description:
         lines.append(product.short_description)
     if product.description_title:

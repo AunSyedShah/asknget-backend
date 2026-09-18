@@ -8,7 +8,7 @@ from catalog.models import Brand, Product, ProductContentSection, ProductOptionT
 
 from .indexing import mark_stale
 
-CARD_FIELDS = {"name", "brand_id", "category_id", "short_description", "description_title", "description"}
+CARD_FIELDS = {"name", "brand_id", "category_id", "tags", "short_description", "description_title", "description"}
 
 
 @receiver(post_save, sender=Product)

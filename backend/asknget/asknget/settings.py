@@ -57,6 +57,8 @@ OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
 SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
+PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # seller wizard 'Media' step
+STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
 DEFAULT_CURRENCY = os.environ.get('DEFAULT_CURRENCY', 'USD')  # TODO(design): §10 Q1 — design shows '$'
 
 # Search & recommendations (discovery app). Provider `hash` is offline and needs
@@ -91,6 +93,7 @@ INSTALLED_APPS = [
     'orders',
     'marketing',
     'discovery',
+    'portal',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

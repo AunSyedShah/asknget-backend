@@ -12,6 +12,7 @@ from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
 from discovery.api import discovery_router
 from marketing.api import marketing_router
+from portal.api import admin_products_router, products_router
 from orders.api import admin_orders_router, cart_router, checkout_router, my_orders_router, orders_public_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
 
@@ -62,3 +63,5 @@ api.add_router("", marketing_router)
 api.add_router("/seller", seller_router)
 api.add_router("/lookups", lookups_router)
 api.add_router("/admin/seller-applications", admin_sellers_router)
+api.add_router("/seller/products", products_router)
+api.add_router("/admin/products", admin_products_router)

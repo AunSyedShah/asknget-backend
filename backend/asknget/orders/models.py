@@ -103,16 +103,18 @@ class Order(TimeStampedModel):
         PENDING_PAYMENT = "pending_payment", "Pending Payment"
         CONFIRMED = "confirmed", "Confirmed"
         PROCESSING = "processing", "Processing"
+        PACKED = "packed", "Packed"
         SHIPPED = "shipped", "Shipped"
         OUT_FOR_DELIVERY = "out_for_delivery", "Out for Delivery"
         DELIVERED = "delivered", "Delivered"
         CANCELLED = "cancelled", "Cancelled"
+        RETURNED = "returned", "Returned"
         REFUNDED = "refunded", "Refunded"
 
     # The My Orders tabs group statuses like this.
-    ONGOING_STATUSES = (OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY)
+    ONGOING_STATUSES = (OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.PACKED, OrderStatus.SHIPPED, OrderStatus.OUT_FOR_DELIVERY)
     COMPLETED_STATUSES = (OrderStatus.DELIVERED,)
-    CANCELLED_STATUSES = (OrderStatus.CANCELLED, OrderStatus.REFUNDED)
+    CANCELLED_STATUSES = (OrderStatus.CANCELLED, OrderStatus.RETURNED, OrderStatus.REFUNDED)
     # TODO(design): §10 Q4 — buyer may cancel until the parcel ships.
     CANCELLABLE_STATUSES = (OrderStatus.PENDING_PAYMENT, OrderStatus.CONFIRMED, OrderStatus.PROCESSING)
 
@@ -188,7 +190,20 @@ class Order(TimeStampedModel):
 
 
 class OrderItem(TimeStampedModel):
-    """Snapshot of what was bought — product data may change after purchase."""
+    """Snapshot of what was bought — product data may change after purchase.
+
+    `status` is the **per-store fulfilment status**: a buyer order can span
+    stores, each seller moves only their own lines (all together), and the
+    buyer-facing Order.status is derived from the parts (orders.services)."""
+
+    class FulfilmentStatus(models.TextChoices):
+        PENDING = "pending", "Pending"          # paid, waiting for the seller
+        PROCESSING = "processing", "Processing"
+        PACKED = "packed", "Packed"
+        SHIPPED = "shipped", "Shipped"
+        DELIVERED = "delivered", "Delivered"
+        CANCELLED = "cancelled", "Cancelled"
+        RETURNED = "returned", "Returned"
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
     store = models.ForeignKey("sellers.Store", on_delete=models.PROTECT, related_name="order_items")
@@ -202,11 +217,12 @@ class OrderItem(TimeStampedModel):
     unit_price_cents = models.PositiveIntegerField()
     compare_at_price_cents = models.PositiveIntegerField(null=True, blank=True)
     line_total_cents = models.PositiveIntegerField()
-    status = models.CharField(max_length=20, choices=Order.OrderStatus.choices, default=Order.OrderStatus.PENDING_PAYMENT)
+    status = models.CharField(max_length=20, choices=FulfilmentStatus.choices, default=FulfilmentStatus.PENDING, db_index=True)
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["created_at"]
         constraints = [models.CheckConstraint(condition=Q(qty__gte=1), name="order_item_qty_positive")]
+        indexes = [models.Index(fields=["store", "status"])]
 
     def __str__(self):
         return f"{self.qty} × {self.product_name}"
@@ -222,6 +238,10 @@ class OrderStatusEvent(TimeStampedModel):
         ADMIN = "admin", "Admin"
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="status_events")
+    store = models.ForeignKey(
+        "sellers.Store", on_delete=models.CASCADE, null=True, blank=True, related_name="order_events",
+        help_text="Set for per-store fulfilment steps; null for order-level events (placed, paid)",
+    )
     status = models.CharField(max_length=20, choices=Order.OrderStatus.choices)
     note = models.CharField(max_length=255, blank=True)
     location = models.CharField(max_length=120, blank=True)

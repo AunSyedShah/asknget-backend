@@ -47,13 +47,23 @@ class Brand(TimeStampedModel):
 
 class Product(SoftDeleteModel):
     class StockStatus(models.TextChoices):
+        """Derived from variant stock (see catalog.services.refresh_stock_status);
+        only `preorder` is set by hand."""
+
         IN_STOCK = "in_stock", "In Stock"
+        LOW_STOCK = "low_stock", "Low Stock"
         OUT_OF_STOCK = "out_of_stock", "Out of Stock"
         PREORDER = "preorder", "Pre-order"
 
+    AVAILABLE_STOCK_STATUSES = ("in_stock", "low_stock", "preorder")
+
     class ProductStatus(models.TextChoices):
+        """Seller dashboard tabs: Draft → (submit) Pending → Active | Rejected; Active ↔ Archived."""
+
         DRAFT = "draft", "Draft"
+        PENDING = "pending", "Pending review"
         ACTIVE = "active", "Active"
+        REJECTED = "rejected", "Rejected"
         ARCHIVED = "archived", "Archived"
 
     store = models.ForeignKey("sellers.Store", on_delete=models.PROTECT, related_name="products")
@@ -62,7 +72,8 @@ class Product(SoftDeleteModel):
 
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True)
-    short_description = models.TextField(blank=True, help_text="One-liner under the title on the PDP")
+    short_description = models.TextField(blank=True, help_text="One-liner under the title on the PDP; the seller wizard's 250-char description")
+    tags = models.JSONField(default=list, blank=True, help_text='Seller wizard "Product Tags"; also fed to search')
     description_title = models.CharField(max_length=200, blank=True, help_text='e.g. "Perfecting BB Cream"')
     description = models.TextField(blank=True)
 
@@ -80,6 +91,17 @@ class Product(SoftDeleteModel):
 
     status = models.CharField(max_length=20, choices=ProductStatus.choices, default=ProductStatus.DRAFT, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    low_stock_threshold = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Overrides the store default")
+
+    # Wizard step 4 "Shipping" (nothing drawn; the minimum a carrier quote needs)
+    weight_grams = models.PositiveIntegerField(null=True, blank=True)
+    length_mm = models.PositiveIntegerField(null=True, blank=True)
+    width_mm = models.PositiveIntegerField(null=True, blank=True)
+    height_mm = models.PositiveIntegerField(null=True, blank=True)
+    ships_from = models.CharField(max_length=120, blank=True)
+    handling_days = models.PositiveSmallIntegerField(default=1)
 
     class Meta(SoftDeleteModel.Meta):
         indexes = [
@@ -102,6 +124,11 @@ class Product(SoftDeleteModel):
         if not self.compare_at_price_cents:
             return None
         return round((1 - self.price_cents / self.compare_at_price_cents) * 100)
+
+    def effective_low_stock_threshold(self) -> int:
+        if self.low_stock_threshold is not None:
+            return self.low_stock_threshold
+        return self.store.low_stock_threshold
 
 
 class ProductImage(TimeStampedModel):
@@ -188,6 +215,30 @@ class ProductVariant(TimeStampedModel):
         """'Size: 30 ml | Shade: Natural' — snapshotted onto order lines."""
         values = self.option_values.select_related("option_type").order_by("option_type__sort_order", "option_type__name")
         return " | ".join(f"{v.option_type.name}: {v.value}" for v in values)
+
+
+class StockMovement(TimeStampedModel):
+    """Every change to a variant's stock, so 'inventory movements' can be audited.
+    `qty_after` is the variant's stock right after this movement."""
+
+    class Reason(models.TextChoices):
+        SALE = "sale", "Sale"
+        CANCEL = "cancel", "Order cancelled"
+        RETURN = "return", "Return"
+        MANUAL = "manual", "Manual adjustment"
+        INITIAL = "initial", "Initial stock"
+
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name="movements")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="stock_movements")
+    delta = models.IntegerField()
+    qty_after = models.PositiveIntegerField()
+    reason = models.CharField(max_length=20, choices=Reason.choices)
+    note = models.CharField(max_length=255, blank=True)
+    order = models.ForeignKey("orders.Order", on_delete=models.SET_NULL, null=True, blank=True, related_name="stock_movements")
+    actor_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta(TimeStampedModel.Meta):
+        indexes = [models.Index(fields=["product", "-created_at"])]
 
 
 class Review(SoftDeleteModel):

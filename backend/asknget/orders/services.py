@@ -15,7 +15,8 @@ from django.utils import timezone
 from ninja.errors import HttpError
 
 from accounts.models import Address, PaymentMethod
-from catalog.models import Product, ProductVariant
+from catalog.models import Product, ProductVariant, StockMovement
+from catalog.services import adjust_stock
 from discovery import events
 from sellers.models import Store
 
@@ -23,6 +24,7 @@ from .models import Cart, CartItem, DeliveryMethod, Order, OrderItem, OrderStatu
 
 CART_TOKEN_HEADER = "X-Cart-Token"
 Status = Order.OrderStatus
+Fulfilment = OrderItem.FulfilmentStatus
 
 # --------------------------------------------------------------------------- #
 # Cart resolution (members + guests)
@@ -354,7 +356,7 @@ def checkout(request, cart: Cart, payload) -> Order:
             qty=item.qty, unit_price_cents=line["unit_price_cents"], compare_at_price_cents=line["compare_at_price_cents"],
             line_total_cents=line["line_total_cents"],
         )
-        ProductVariant.objects.filter(pk=v.pk).update(stock_qty=F("stock_qty") - item.qty)
+        adjust_stock(v, delta=-item.qty, reason=StockMovement.Reason.SALE, order=order)
         events.record_for_cart(events.ProductEvent.Kind.PURCHASE, product=v.product, cart=cart)
     if cart.voucher_id:
         VoucherRedemption.objects.create(voucher=cart.voucher, user=user, order=order)
@@ -407,18 +409,22 @@ def get_my_order(user, order_id) -> Order:
 def cancel(order: Order, *, user, reason: str) -> Order:
     if not order.can_cancel:
         raise HttpError(409, f"Orders that are {order.get_status_display().lower()} can no longer be cancelled")
-    for item in order.items.all():
-        if item.variant_id:
-            ProductVariant.objects.filter(pk=item.variant_id).update(stock_qty=F("stock_qty") + item.qty)
+    _restock(order, order.items.all(), reason=StockMovement.Reason.CANCEL, actor_user=user)
     now = timezone.now()
     order.status = Status.CANCELLED
     order.cancelled_at = now
     order.cancel_reason = reason
     order.cancelled_by = user
     order.save()
-    order.items.update(status=Status.CANCELLED)
+    order.items.update(status=Fulfilment.CANCELLED)
     _record_event(order, Status.CANCELLED, actor="buyer", actor_user=user, note=reason or "Cancelled by customer")
     return order
+
+
+def _restock(order: Order, items, *, reason: str, actor_user=None) -> None:
+    for item in items:
+        if item.variant_id and item.status not in (Fulfilment.CANCELLED, Fulfilment.RETURNED):
+            adjust_stock(item.variant, delta=item.qty, reason=reason, order=order, actor_user=actor_user)
 
 
 def reorder(order: Order, cart: Cart) -> list[str]:
@@ -439,16 +445,49 @@ def track(*, order_number: str, email: str) -> Order:
     return order
 
 
-# Admin / seller side (no screens yet) — keeps the timeline honest when ops move an order.
+# --------------------------------------------------------------------------- #
+# Admin (order-level) and seller (per-store) status changes
+# --------------------------------------------------------------------------- #
+
+# Ops override of the whole buyer order — keeps the timeline honest.
 ALLOWED_NEXT = {
     Status.PENDING_PAYMENT: {Status.CONFIRMED, Status.CANCELLED},
     Status.CONFIRMED: {Status.PROCESSING, Status.CANCELLED},
-    Status.PROCESSING: {Status.SHIPPED, Status.CANCELLED},
+    Status.PROCESSING: {Status.PACKED, Status.SHIPPED, Status.CANCELLED},
+    Status.PACKED: {Status.SHIPPED, Status.CANCELLED},
     Status.SHIPPED: {Status.OUT_FOR_DELIVERY, Status.DELIVERED},
     Status.OUT_FOR_DELIVERY: {Status.DELIVERED},
-    Status.DELIVERED: {Status.REFUNDED},
+    Status.DELIVERED: {Status.RETURNED, Status.REFUNDED},
     Status.CANCELLED: {Status.REFUNDED},
+    Status.RETURNED: {Status.REFUNDED},
     Status.REFUNDED: set(),
+}
+
+# Order status → what every store's lines become when ops move the whole order.
+ORDER_TO_FULFILMENT = {
+    Status.PENDING_PAYMENT: Fulfilment.PENDING, Status.CONFIRMED: Fulfilment.PENDING,
+    Status.PROCESSING: Fulfilment.PROCESSING, Status.PACKED: Fulfilment.PACKED,
+    Status.SHIPPED: Fulfilment.SHIPPED, Status.OUT_FOR_DELIVERY: Fulfilment.SHIPPED,
+    Status.DELIVERED: Fulfilment.DELIVERED, Status.CANCELLED: Fulfilment.CANCELLED,
+    Status.RETURNED: Fulfilment.RETURNED, Status.REFUNDED: None,  # refund doesn't change fulfilment
+}
+
+# Seller moves of one store's lines (docs/sprint-3-plan.md §3).
+FULFILMENT_NEXT = {
+    Fulfilment.PENDING: {Fulfilment.PROCESSING, Fulfilment.CANCELLED},
+    Fulfilment.PROCESSING: {Fulfilment.PACKED, Fulfilment.SHIPPED, Fulfilment.CANCELLED},
+    Fulfilment.PACKED: {Fulfilment.SHIPPED, Fulfilment.CANCELLED},
+    Fulfilment.SHIPPED: {Fulfilment.DELIVERED},
+    Fulfilment.DELIVERED: {Fulfilment.RETURNED},
+    Fulfilment.CANCELLED: set(),
+    Fulfilment.RETURNED: set(),
+}
+
+# Fulfilment → Order.OrderStatus vocabulary for the per-store timeline events.
+FULFILMENT_TO_ORDER = {
+    Fulfilment.PENDING: Status.CONFIRMED, Fulfilment.PROCESSING: Status.PROCESSING, Fulfilment.PACKED: Status.PACKED,
+    Fulfilment.SHIPPED: Status.SHIPPED, Fulfilment.DELIVERED: Status.DELIVERED,
+    Fulfilment.CANCELLED: Status.CANCELLED, Fulfilment.RETURNED: Status.RETURNED,
 }
 
 
@@ -457,16 +496,64 @@ def set_status(order: Order, *, status: str, actor_user, note: str = "", locatio
     if status not in ALLOWED_NEXT[order.status]:
         raise HttpError(409, f"Cannot move order from {order.status} to {status}")
     if status == Status.CANCELLED:
-        for item in order.items.all():
-            if item.variant_id:
-                ProductVariant.objects.filter(pk=item.variant_id).update(stock_qty=F("stock_qty") + item.qty)
+        _restock(order, order.items.all(), reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
         order.cancelled_at = timezone.now()
         order.cancelled_by = actor_user
         order.cancel_reason = note
+    elif status == Status.RETURNED:
+        _restock(order, order.items.all(), reason=StockMovement.Reason.RETURN, actor_user=actor_user)
     if status == Status.CONFIRMED and order.payment_status == Order.OrderPaymentStatus.UNPAID:
         order.payment_status = Order.OrderPaymentStatus.PAID  # manual confirmation (bank transfer) until the PSP lands
     order.status = status
     order.save()
-    order.items.update(status=status)
+    if ORDER_TO_FULFILMENT[status] is not None:
+        order.items.update(status=ORDER_TO_FULFILMENT[status])
     _record_event(order, status, actor="admin", actor_user=actor_user, note=note, location=location)
+    return order
+
+
+def derive_order_status(order: Order) -> str:
+    """Buyer-facing status from the per-store parts. Unpaid and refunded orders are left alone."""
+    if order.status in (Status.PENDING_PAYMENT, Status.REFUNDED):
+        return order.status
+    parts = set(order.items.values_list("status", flat=True))
+    live = parts - {Fulfilment.CANCELLED}
+    if not live:
+        status = Status.CANCELLED
+    elif live <= {Fulfilment.DELIVERED, Fulfilment.RETURNED}:
+        status = Status.RETURNED if live == {Fulfilment.RETURNED} else Status.DELIVERED
+    elif Fulfilment.SHIPPED in live:
+        status = Status.SHIPPED
+    elif live & {Fulfilment.PROCESSING, Fulfilment.PACKED}:
+        status = Status.PROCESSING
+    else:
+        status = Status.CONFIRMED
+    if status != order.status:
+        if status == Status.CANCELLED and not order.cancelled_at:
+            order.cancelled_at = timezone.now()
+        order.status = status
+        order.save(update_fields=["status", "cancelled_at", "updated_at"])
+    return order.status
+
+
+@transaction.atomic
+def set_store_status(order: Order, store, *, status: str, actor_user, note: str = "") -> Order:
+    """A seller moves *their* lines of an order. Records a per-store timeline event,
+    restocks on cancel/return and re-derives the buyer-facing order status."""
+    items = list(order.items.filter(store=store).select_related("variant"))
+    if not items:
+        raise HttpError(404, "Order not found")
+    current = items[0].status
+    if status not in FULFILMENT_NEXT[current]:
+        raise HttpError(409, f"Cannot move this order from {current} to {status}")
+    if status == Fulfilment.CANCELLED:
+        _restock(order, items, reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
+    elif status == Fulfilment.RETURNED:
+        _restock(order, items, reason=StockMovement.Reason.RETURN, actor_user=actor_user)
+    order.items.filter(store=store).update(status=status)
+    OrderStatusEvent.objects.create(
+        order=order, store=store, status=FULFILMENT_TO_ORDER[status], note=note[:255],
+        actor=OrderStatusEvent.OrderEventActor.SELLER, actor_user=actor_user,
+    )
+    derive_order_status(order)
     return order
