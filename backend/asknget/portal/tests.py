@@ -428,3 +428,43 @@ class CustomerTests(PortalBase):
         res = self.get(f"{self.C}/export.csv", token=self.token)
         lines = b"".join(res.streaming_content).decode().strip().splitlines()
         self.assertEqual(len(lines), 4)
+
+
+class DashboardTests(PortalBase):
+    def test_summary_and_search(self):
+        from catalog.services import refresh_stock_status
+
+        bb = make_product(self.store, self.makeup, "BB Cream", 4999, None, stock=2)
+        lip = make_product(self.store, self.makeup, "Lipstick", 1299, None, stock=0)
+        for p in (bb, lip):
+            refresh_stock_status(p)
+        olivia = make_user(full_name="Olivia Martin")
+        self.client.get(f"/api/v1/products/{bb.slug}", headers={"X-Cart-Token": "g1"})
+        self.client.get(f"/api/v1/products/{bb.slug}", headers={"X-Cart-Token": "g2"})
+        o1 = self._order((bb, 2), user=olivia)
+        self._order((lip, 1), user=olivia)
+        self._order((bb, 1), user=olivia, status="cancelled")
+        for status in ("processing", "shipped", "delivered"):
+            self.post(f"/api/v1/seller/orders/{o1.pk}/status", {"status": status}, token=self.token)
+
+        body = self.get("/api/v1/seller/dashboard", token=self.token).json()
+        self.assertEqual(body["seller"]["first_name"], "Sirosh")
+        self.assertEqual(body["store"]["name"], "Huda Beauty")
+        self.assertEqual(body["sales_cents"]["value"], 2 * 4999 + 1299)      # booked (cancelled excluded)
+        self.assertEqual(body["revenue_cents"]["value"], 2 * 4999)           # delivered only
+        self.assertEqual(body["orders"]["value"], 3)                          # includes the cancelled order (it was placed)
+        self.assertEqual((body["products"]["value"], body["low_stock"]), (2, 1))
+        self.assertEqual(body["stock_breakdown"], {"in_stock": 0, "low_stock": 1, "out_of_stock": 1})
+        perf = body["performance"]
+        self.assertEqual(perf["product_views"]["value"], 2)
+        self.assertEqual(perf["conversion_rate"]["value"], 150.0)
+        self.assertEqual(perf["aov_cents"]["value"], round((2 * 4999 + 1299) / 3))
+        self.assertEqual(perf["customer_growth"]["value"], 1)
+        self.assertEqual(len(body["revenue_series"]), 12)
+        self.assertEqual(sum(m["values"]["revenue"] for m in body["revenue_series"]), 2 * 4999)
+        self.assertEqual(len(body["latest_orders"]), 3)
+
+        hits = self.get("/api/v1/seller/search", token=self.token, q="oliv").json()
+        self.assertEqual((len(hits["products"]), len(hits["orders"]), len(hits["customers"])), (0, 3, 1))
+        self.assertEqual(self.get("/api/v1/seller/search", token=self.token, q="lip").json()["products"][0]["label"], "Lipstick")
+        self.assertEqual(self.get("/api/v1/seller/search", token=self.token, q=o1.order_number).json()["orders"][0]["label"], o1.order_number)

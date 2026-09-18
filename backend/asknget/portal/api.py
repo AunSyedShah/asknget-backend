@@ -19,7 +19,7 @@ from core.auth import StaffAuth
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
-from . import customers, inventory, orders, products
+from . import customers, dashboard, inventory, orders, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -29,6 +29,8 @@ from .schemas import (
     InventoryVariantOut,
     StockAdjustIn,
     StockMovementOut,
+    DashboardOut,
+    PortalSearchOut,
     CustomerDetailOut,
     CustomerNoteIn,
     CustomerNoteOut,
@@ -67,6 +69,8 @@ admin_products_router = Router(tags=["admin: products"], auth=StaffAuth())
 inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth())
 orders_router = Router(tags=["seller: orders"], auth=StoreAuth())
 customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
+dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
+search_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 
 _NOT_FOUND = {404: ErrorOut}
 _EDIT = {200: SellerProductOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}
@@ -322,3 +326,18 @@ def customer_note_add(request, key: str, payload: CustomerNoteIn):
 def customer_note_delete(request, key: str, note_id: UUID):
     customers.delete_note(request.store, key, note_id)
     return 204, None
+
+
+# --------------------------------------------------------------------------- #
+# Dashboard + header search
+# --------------------------------------------------------------------------- #
+
+
+@dashboard_router.get("", response=DashboardOut, summary="Seller Dashboard: KPIs, revenue chart, performance, latest orders, stock breakdown")
+def dashboard_summary(request, period: PeriodLit = "month"):
+    return dashboard.summary(request.store, request.auth, period)
+
+
+@search_router.get("", response=PortalSearchOut, summary="Header 'Search anything...' across own products, orders and customers")
+def portal_search(request, q: str = Query(..., min_length=1, max_length=80), limit: int = Query(5, ge=1, le=10)):
+    return dashboard.search(request.store, q, limit)

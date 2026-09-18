@@ -590,3 +590,62 @@ class CustomerDetailOut(CustomerRowOut):
 
 class CustomerNoteIn(Schema):
     body: NonEmptyStr = Field(max_length=2000)
+
+
+# --------------------------------------------------------------------------- #
+# Dashboard + header search
+# --------------------------------------------------------------------------- #
+
+
+class SellerRefOut(Schema):
+    name: str
+    first_name: str
+    role: str
+
+
+class DashboardStoreOut(Schema):
+    id: UUID
+    name: str
+    slug: str
+    currency: str
+
+
+class PerformanceOut(Schema):
+    product_views: Kpi
+    conversion_rate: Kpi = Field(..., description="%")
+    aov_cents: Kpi
+    customer_growth: Kpi
+
+
+class StockBreakdownOut(Schema):
+    in_stock: int
+    low_stock: int
+    out_of_stock: int
+
+
+class DashboardOut(Schema):
+    period: str
+    seller: SellerRefOut
+    store: DashboardStoreOut
+    sales_cents: Kpi = Field(..., description="'Total Sales' — booked in the period")
+    orders: Kpi
+    products: Kpi
+    new_products: int
+    low_stock: int
+    revenue_cents: Kpi = Field(..., description="'Total Revenue' — delivered in the period")
+    revenue_series: list[SeriesPoint] = Field(..., description="Jan..Dec: revenue + orders")
+    performance: PerformanceOut
+    latest_orders: list[SellerOrderRowOut]
+    stock_breakdown: StockBreakdownOut
+
+
+class SearchHitOut(Schema):
+    id: str
+    label: str
+    sub: str = ""
+
+
+class PortalSearchOut(Schema):
+    products: list[SearchHitOut]
+    orders: list[SearchHitOut]
+    customers: list[SearchHitOut]
