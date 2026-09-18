@@ -19,7 +19,7 @@ from core.auth import StaffAuth
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
-from . import inventory, products
+from . import inventory, orders, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -29,6 +29,14 @@ from .schemas import (
     InventoryVariantOut,
     StockAdjustIn,
     StockMovementOut,
+    OrderCancelIn,
+    OrderStatusIn,
+    OrderTabsOut,
+    SellerInvoiceOut,
+    SellerOrderDetailOut,
+    SellerOrderQuery,
+    SellerOrderRowOut,
+    SellerOrdersOverviewOut,
     ContentIn,
     ImageOrderIn,
     OptionsIn,
@@ -50,6 +58,7 @@ from .schemas import (
 products_router = Router(tags=["seller: products"], auth=StoreAuth())
 admin_products_router = Router(tags=["admin: products"], auth=StaffAuth())
 inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth())
+orders_router = Router(tags=["seller: orders"], auth=StoreAuth())
 
 _NOT_FOUND = {404: ErrorOut}
 _EDIT = {200: SellerProductOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}
@@ -213,3 +222,53 @@ def inventory_adjust(request, variant_id: UUID, payload: StockAdjustIn):
 @inventory_router.get("/{variant_id}/movements", response={200: list[StockMovementOut], 404: ErrorOut}, summary="Inventory movements for one variant")
 def inventory_movements(request, variant_id: UUID, limit: int = Query(50, ge=1, le=200)):
     return [inventory.movement_out(m) for m in inventory.movements(request.store, variant_id, limit)]
+
+
+# --------------------------------------------------------------------------- #
+# Orders
+# --------------------------------------------------------------------------- #
+
+_ORDER = {200: SellerOrderDetailOut, 404: ErrorOut, 409: ErrorOut}
+
+
+@orders_router.get("/overview", response=SellerOrdersOverviewOut, summary="Orders Overview: KPIs, monthly chart, status donut, latest")
+def orders_overview(request, period: PeriodLit = "month"):
+    return orders.overview(request.store, period)
+
+
+@orders_router.get("", response=list[SellerOrderRowOut], summary="Orders table (tabs, search, date range)")
+@paginate(PagePagination)
+def orders_list(request, filters: SellerOrderQuery = Query(...)):
+    return [orders.row(o) for o in orders.list_orders(request.store, tab=filters.tab, q=filters.q, date_from=filters.date_from, date_to=filters.date_to, sort=filters.sort)]
+
+
+@orders_router.get("/tabs", response=OrderTabsOut)
+def orders_tabs(request):
+    return orders.tabs(request.store)
+
+
+@orders_router.get("/export.csv", summary="'Export' — CSV of this store's orders")
+def orders_export(request):
+    return orders.export(request.store)
+
+
+@orders_router.get("/{order_id}", response={200: SellerOrderDetailOut, 404: ErrorOut}, summary="View Order")
+def order_detail(request, order_id: UUID):
+    return orders.detail(orders.get_order(request.store, order_id), request.store)
+
+
+@orders_router.post("/{order_id}/status", response=_ORDER, summary="'Update Status' (processing → packed → shipped → delivered; returned after delivery)")
+def order_status(request, order_id: UUID, payload: OrderStatusIn):
+    order = orders.update_status(request.store, order_id, status=payload.status, note=payload.note, actor=request.auth)
+    return orders.detail(order, request.store)
+
+
+@orders_router.post("/{order_id}/cancel", response=_ORDER, summary="'Cancel Order' (this store's lines; stock restored)")
+def order_cancel(request, order_id: UUID, payload: OrderCancelIn):
+    order = orders.cancel(request.store, order_id, reason=payload.reason, actor=request.auth)
+    return orders.detail(order, request.store)
+
+
+@orders_router.get("/{order_id}/invoice", response={200: SellerInvoiceOut, 404: ErrorOut}, summary="'Print / Download Invoice' — invoice data (PDF layout is UI-side)")
+def order_invoice(request, order_id: UUID):
+    return orders.invoice(orders.get_order(request.store, order_id), request.store)

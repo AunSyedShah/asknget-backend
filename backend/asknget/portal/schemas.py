@@ -3,7 +3,7 @@
 Every KPI is {value, previous, change_pct} so cards can render "12.8% vs. previous period".
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -385,3 +385,136 @@ class StockMovementOut(Schema):
     order_number: Optional[str] = None
     actor: Optional[str] = None
     created_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Orders
+# --------------------------------------------------------------------------- #
+
+OrderTabLit = Literal["all", "pending", "processing", "shipped", "delivered", "cancelled", "returned"]
+OrderSortLit = Literal["newest", "oldest", "total", "total_asc"]
+FulfilmentLit = Literal["processing", "packed", "shipped", "delivered", "cancelled", "returned"]
+
+
+class SellerOrderQuery(FilterSchema):
+    tab: OrderTabLit = "all"
+    q: Optional[str] = Field(None, max_length=120, description="Order number, customer name or email")
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    sort: OrderSortLit = "newest"
+
+
+class SellerOrderRowOut(Schema):
+    id: UUID
+    order_number: str
+    customer: str
+    customer_email: str
+    items_count: int
+    placed_at: datetime
+    total_cents: int = Field(..., description="This store's lines only")
+    currency: str
+    payment_method: str
+    payment_status: str
+    status: str = Field(..., description="Per-store fulfilment status")
+
+
+class OrderTabsOut(Schema):
+    all: int
+    pending: int
+    processing: int
+    shipped: int
+    delivered: int
+    cancelled: int
+    returned: int
+
+
+class SellerOrdersOverviewOut(Schema):
+    period: str
+    total_orders: Kpi
+    pending: Kpi
+    processing: Kpi
+    delivered: Kpi
+    monthly: list[SeriesPoint] = Field(..., description="Jan..Dec of the current year: delivered / pending / refunded")
+    status_share: dict[str, float] = Field(..., description="'Orders Status' donut: % of period orders per status")
+    latest: list[SellerOrderRowOut]
+    tabs: OrderTabsOut
+
+
+class TimelineStageOut(Schema):
+    key: str
+    label: str
+    at: Optional[datetime] = None
+    state: Literal["done", "waiting", "skipped"]
+    note: str = ""
+
+
+class SellerOrderItemOut(Schema):
+    id: UUID
+    product_id: Optional[UUID] = None
+    product_slug: Optional[str] = None
+    product_name: str
+    variant_summary: str
+    image_url: Optional[str] = None
+    qty: int
+    unit_price_cents: int
+    line_total_cents: int
+    status: str
+
+
+class OrderCustomerOut(Schema):
+    name: str
+    email: str
+    phone: str
+    customer_key: str = Field(..., description="Use with /seller/customers/{key}")
+
+
+class OrderPaymentOut(Schema):
+    method: str
+    status: str
+    amount_cents: int
+    currency: str
+
+
+class OrderSummaryBlockOut(Schema):
+    subtotal_cents: int
+    shipping_cents: int
+    discount_cents: int
+    tax_cents: int
+    total_cents: int
+    currency: str
+    multi_store: bool = Field(..., description="Order also contains other stores' items; shipping/discount are order-level")
+    order_total_cents: int
+    shipping_shared: bool
+
+
+class SellerOrderDetailOut(Schema):
+    id: UUID
+    order_number: str
+    placed_at: datetime
+    status: str
+    allowed_next: list[str]
+    customer: OrderCustomerOut
+    shipping_address: dict
+    billing_address: Optional[dict] = None
+    delivery_method: Optional[dict] = None
+    special_note: str
+    payment: OrderPaymentOut
+    timeline: list[TimelineStageOut]
+    items: list[SellerOrderItemOut]
+    summary: OrderSummaryBlockOut
+    cancel_reason: str
+
+
+class SellerInvoiceOut(SellerOrderDetailOut):
+    invoice_number: str
+    issued_at: datetime
+    seller: dict
+
+
+class OrderStatusIn(Schema):
+    status: FulfilmentLit
+    note: str = Field("", max_length=255)
+
+
+class OrderCancelIn(Schema):
+    reason: NonEmptyStr = Field(max_length=255)

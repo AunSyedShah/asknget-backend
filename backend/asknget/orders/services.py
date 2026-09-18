@@ -513,10 +513,11 @@ def set_status(order: Order, *, status: str, actor_user, note: str = "", locatio
 
 
 def derive_order_status(order: Order) -> str:
-    """Buyer-facing status from the per-store parts. Unpaid and refunded orders are left alone."""
+    """Buyer-facing status from the per-store parts. Unpaid and refunded orders are left alone.
+    Queries OrderItem directly: `order.items` may be a store-filtered prefetch."""
     if order.status in (Status.PENDING_PAYMENT, Status.REFUNDED):
         return order.status
-    parts = set(order.items.values_list("status", flat=True))
+    parts = set(OrderItem.objects.filter(order=order).values_list("status", flat=True))
     live = parts - {Fulfilment.CANCELLED}
     if not live:
         status = Status.CANCELLED
@@ -524,7 +525,7 @@ def derive_order_status(order: Order) -> str:
         status = Status.RETURNED if live == {Fulfilment.RETURNED} else Status.DELIVERED
     elif Fulfilment.SHIPPED in live:
         status = Status.SHIPPED
-    elif live & {Fulfilment.PROCESSING, Fulfilment.PACKED}:
+    elif live - {Fulfilment.PENDING}:  # some store has started (or finished) its part
         status = Status.PROCESSING
     else:
         status = Status.CONFIRMED
@@ -540,7 +541,7 @@ def derive_order_status(order: Order) -> str:
 def set_store_status(order: Order, store, *, status: str, actor_user, note: str = "") -> Order:
     """A seller moves *their* lines of an order. Records a per-store timeline event,
     restocks on cancel/return and re-derives the buyer-facing order status."""
-    items = list(order.items.filter(store=store).select_related("variant"))
+    items = list(OrderItem.objects.filter(order=order, store=store).select_related("variant"))
     if not items:
         raise HttpError(404, "Order not found")
     current = items[0].status
@@ -550,7 +551,7 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
         _restock(order, items, reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
     elif status == Fulfilment.RETURNED:
         _restock(order, items, reason=StockMovement.Reason.RETURN, actor_user=actor_user)
-    order.items.filter(store=store).update(status=status)
+    OrderItem.objects.filter(order=order, store=store).update(status=status)
     OrderStatusEvent.objects.create(
         order=order, store=store, status=FULFILMENT_TO_ORDER[status], note=note[:255],
         actor=OrderStatusEvent.OrderEventActor.SELLER, actor_user=actor_user,

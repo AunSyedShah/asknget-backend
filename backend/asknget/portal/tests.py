@@ -7,7 +7,7 @@ from PIL import Image
 
 from catalog.models import Brand, Category, Product, ProductVariant, StockMovement
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
-from orders.models import Order, OrderItem
+from orders.models import Order, OrderItem, OrderStatusEvent
 from sellers.models import Store
 
 P = "/api/v1/seller/products"
@@ -274,3 +274,98 @@ class InventoryTests(PortalBase):
         self.assertEqual(len(lines), 3)
         self.assertTrue(lines[0].startswith("product,sku,options"))
         self.assertIn("Shade: Ivory", lines[1])
+
+
+class OrderTests(PortalBase):
+    O = "/api/v1/seller/orders"
+
+    def setUp(self):
+        super().setUp()
+        self.bb = make_product(self.store, self.makeup, "BB Cream", 4999, None, stock=10)
+        self.teddy = make_product(self.store, self.makeup, "Teddy Bear", 2299, None, stock=10)
+        self.foreign = make_product(self.other_store, self.makeup, "Foreign Lamp", 1000, None, stock=10)
+        self.olivia = make_user(full_name="Olivia Martin")
+
+    def test_list_only_shows_my_paid_slice(self):
+        mixed = self._order((self.bb, 1), (self.teddy, 2), (self.foreign, 1), user=self.olivia)  # multi-store
+        self._order((self.foreign, 1), user=self.olivia)                                       # not mine
+        self._order((self.bb, 1), user=self.olivia, order_status="pending_payment")            # unpaid
+        self._order((self.teddy, 1), user=self.olivia, status="delivered")
+        body = self.get(self.O, token=self.token).json()
+        self.assertEqual(body["total"], 2)
+        rows = {r["order_number"]: r for r in body["items"]}
+        mine = rows[mixed.order_number]
+        self.assertEqual((mine["items_count"], mine["total_cents"], mine["status"], mine["customer"]), (3, 4999 + 2 * 2299, "pending", "Olivia Martin"))
+        self.assertEqual(self.get(self.O, token=self.token, tab="delivered").json()["total"], 1)
+        self.assertEqual(self.get(self.O, token=self.token, q="olivia").json()["total"], 2)
+        self.assertEqual(self.get(f"{self.O}/tabs", token=self.token).json(), {"all": 2, "pending": 1, "processing": 0, "shipped": 0, "delivered": 1, "cancelled": 0, "returned": 0})
+
+    def test_detail_timeline_and_status_flow(self):
+        order = self._order((self.bb, 1), (self.teddy, 2), (self.foreign, 1), user=self.olivia)
+        body = self.get(f"{self.O}/{order.pk}", token=self.token).json()
+        self.assertEqual(body["status"], "pending")
+        self.assertEqual(sorted(body["allowed_next"]), ["cancelled", "processing"])
+        self.assertEqual([i["product_name"] for i in body["items"]], ["BB Cream", "Teddy Bear"])  # not the foreign lamp
+        self.assertEqual(body["summary"]["subtotal_cents"], 4999 + 2 * 2299)
+        self.assertTrue(body["summary"]["multi_store"])
+        self.assertEqual([s["state"] for s in body["timeline"]], ["done", "done", "waiting", "waiting", "waiting", "waiting"])
+        self.assertEqual(body["customer"]["customer_key"], str(self.olivia.pk))
+
+        for status in ("processing", "packed", "shipped"):
+            res = self.post(f"{self.O}/{order.pk}/status", {"status": status, "note": f"now {status}"}, token=self.token)
+            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(res.json()["status"], status)
+        order.refresh_from_db()
+        self.assertEqual(order.status, "shipped")  # buyer-facing status derived from my part (other store still pending → shipped wins)
+        self.assertEqual(self.post(f"{self.O}/{order.pk}/status", {"status": "processing"}, token=self.token).status_code, 409)  # no going back
+        res = self.post(f"{self.O}/{order.pk}/status", {"status": "delivered"}, token=self.token)
+        stages = {s["key"]: s for s in res.json()["timeline"]}
+        self.assertEqual(stages["packed"]["note"], "now packed")
+        self.assertTrue(all(stages[k]["state"] == "done" for k in ("processing", "packed", "shipped", "delivered")))
+        order.refresh_from_db()
+        self.assertEqual(order.status, "processing")  # my part delivered, the other store's part still pending → not delivered yet
+        # the other store's events are invisible to me
+        self.assertEqual(OrderStatusEvent.objects.filter(order=order, store=self.store).count(), 4)
+        # buyer's own tracking still works and shows seller steps
+        self.assertEqual(self.post("/api/v1/orders/track", {"order_number": order.order_number, "email": self.olivia.email}).status_code, 200)
+
+    def test_cancel_and_return_restock(self):
+        order = self._order((self.bb, 3), user=self.olivia)
+        before = ProductVariant.objects.get(pk=self.bb.variants.first().pk).stock_qty
+        res = self.post(f"{self.O}/{order.pk}/cancel", {"reason": "Out of stock"}, token=self.token)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["status"], "cancelled")
+        self.assertEqual(ProductVariant.objects.get(pk=self.bb.variants.first().pk).stock_qty, before + 3)
+        order.refresh_from_db()
+        self.assertEqual((order.status, order.cancelled_at is not None), ("cancelled", True))
+        self.assertEqual(StockMovement.objects.filter(order=order, reason="cancel").count(), 1)
+        self.assertEqual(self.post(f"{self.O}/{order.pk}/cancel", {"reason": "again"}, token=self.token).status_code, 409)
+
+        delivered = self._order((self.teddy, 1), user=self.olivia, status="delivered", order_status="delivered")
+        res = self.post(f"{self.O}/{delivered.pk}/status", {"status": "returned"}, token=self.token)
+        self.assertEqual(res.status_code, 200, res.content)
+        delivered.refresh_from_db()
+        self.assertEqual(delivered.status, "returned")
+        self.assertEqual(StockMovement.objects.filter(order=delivered, reason="return").count(), 1)
+
+    def test_overview_invoice_export(self):
+        self._order((self.bb, 1), user=self.olivia)
+        d = self._order((self.teddy, 1), user=self.olivia)
+        self.post(f"{self.O}/{d.pk}/status", {"status": "processing"}, token=self.token)
+        self.post(f"{self.O}/{d.pk}/status", {"status": "shipped"}, token=self.token)
+        self.post(f"{self.O}/{d.pk}/status", {"status": "delivered"}, token=self.token)
+        body = self.get(f"{self.O}/overview", token=self.token).json()
+        self.assertEqual((body["total_orders"]["value"], body["pending"]["value"], body["delivered"]["value"]), (2, 1, 1))
+        self.assertEqual(body["status_share"], {"pending": 50.0, "delivered": 50.0})
+        self.assertEqual(len(body["monthly"]), 12)
+        self.assertEqual(sum(m["values"]["delivered"] for m in body["monthly"]), 1)
+        self.assertEqual(len(body["latest"]), 2)
+        inv = self.get(f"{self.O}/{d.pk}/invoice", token=self.token).json()
+        self.assertTrue(inv["invoice_number"].startswith(f"INV-{d.order_number}-"))
+        self.assertEqual(inv["seller"]["name"], "Huda Beauty")
+        res = self.get(f"{self.O}/export.csv", token=self.token)
+        lines = b"".join(res.streaming_content).decode().strip().splitlines()
+        self.assertEqual(len(lines), 3)
+        # foreign order is 404, not 403 (no information leak)
+        other = self._order((self.foreign, 1), user=self.olivia)
+        self.assertEqual(self.get(f"{self.O}/{other.pk}", token=self.token).status_code, 404)
