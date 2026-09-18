@@ -224,3 +224,53 @@ class ProductListTests(PortalBase):
         self.assertEqual((body["views"]["value"], body["sold_qty"]["value"], body["earned_cents"]["value"]), (2, 2, 5198))
         self.assertEqual(body["conversion_rate"]["value"], 50.0)
         self.assertEqual(len(body["daily"]), 30)
+
+
+class InventoryTests(PortalBase):
+    def test_rows_kpis_adjust_and_movements(self):
+        from catalog.services import refresh_stock_status
+
+        bb = make_product(self.store, self.makeup, "BB Cream", options={"Shade": ["Ivory", "Natural"]}, stock=2)
+        boots = make_product(self.store, self.makeup, "Boots", stock=0)
+        make_product(self.other_store, self.makeup, "Not mine")
+        for p in (bb, boots):
+            refresh_stock_status(p)
+        self._order((bb, 1), user=make_user())  # pending → reserved
+
+        body = self.get("/api/v1/seller/inventory", token=self.token).json()
+        self.assertEqual(body["total"], 2)
+        rows = {r["name"]: r for r in body["items"]}
+        self.assertEqual((rows["BB Cream"]["on_hand"], rows["BB Cream"]["reserved"], rows["BB Cream"]["variant_count"]), (4, 1, 2))
+        self.assertEqual(rows["Boots"]["stock_status"], "out_of_stock")
+        kpis = self.get("/api/v1/seller/inventory/kpis", token=self.token).json()
+        self.assertEqual((kpis["total_products"], kpis["total_variants"], kpis["total_units"], kpis["out_of_stock"], kpis["low_stock"]), (2, 3, 4, 1, 1))
+        self.assertEqual(kpis["tabs"]["recent"], 0)
+
+        vid = rows["Boots"]["variants"][0]["id"]
+        res = self.post(f"/api/v1/seller/inventory/{vid}/adjust", {"delta": 50, "note": "Received"}, token=self.token)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["stock_qty"], 50)
+        self.assertEqual(self.post(f"/api/v1/seller/inventory/{vid}/adjust", {"set": 50}, token=self.token).status_code, 422)
+        self.assertEqual(self.post(f"/api/v1/seller/inventory/{vid}/adjust", {"delta": -60}, token=self.token).status_code, 409)
+        self.assertEqual(self.post(f"/api/v1/seller/inventory/{vid}/adjust", {"set": 5, "delta": 1}, token=self.token).status_code, 422)
+        res = self.post(f"/api/v1/seller/inventory/{vid}/adjust", {"set": 3}, token=self.token)
+        self.assertEqual(res.json()["stock_qty"], 3)
+        boots.refresh_from_db()
+        self.assertEqual(boots.stock_status, "low_stock")
+        moves = self.get(f"/api/v1/seller/inventory/{vid}/movements", token=self.token).json()
+        self.assertEqual([(m["delta"], m["qty_after"], m["reason"]) for m in moves], [(-47, 3, "manual"), (50, 50, "manual")])
+        self.assertEqual(moves[0]["actor"], "Sirosh Bashir")
+        self.assertEqual(self.get("/api/v1/seller/inventory", token=self.token, tab="recent").json()["total"], 1)
+        # another store's variant is invisible
+        foreign = ProductVariant.objects.filter(product__store=self.other_store).first()
+        self.assertEqual(self.post(f"/api/v1/seller/inventory/{foreign.pk}/adjust", {"delta": 1}, token=self.token).status_code, 404)
+
+    def test_export_csv(self):
+        make_product(self.store, self.makeup, "BB Cream", options={"Shade": ["Ivory", "Natural"]}, stock=2)
+        res = self.get("/api/v1/seller/inventory/export.csv", token=self.token)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "text/csv; charset=utf-8")
+        lines = b"".join(res.streaming_content).decode().strip().splitlines()
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[0].startswith("product,sku,options"))
+        self.assertIn("Shade: Ivory", lines[1])

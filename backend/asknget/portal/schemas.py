@@ -302,3 +302,86 @@ class AdminProductRowOut(Schema):
     status: str
     submitted_at: Optional[datetime] = None
     image_url: Optional[str] = None
+
+
+# --------------------------------------------------------------------------- #
+# Inventory
+# --------------------------------------------------------------------------- #
+
+InventoryTabLit = Literal["all", "low", "out", "recent"]
+InventorySortLit = Literal["updated", "stock", "stock_desc", "name"]
+
+
+class InventoryQuery(FilterSchema):
+    tab: InventoryTabLit = "all"
+    q: Optional[str] = Field(None, max_length=120)
+    brand: Optional[list[str]] = None
+    category: Optional[str] = None
+    sort: InventorySortLit = "updated"
+
+
+class InventoryVariantOut(Schema):
+    id: UUID
+    sku: str
+    option_values: dict[str, str]
+    stock_qty: int
+    is_active: bool
+
+
+class InventoryRowOut(Schema):
+    id: UUID
+    name: str
+    slug: str
+    image_url: Optional[str] = None
+    category: Optional[str] = None
+    brand: Optional[str] = None
+    on_hand: int = Field(..., description="Sum of active variants' stock")
+    reserved: int = Field(..., description="Units in paid orders not yet shipped (informational)")
+    available: int
+    variant_count: int
+    stock_status: str
+    status: str
+    low_stock_threshold: int
+    last_updated: datetime
+    variants: list[InventoryVariantOut]
+
+
+class InventoryTabsOut(Schema):
+    all: int
+    low: int
+    out: int
+    recent: int
+
+
+class InventoryKpisOut(Schema):
+    total_products: int
+    total_variants: int
+    total_units: int
+    out_of_stock: int
+    low_stock: int
+    tabs: InventoryTabsOut
+
+
+class StockAdjustIn(Schema):
+    """Exactly one of `set` / `delta`."""
+
+    set: Optional[int] = Field(None, ge=0, description="New absolute quantity")
+    delta: Optional[int] = Field(None, description="Change, e.g. +50 received, -2 damaged")
+    note: str = Field("", max_length=255)
+
+    @model_validator(mode="after")
+    def _one_of(self):
+        if (self.set is None) == (self.delta is None):
+            raise ValueError("Provide exactly one of set / delta")
+        return self
+
+
+class StockMovementOut(Schema):
+    id: UUID
+    delta: int
+    qty_after: int
+    reason: str
+    note: str
+    order_number: Optional[str] = None
+    actor: Optional[str] = None
+    created_at: datetime

@@ -19,10 +19,16 @@ from core.auth import StaffAuth
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
-from . import products
+from . import inventory, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
+    InventoryKpisOut,
+    InventoryQuery,
+    InventoryRowOut,
+    InventoryVariantOut,
+    StockAdjustIn,
+    StockMovementOut,
     ContentIn,
     ImageOrderIn,
     OptionsIn,
@@ -43,6 +49,7 @@ from .schemas import (
 
 products_router = Router(tags=["seller: products"], auth=StoreAuth())
 admin_products_router = Router(tags=["admin: products"], auth=StaffAuth())
+inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth())
 
 _NOT_FOUND = {404: ErrorOut}
 _EDIT = {200: SellerProductOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}
@@ -174,3 +181,35 @@ def admin_product_reject(request, product_id: UUID, payload: RejectIn):
         return 404, {"detail": "Product not found"}
     products.reject(product, payload.reason)
     return {"detail": f"{product.name} rejected"}
+
+
+# --------------------------------------------------------------------------- #
+# Inventory
+# --------------------------------------------------------------------------- #
+
+
+@inventory_router.get("", response=list[InventoryRowOut], summary="Inventory table (per product, variants nested)")
+@paginate(PagePagination)
+def inventory_list(request, filters: InventoryQuery = Query(...)):
+    return [inventory.row(p) for p in inventory.list_inventory(request.store, tab=filters.tab, q=filters.q, brand=filters.brand, category=filters.category, sort=filters.sort)]
+
+
+@inventory_router.get("/kpis", response=InventoryKpisOut)
+def inventory_kpis(request):
+    return inventory.kpis(request.store)
+
+
+@inventory_router.get("/export.csv", summary="'Export' — CSV, one line per variant")
+def inventory_export(request):
+    return inventory.export(request.store)
+
+
+@inventory_router.post("/{variant_id}/adjust", response={200: InventoryVariantOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Adjust stock (logged as a manual movement)")
+def inventory_adjust(request, variant_id: UUID, payload: StockAdjustIn):
+    inventory.adjust(request.store, variant_id, set_to=payload.set, delta=payload.delta, note=payload.note, actor=request.auth)
+    return inventory.variant_row(inventory.get_variant(request.store, variant_id))
+
+
+@inventory_router.get("/{variant_id}/movements", response={200: list[StockMovementOut], 404: ErrorOut}, summary="Inventory movements for one variant")
+def inventory_movements(request, variant_id: UUID, limit: int = Query(50, ge=1, le=200)):
+    return [inventory.movement_out(m) for m in inventory.movements(request.store, variant_id, limit)]
