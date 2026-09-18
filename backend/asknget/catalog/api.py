@@ -15,6 +15,8 @@ from core.auth import JWTAuth, OptionalJWTAuth
 from core.pagination import PagePagination
 from core.schemas import ErrorOut
 
+from discovery import events
+
 from . import services
 from .models import Brand
 from .schemas import (
@@ -68,7 +70,10 @@ def product_filters(request):
 @catalog_router.get("/products", response=list[ProductCardOut], auth=OptionalJWTAuth(), summary="Search / browse products")
 @paginate(PagePagination)
 def product_list(request, filters: ProductQuery = Query(...)):
-    return services.filter_products(services.public_products(), filters)
+    qs = services.filter_products(services.public_products(), filters)
+    if filters.q and request.GET.get("page", "1") == "1":  # query log: what shoppers look for, and what finds nothing
+        events.record_search(request, filters.q, qs.count())
+    return qs
 
 
 @catalog_router.get("/products/featured", response=list[ProductCardOut], auth=OptionalJWTAuth(), summary="Landing: 'Featured Products'")
@@ -94,7 +99,9 @@ def product_top_discounted(request, limit: int = Query(8, ge=1, le=24)):
 
 @catalog_router.get("/products/{slug}", response={200: ProductDetailOut, 404: ErrorOut}, auth=OptionalJWTAuth(), summary="Product Details")
 def product_detail(request, slug: str):
-    return services.get_product(slug)
+    product = services.get_product(slug)
+    events.record(events.ProductEvent.Kind.VIEW, product=product, request=request)
+    return product
 
 
 @catalog_router.get("/products/{slug}/related", response=list[ProductCardOut], auth=OptionalJWTAuth(), summary="'You may also like'")

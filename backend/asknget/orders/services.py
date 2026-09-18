@@ -16,6 +16,7 @@ from ninja.errors import HttpError
 
 from accounts.models import Address, PaymentMethod
 from catalog.models import Product, ProductVariant
+from discovery import events
 from sellers.models import Store
 
 from .models import Cart, CartItem, DeliveryMethod, Order, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
@@ -210,6 +211,8 @@ def add_item(cart: Cart, *, variant_id, qty: int) -> None:
     if not created:
         line.qty = min(line.qty + qty, variant.stock_qty, 99)
         line.save(update_fields=["qty", "updated_at"])
+    else:
+        events.record_for_cart(events.ProductEvent.Kind.ADD_TO_CART, product=variant.product, cart=cart)
 
 
 def set_item_qty(cart: Cart, item_id, qty: int) -> None:
@@ -352,6 +355,7 @@ def checkout(request, cart: Cart, payload) -> Order:
             line_total_cents=line["line_total_cents"],
         )
         ProductVariant.objects.filter(pk=v.pk).update(stock_qty=F("stock_qty") - item.qty)
+        events.record_for_cart(events.ProductEvent.Kind.PURCHASE, product=v.product, cart=cart)
     if cart.voucher_id:
         VoucherRedemption.objects.create(voucher=cart.voucher, user=user, order=order)
         Voucher.objects.filter(pk=cart.voucher_id).update(used_count=F("used_count") + 1)

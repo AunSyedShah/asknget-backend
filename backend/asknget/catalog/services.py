@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Avg, Count, Max, Min, Prefetch, Q
+from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch, Q, When
 from ninja.errors import HttpError
 
 from sellers.models import Store
@@ -92,8 +92,8 @@ SORTS = {
 
 
 def filter_products(qs, f):
-    if f.q:
-        qs = qs.filter(Q(name__icontains=f.q) | Q(short_description__icontains=f.q) | Q(brand__name__icontains=f.q))
+    """Apply every sidebar filter exactly, then rank. With `q`, ranking is the
+    hybrid keyword + semantic search (discovery.search) over the filtered set."""
     if f.category:
         qs = qs.filter(category__in=category_with_descendants(f.category))
     if f.brand:
@@ -119,7 +119,19 @@ def filter_products(qs, f):
         qs = qs.filter(is_best_seller=True)
     if f.new_arrival:
         qs = qs.filter(is_new_arrival=True)
-    return qs.distinct().order_by(*SORTS[f.sort])
+    qs = qs.distinct()
+    sort = f.sort or ("relevance" if f.q else "new")
+    if f.q:
+        from discovery.search import hybrid_search
+
+        ranked = [pid for pid, _ in hybrid_search(qs, f.q)]
+        qs = qs.filter(pk__in=ranked)
+        if sort == "relevance":
+            position = Case(*[When(pk=pid, then=i) for i, pid in enumerate(ranked)], output_field=IntegerField())
+            return qs.order_by(position) if ranked else qs.none()
+    elif sort == "relevance":
+        sort = "new"
+    return qs.order_by(*SORTS[sort])
 
 
 def filters_payload() -> dict:
@@ -267,7 +279,11 @@ def wishlist_add(user, product_id) -> WishlistItem:
     product = public_products().filter(pk=product_id).first()
     if product is None:
         raise HttpError(404, "Product not found")
-    item, _ = WishlistItem.objects.get_or_create(user=user, product=product)
+    item, created = WishlistItem.objects.get_or_create(user=user, product=product)
+    if created:
+        from discovery import events
+
+        events.record(events.ProductEvent.Kind.WISHLIST, product=product, user=user)
     return item
 
 

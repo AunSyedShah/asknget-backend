@@ -26,6 +26,8 @@ if [ "${SKIP_MIGRATE:-0}" != "1" ]; then
   python manage.py migrate --noinput
   echo "[entrypoint] seeding lookup tables (idempotent)"
   python manage.py seed_lookups
+  echo "[entrypoint] embedding new/changed products for search"
+  python manage.py embed_products
 fi
 
 exec "$@"

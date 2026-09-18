@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.3"
+VERSION = "0.4"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +213,9 @@ story += [
         ["Cart (members + guests), vouchers, delivery methods, checkout", "Implemented", "/api/v1/cart/*, /checkout - order is created pending_payment"],
         ["My Orders, cancel, re-order, public tracking, admin order status", "Implemented", "/api/v1/me/orders/*, /orders/track, /admin/orders/*"],
         ["Banners, newsletter, contact form, site info", "Implemented", "/api/v1/banners, /newsletter/subscribe, /contact, /site-info"],
+        ["AI search: hybrid keyword + semantic ranking, typo tolerance, suggestions, query log", "Implemented", "/api/v1/products?q=, /search/suggest - pgvector; offline embedder by default, Voyage/OpenAI by env"],
+        ["Recommendations: similar, frequently bought together, trending, 'Recommended for you'", "Implemented", "/api/v1/products/{slug}/similar|frequently-bought-together, /recommendations"],
+        ["Docker packaging: API image (uv), Postgres+pgvector, embeddings worker", "Implemented", "compose.yaml (+ compose.override.yaml for live reload)"],
         ["Payment provider: card tokenisation, capture, webhooks, 'save card'", "Planned", "Next sprint. Checkout records the chosen method only; orders stay unpaid until then."],
         ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "Requested by team lead; not in Figma; schema proposal pending"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
@@ -229,12 +232,14 @@ story += [
         ["API framework", "django-ninja 1.7", "Fast, typed REST on top of Django; pydantic v2 validation; auto OpenAPI/Swagger"],
         ["Validation", "pydantic 2", "Every request body is a typed schema; errors are returned as 422 with field paths"],
         ["Auth", "PyJWT (HS256)", "Short-lived access tokens; opaque rotating refresh tokens stored hashed"],
-        ["Database", "PostgreSQL (target) / SQLite (dev fallback)", "Set DATABASE_URL to switch; psycopg 3 driver"],
+        ["Database", "PostgreSQL 17 + pgvector (target) / SQLite (dev fallback)", "Set DATABASE_URL to switch; psycopg 3 driver with connection pool; pgvector for embeddings, full-text + trigram for keywords"],
+        ["Embeddings", "hash (offline, default) / Voyage AI / OpenAI", "EMBEDDING_PROVIDER; one vector per product (discovery.ProductEmbedding); swap provider then embed_products --all"],
+        ["Containers", "Docker Compose: db, web (gunicorn), worker", "Two-stage image from astral/uv; dev override bind-mounts the code for live reload"],
         ["Field encryption", "cryptography (Fernet)", "ID/passport numbers and bank account numbers encrypted at rest"],
         ["Images", "Pillow", "Avatar, product, banner, store images"],
         ["Config", "python-dotenv + dj-database-url", "All settings via environment variables / backend/.env"],
         ["Docs", "Swagger UI (built in)", "/api/v1/docs and /api/v1/openapi.json"],
-        ["Tests", "Django TestCase", "End-to-end through the real URL config; 29 tests for accounts"],
+        ["Tests", "Django TestCase", "End-to-end through the real URL config; 103 tests, green on SQLite and on Postgres+pgvector inside the container"],
     ], (34 * mm, 52 * mm, 86 * mm)),
 ]
 
@@ -512,7 +517,8 @@ story += [
         ["Reviews tab", "GET /products/{slug}/reviews?sort=new|top|low&page=, GET /products/{slug}/reviews/summary", "Approved reviews only; names abbreviated ('Ayesha K.')"],
         ["'Submit Review'", "POST /products/{slug}/reviews (multipart: name?, email?, rating, body, files[])",
          "Guests must send name + email; members default to their profile. Stored pending; 'Verified Purchase' when the member has a delivered order for it"],
-        ["'You may also like'", "GET /products/{slug}/related", "Same category first, then same brand"],
+        ["'You may also like'", "GET /products/{slug}/similar (or /related)", "similar = embedding neighbours, topped up by same category/brand; related = the old rule-only version"],
+        ["'Frequently bought together'", "GET /products/{slug}/frequently-bought-together", "Order co-occurrence (cancelled orders ignored), cached 10 min; falls back to similar"],
         ["Wishlist heart / Wishlist tab", "PUT|DELETE /me/wishlist/{productId}, GET /me/wishlist", "PUT is idempotent"],
     ]),
 
@@ -544,7 +550,26 @@ story += [
         ["Ops move an order (no screen)", "POST /admin/orders/{id}/status {status, note?, location?}", "confirmed -> processing -> shipped -> out_for_delivery -> delivered; each writes a timeline event"],
     ]),
 
-    P("6.12 Support and marketing", "h2"),
+    P("6.12 Search and recommendations", "h2"),
+    P("Search is <b>hybrid</b>: every sidebar filter is applied first (so results stay exact), then the remaining "
+      "candidates are ranked by two independent rankers fused with Reciprocal Rank Fusion - keyword (Postgres websearch "
+      "full-text over a per-product text card + trigram similarity on the name for typos) and semantic (cosine nearest "
+      "neighbours of the query embedding via pgvector). A product found by both rises; an exact brand/SKU still wins on "
+      "keywords alone; nonsense queries return nothing because each ranker has a relevance floor. "
+      "Recommendations reuse the same embeddings: a shopper's <b>taste profile</b> is the weighted mean of what they viewed "
+      "(1), wishlisted (3), added to cart (4) or bought (6), halved every 30 days; 'Recommended for you' is its nearest "
+      "neighbours minus everything they already interacted with. Behaviour is recorded server-side (discovery.ProductEvent) "
+      "from the existing endpoints - the frontend sends no tracking calls; guests are keyed by X-Cart-Token."),
+    flow([
+        ["Header search box (typeahead)", "GET /search/suggest?q=lip", "Up to 5 products, brands and categories matching the prefix (trigram-tolerant on Postgres)"],
+        ["'Search Products' / results page", "GET /products?q=...&category=&price_max=&sort=", "sort defaults to relevance when q is given; any explicit sort (price_asc...) is honoured over the matched set. Logged with result_count (0 = nothing found)"],
+        ["PDP 'You may also like'", "GET /products/{slug}/similar?limit=6", "Semantic neighbours across the whole public catalogue"],
+        ["PDP / cart 'Frequently bought together'", "GET /products/{slug}/frequently-bought-together?limit=4", "From real orders; similar() until enough orders exist"],
+        ["Home 'Recommended for you'", "GET /recommendations?limit=8 (+ Bearer or X-Cart-Token)", "strategy=personalised with seeds[] ('Because you viewed ...') or strategy=trending until there is history"],
+        ["Ops: switch to a real embedding model", "EMBEDDING_PROVIDER=voyage + VOYAGE_API_KEY, then manage.py embed_products --all", "Default 'hash' provider is offline/lexical (dev + tests); the worker service keeps embeddings fresh as products change"],
+    ]),
+
+    P("6.13 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -623,6 +648,10 @@ story += [
         ["GET /products/featured | best-sellers | new-arrivals | top-discounted", "optional", "?limit=", "200 [ProductCardOut]", ""],
         ["GET /products/{slug}", "optional", "-", "200 ProductDetailOut", "404"],
         ["GET /products/{slug}/related", "optional", "?limit=", "200 [ProductCardOut]", "404"],
+        ["GET /products/{slug}/similar", "optional", "?limit=", "200 [ProductCardOut]", "404"],
+        ["GET /products/{slug}/frequently-bought-together", "optional", "?limit=", "200 [ProductCardOut]", "404"],
+        ["GET /search/suggest", "-", "?q=&limit=", "200 SuggestOut", "422"],
+        ["GET /recommendations", "optional", "?limit= (+X-Cart-Token)", "200 RecommendationsOut", ""],
         ["GET /products/{slug}/reviews?sort=", "-", "-", "200 Page[ReviewOut]", "404"],
         ["GET /products/{slug}/reviews/summary", "-", "-", "200 RatingBreakdownOut", "404"],
         ["POST /products/{slug}/reviews", "optional", "multipart ReviewIn + files[]", "201 ReviewCreatedOut", "404, 409, 422"],
@@ -742,7 +771,8 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
         ["2", "Seller dashboard APIs: product CRUD, inventory, delivery setup, order fulfilment per store", "Design (referenced by 'Quick Start' but not drawn)"],
         ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
         ["4", "Vendor sub-roles/permissions, premium tier, vendor-customer messaging", "Product decisions + design"],
-        ["5", "Email/SMS providers, background jobs (category counts, rating refresh, cart expiry)", "Infra"],
+        ["5", "Email/SMS providers; more worker jobs (category counts, rating refresh, cart expiry)", "Worker service exists; add commands"],
+        ["6", "LLM query understanding ('gift under $50 for dry skin' -> filters) and a streaming shopping assistant", "Claude API key; ASGI (uvicorn) for streaming - only those endpoints go async"],
     ], (14 * mm, 112 * mm, 46 * mm)),
     Spacer(1, 6 * mm),
     P("Repository: https://github.com/AunSyedShah/asknget &nbsp;&nbsp;|&nbsp;&nbsp; Backend README: backend/README.md &nbsp;&nbsp;|&nbsp;&nbsp; "

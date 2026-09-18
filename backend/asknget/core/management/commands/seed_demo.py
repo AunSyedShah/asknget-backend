@@ -115,6 +115,9 @@ class Command(BaseCommand):
                     Review.objects.create(product=product, reviewer_name=who, reviewer_email="demo@asknget.demo", rating=rating, body=body, status="approved")
                 refresh_product_rating(product)
         refresh_category_counts()
+        from discovery.indexing import embed_products
+
+        embed_products()
 
         Voucher.objects.get_or_create(code="SAVE20", defaults=dict(type="percent", value=20, min_subtotal_cents=5000))
         Voucher.objects.get_or_create(code="WELCOME5", defaults=dict(type="fixed", value=500, per_user_limit=1))

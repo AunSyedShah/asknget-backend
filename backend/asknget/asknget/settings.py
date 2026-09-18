@@ -59,6 +59,17 @@ SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
 DEFAULT_CURRENCY = os.environ.get('DEFAULT_CURRENCY', 'USD')  # TODO(design): §10 Q1 — design shows '$'
 
+# Search & recommendations (discovery app). Provider `hash` is offline and needs
+# no key — good for dev/tests; switch to `voyage` or `openai` for real semantics.
+# Changing EMBEDDING_DIMENSIONS needs a migration (pgvector columns are fixed-width)
+# and `embed_products --all`.
+EMBEDDING_PROVIDER = os.environ.get('EMBEDDING_PROVIDER', 'hash')  # hash | voyage | openai
+EMBEDDING_MODEL = os.environ.get('EMBEDDING_MODEL', '')  # empty → provider default
+EMBEDDING_DIMENSIONS = int(os.environ.get('EMBEDDING_DIMENSIONS', 512))
+VOYAGE_API_KEY = os.environ.get('VOYAGE_API_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+SEARCH_MAX_CANDIDATES = int(os.environ.get('SEARCH_MAX_CANDIDATES', 200))  # deepest page a query can reach
+
 
 # Application definition
 
@@ -71,6 +82,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # third-party
     'ninja',
+    'django.contrib.postgres',  # full-text / trigram lookups (no-op on SQLite)
     # asknget
     'core',
     'accounts',
@@ -78,6 +90,7 @@ INSTALLED_APPS = [
     'sellers',
     'orders',
     'marketing',
+    'discovery',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -124,6 +137,11 @@ DATABASES = {
         conn_max_age=600,
     )
 }
+if DATABASES['default'].get('ENGINE', '').endswith('postgresql') and os.environ.get('DB_POOL', '1') == '1':
+    # psycopg connection pool per process (needs psycopg[pool]); pooling and
+    # persistent connections are mutually exclusive in Django.
+    DATABASES['default']['CONN_MAX_AGE'] = 0
+    DATABASES['default'].setdefault('OPTIONS', {})['pool'] = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

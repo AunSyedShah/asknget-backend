@@ -22,3 +22,7 @@ services:
     volumes:
       - ./backend/asknget:/app/asknget
       - ./backend/asknget/media:/app/asknget/media
+
+  worker:
+    volumes:
+      - ./backend/asknget:/app/asknget

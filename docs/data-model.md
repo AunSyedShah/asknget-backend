@@ -481,3 +481,6 @@ REST-style JSON; auth via access + refresh JWT.
 14. **Who moves `submitted → under_review`** — today an explicit admin "start review" call; should opening the application do it automatically?
 15. **Colour filter source** — backend feeds "Colors" from option types named Color/Colour (not makeup Shades). Confirm.
 16. **Guest checkout** is implemented (cart token + order number/email tracking) pending Q2's answer; easy to disable if the decision is members-only.
+17. **Seller dashboard is now designed** (Figma 2026-09-18: Login, Dashboard, Products ×2, Inventory, Orders ×2, Order detail, Customers ×2; sidebar also lists Returns, Chat, Analytics, Notifications, Team/Managers). Supersedes Q12 — next slice. Team/Managers implies the vendor sub-roles that were deferred; do they come with this slice?
+18. **Search & recommendations** — implemented with an offline lexical embedder by default. Which hosted embedding provider (Voyage recommended, OpenAI alternative) and is sending *product text only* to it acceptable? Where do "Recommended for you" / "Frequently bought together" rails live in the design (not drawn yet)?
+19. **Behaviour tracking retention** — product views/searches are stored per user or guest cart token (no PII). Proposed retention: 180 days. Confirm, and whether the privacy policy needs a line about it.

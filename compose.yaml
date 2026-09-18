@@ -11,7 +11,9 @@ name: asknget
 
 services:
   db:
-    image: postgres:17-alpine
+    # Postgres 17 + pgvector (semantic search / recommendations). Same major as
+    # plain postgres:17, so dump/restore and psql work unchanged.
+    image: pgvector/pgvector:pg17-trixie
     env_file: backend/.env            # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -39,6 +41,22 @@ services:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    # Background jobs. Today: keeps product embeddings fresh (catalog edits mark
+    # rows stale; this loop re-embeds them). Add more periodic work here rather
+    # than in request handlers.
+    image: asknget-api:latest
+    env_file: backend/.env
+    environment:
+      SKIP_MIGRATE: "1"               # web already migrates; don't race it
+    command: ["python", "manage.py", "embed_products", "--watch", "--interval", "30"]
+    healthcheck:
+      disable: true                   # image healthcheck probes HTTP; the worker serves none
+    depends_on:
+      web:
         condition: service_healthy
     restart: unless-stopped
 

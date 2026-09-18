@@ -13,7 +13,7 @@ from pydantic import model_validator
 
 from core.validators import EmailStr, NonEmptyStr
 
-SortLit = Literal["new", "price_asc", "price_desc", "rating", "popular"]
+SortLit = Literal["relevance", "new", "price_asc", "price_desc", "rating", "popular"]
 ReviewSortLit = Literal["new", "top", "low"]
 
 # --------------------------------------------------------------------------- #
@@ -75,7 +75,7 @@ class ProductFiltersOut(Schema):
 class ProductQuery(FilterSchema):
     """Query string for GET /products. Every field optional; combine freely."""
 
-    q: Optional[str] = Field(None, max_length=120, description="'Search Products'")
+    q: Optional[str] = Field(None, max_length=120, description="'Search Products' — hybrid keyword + semantic ranking")
     category: Optional[str] = Field(None, description="Category slug; includes descendants")
     brand: Optional[list[str]] = Field(None, description="Brand slugs (repeat the param)")
     color: Optional[list[str]] = Field(None, description="Colour option values, e.g. color=Black&color=Red")
@@ -86,7 +86,7 @@ class ProductQuery(FilterSchema):
     featured: Optional[bool] = None
     best_seller: Optional[bool] = None
     new_arrival: Optional[bool] = None
-    sort: SortLit = "new"
+    sort: Optional[SortLit] = Field(None, description="Default: relevance when q is given, otherwise new")
 
     @model_validator(mode="after")
     def _price_range(self):
