@@ -484,3 +484,21 @@ REST-style JSON; auth via access + refresh JWT.
 17. **Seller dashboard is now designed** (Figma 2026-09-18: Login, Dashboard, Products ×2, Inventory, Orders ×2, Order detail, Customers ×2; sidebar also lists Returns, Chat, Analytics, Notifications, Team/Managers). Supersedes Q12 — next slice. Team/Managers implies the vendor sub-roles that were deferred; do they come with this slice?
 18. **Search & recommendations** — implemented with an offline lexical embedder by default. Which hosted embedding provider (Voyage recommended, OpenAI alternative) and is sending *product text only* to it acceptable? Where do "Recommended for you" / "Frequently bought together" rails live in the design (not drawn yet)?
 19. **Behaviour tracking retention** — product views/searches are stored per user or guest cart token (no PII). Proposed retention: 180 days. Confirm, and whether the privacy policy needs a line about it.
+
+**Seller dashboard (sprint 3, see `docs/sprint-3-plan.md`)**
+
+20. **Sidebar items without screens** — Returns, Chat, Analytics, Notifications, Team/Managers (and the header badge "2", "Message Customer", "Download Invoice"). Out of scope until designed; Team/Managers = the deferred vendor sub-roles.
+21. **KPI card subtitles** ("50% Average of total customers", "70% Average of total products") read as placeholder copy. Backend returns month-over-month `change_pct`; confirm that's the intended sentence.
+22. **Products "Status" column** mixes lifecycle (Active) with stock (Out of Stock / Low Stock). Backend returns `status` and `stock_status` separately; UI merges.
+23. **Product description ≤ 250 chars** in the wizard vs the PDP's long description + Key Benefits + How to Use. Wizard field maps to `short_description`; the rich sections stay optional — is a second "Content" step wanted?
+24. **Shipping step is empty in the design.** Backend stores weight, dimensions, ships-from and handling days. Confirm, and whether per-product shipping price/free-shipping flags are expected.
+25. **Product moderation** — the Pending/Rejected tabs imply staff approve listings before they go live. Confirm (alternative: publish immediately, moderate after).
+26. **Returned orders** — a "Returned" tab and a Returns menu exist but no return-request flow. Interim: seller marks a delivered store order returned (stock restored). Refund handling waits for the PSP.
+27. **Unpaid orders hidden from sellers** — orders still `pending_payment` (bank transfer not yet confirmed, PSP pending) are not shown in the seller portal. Confirm, especially for COD/bank-transfer flows.
+28. **Invoices** — "Print/Download Invoice" drawn as menu items only. Backend exposes invoice data; PDF layout needs a design.
+29. **Inventory "Stock" vs "Available"** — stock is decremented at checkout, so both are equal today. If "Available" should exclude unpaid/unshipped reservations, checkout must reserve instead of decrement.
+30. **Customer names** — buyer side abbreviates ("Olivia M."), seller list shows both forms. Backend returns the full contact name to sellers (needed to ship). Confirm privacy stance.
+31. **"Total Sales" vs "Total Revenue"** on the dashboard show near-identical figures. Backend defines Sales = booked (placed, non-cancelled) and Revenue = recognised (delivered). Confirm or drop one card.
+32. **Traffic Channel widget** (visitors, socialising, active/inactive users) needs web analytics we do not collect. Omitted; wire to GA/Plausible later if wanted.
+33. **Social login** (Apple/Google) on the seller Login screen — no provider configured; needs OAuth client ids and a decision on account linking.
+34. **Order-level discount allocation** — vouchers apply to the whole buyer order; a store's "sales" currently use undiscounted line totals. Allocate pro-rata per store, or treat vouchers as marketplace-funded?
