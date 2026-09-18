@@ -1,0 +1,167 @@
+[Seller Dashboard]
+  [Top Header]
+    [Bread Crums]
+      T: Dashboard
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Good morning, Sirosh
+      T: Here's what's happening with your store today.
+    [KIP'S]
+      [KPI - 1]
+            T: View Report
+                T: 12.8%
+                T: R 84,520
+                T: Total Sales
+      [KPI - 2]
+            T: View Report
+                T: 12.8%
+                T: 245
+                T: Total Orders
+      [KPI - 3]
+            T: View Report
+                T: +24 new this month
+                T: 1,265
+                T: Total Products
+      [KPI - 4]
+            T: View Report
+                T: Needs attention
+                T: 24
+                T: Low Stock
+      [KPI - 5]
+            T: View Report
+                T: 12.8%
+                T: R 85, 0345.00
+                T: Total Revenue
+    [Total Revenue]
+        T: This Month
+      [Months]
+        T: Jan
+        T: Feb
+        T: Mar
+        T: Apr
+        T: May
+        T: Jun
+        T: Jul
+        T: Aug
+        T: Sep
+        T: Oct
+        T: Nov
+        T: Dec
+      [Payments]
+        T: R50k
+        T: R40k
+        T: R30k
+        T: R20k
+        T: R10k
+        T: 0k
+      T: Total Revenue
+      [Lines]
+        [Vertical Lines]
+        [Horizontal Lines]
+          T: Revenue
+          T: Orders
+    [Store Performance]
+        T: Store Performance
+              T: Product Views
+                T: 12.8%
+              T: 24,582
+              T: Conversion Rate
+                T: 0.8%
+              T: 3.2%
+              T: Average Order Value
+                T: 6.2%
+              T: R 340
+              T: Customer Growth
+                T: 14%
+              T: +128
+    [Traffic Channel]
+      T: Traffic Channel
+          T: 87.76%
+          [Circles]
+            T: Total Visitors
+            T: Total Purchase
+            T: Socializing
+              T: Active Users
+              T: 816,712K
+                  T: 88%
+              T: Inactive Users
+              T: 816,712K
+                  T: 32%
+        T: Monthly
+    [Latest Orders]
+        T: Latest Orders
+          T: Order ID
+          T: Customer
+          T: Product
+          T: Order Date
+          T: Price
+          T: Payment
+          T: Status
+          T: Action
+          T: #ASK48291
+          T: Olivia M.
+          T: NARS BB Cream
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Processing
+          T: #ASK48291
+          T: Olivia M.
+          T: NARS BB Cream
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Processing
+          T: #ASK48291
+          T: Olivia M.
+          T: NARS BB Cream
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Processing
+          T: #ASK48291
+          T: Olivia M.
+          T: NARS BB Cream
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Processing
+        T: See All Orders
+    [All Products]
+          T: All Products
+          T: See All Products
+              T: In Stock
+              T: 3,560 Products
+              T: Low Stock
+              T: 879 Products
+              T: Out of Stock
+              T: 398 Products
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard Active]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers

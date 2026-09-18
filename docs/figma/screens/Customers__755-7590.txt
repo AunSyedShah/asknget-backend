@@ -1,0 +1,161 @@
+[Customers]
+  [Top Header]
+    [Bread Crums]
+      T: Customers
+      T: Dashboard / Customers
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers Active]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
+  [Content Frame]
+      T: Customers
+      T: Manage your customers and view purchase activity.
+    [I:Button | State=Default]
+      T: Export Customers
+    [Tabs]
+        T: New (350)
+        T: Returning (1,250)
+        T: One-Time (1,840)
+          T: All Customers (2,859)
+    [Recent Customers]
+        T: Recent Customers
+        [Filters]
+            [Search Bar]
+                T: Search by customer name or email...
+            [Brand]
+                T: Last Order
+            [Brand]
+                T: Customer Type
+            [Brand]
+                T: Customer Status
+            [Brand]
+                T: Sort:  Recently Active
+        [Row 1]
+              T: Olivia M.
+            T: m.olivia@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 5
+            T: Active
+        [Row 2]
+              T: Daniel Peters
+            T: daniel.peters@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 4
+            T: New
+        [Row 3]
+              T: Emma Roberts
+            T: emma.roberts@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 8
+            T: Returning
+        [Row 4]
+              T: James Khan
+            T: khan.james@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 5
+            T: New
+        [Row 5]
+              T: Olivia Martin
+            T: martin.olivia@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 3
+            T: New
+        [Row 6]
+              T: Sarah Lewis
+            T: sarah.lewis@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 2
+            T: New
+        [Row 7]
+              T: Sarah Johns
+            T: sarah.johns@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 1
+            T: Active
+        [Row 8]
+              T: Daniel Khan
+            T: khan.daniel@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 2
+            T: Active
+        [Row 9]
+              T: Roberts James
+            T: james.roberts@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 4
+            T: Active
+        [Row 10]
+              T: Sarah Martin
+            T: martin.sarah@gmail.com
+            T: #ASK48291
+            T: Sep 14, 12:40 pm
+            T: R2,250
+            T: 3
+            T: New
+    [Pagination]
+      T: Showing 10 of 2859 customers
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+    [Actions]
+        T: View Orders
+        T: Message Customer
+        T: Add Note
+        T: Download Invoice
+          T: View Customer

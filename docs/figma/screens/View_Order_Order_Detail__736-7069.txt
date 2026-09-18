@@ -1,0 +1,101 @@
+[View Order/ Order Detail]
+  [Top Header]
+    [Bread Crums]
+      T: Orders
+      T: Dashboard / Orders / ASK48291
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders Active]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
+  [Content Frame]
+      T: Placed:  Apr 07, 2026 at 10:24 AM
+        T: #ASK48291
+        [Status]
+          T: Processing
+    T: Back to orders
+    [I:Button | State=Default]
+      T: Update Status
+    [Customer Info]
+          T: Customer Information
+            T: olivia@gmail.com
+            T: +27 82 123 4567
+            T: Olivia M.
+    [Shipping Address]
+        T: Shipping Address
+            T: 123 Main Street Cape Town, 6001 South Africa
+            T: Olivia M.
+    [Payment Info]
+        T: Payment Information
+            T: Credit Card •••• 4242
+              T: Paid
+              T: R49.99
+            T: Payment Method
+    [Order Timeline]
+        T: Order Timeline
+        [Order Status]
+          [Delivered]
+              T: Waiting
+              T: Delivered
+          [Order Placed]
+                T: Apr 07  |  10:24 AM
+                T: Order Placed
+          [Payment Cofirmed]
+                T: Apr 07  |  10:27 AM
+                T: Payment Confirmed
+          [Processing]
+                T: Apr 07  |  11:00 AM
+                T: Processing
+          [Packed]
+                T: Waiting
+                T: Packed
+          [Shipped]
+                T: Waiting
+                T: Shipped
+            [Items]
+              [Row 1]
+                T: 1
+                T: R 49.99
+                    T: Classis Leather Bag
+                    T: Color: Blue
+              [Row 2]
+                T: 2
+                T: R 22.99
+                T: R 44.99
+                    T: Teddy Bear Brown
+                    T: Color: Brown  | Size: Medium
+          T: Order Items (2)
+          T: Order Summary
+              T: Total
+              T: R164.98
+                T: Subtotal
+                T: R 94.98
+                T: Shipping
+                T: R 70
+                T: Tax
+                T: R 0

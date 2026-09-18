@@ -1,0 +1,124 @@
+[Orders Overview]
+  [Top Header]
+    [Bread Crums]
+      T: Orders
+      T: Dashboard / Orders
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders Active]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
+  [Content Frame]
+      T: Orders
+      T: Here’s what happing with your orders today.
+    [I:Button | State=Default]
+      T: Export
+    [KPI - 1]
+          T: 8.5% vs. previous period
+              T: 285
+              T: Total Orders
+    [KPI - 5]
+          T: Needs Attention
+              T: 24
+              T: Pending orders
+    [KPI - 7]
+          T: Currently being prepared
+              T: 54
+              T: Processing
+    [KPI - 8]
+          T: 12.8%
+              T: 248
+              T: Delivered
+    [Orders Overview]
+              T: This Month
+                T: Delivered
+                T: Pending
+                T: Refunded
+          T: Orders Overview
+        [Chart]
+                T: Jan
+                T: Feb
+                T: Mar
+                T: Apr
+                T: May
+                T: Jun
+                T: Jul
+                T: Aug
+                T: Sep
+                T: Oct
+                T: Nov
+                T: Dec
+                T: 0
+                T: 150
+                T: 300
+                T: 450
+                T: 600
+    [Orders Status]
+          [Circles]
+            T: 70%
+              T: Processing
+              T: 40%
+              T: Shipped
+              T: 22%
+              T: Cancelled
+              T: 5%
+              T: Refunded
+              T: 3%
+        T: Orders Status
+    [Latest Orders]
+        T: Latest Orders
+          T: Order ID
+          T: Customer
+          T: Items
+          T: Order Date
+          T: Price
+          T: Payment
+          T: Status
+          T: Action
+          T: #ASK48291
+          T: Olivia M.
+          T: 2
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Credit Card
+          T: Processing
+          T: #ASK48291
+          T: Olivia M.
+          T: 3
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Delivered
+          T: #ASK48291
+          T: Olivia M.
+          T: 4
+          T: Sep 14, 12:40 pm
+          T: R49.99
+          T: Bank Transfer
+          T: Shipped
+        T: See All Orders

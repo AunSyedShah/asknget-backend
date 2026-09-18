@@ -1,0 +1,166 @@
+[Products]
+  [Top Header]
+    [Bread Crums]
+      T: Products
+      T: Dashboard / Products
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Products
+      T: Manage your products, listings, pricing and availability.
+    [I:Button | State=Default]
+      T: + Add New Product
+    [KPI - 1]
+          T: 50% Average of total customers
+              T: 4,560 Products
+              T: Total Products
+    [KPI - 5]
+          T: 70% Average of total products
+              T: 640 Products
+              T: New Added
+    [KPI - 7]
+          T: 10% Average of total purchase
+              T: 645 Products
+              T: Total Purchase
+    [KPI - 8]
+          T: 15% Average of total returned
+              T: 150 Products
+              T: Total Returned
+    [Tabs]
+        T: Active (85)
+        T: Pending (25)
+        T: Draft (15)
+        T: Rejected (2)
+        T: Archived (2)
+          T: All Products (120)
+    [Products List]
+          T: Products List
+            [Search Bar]
+                T: Search products...
+            [Brand]
+                T: Brand
+            [Brand]
+                T: Category
+            [Brand]
+                T: Status
+            [Brand]
+                T: Stock
+            [Brand]
+                T: Sort: Recently Updated
+        [Table]
+            T: Category
+            T: Brand
+            T: Stock
+            T: Date & Time
+            T: Price
+            T: Sold Items
+            T: Total Earned
+            T: Status
+            T: Action
+              T: Product Name
+            T: Bags
+            T: Dior
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: R49.99
+            T: 250
+            T: R1,569,45.00
+            T: Active
+              T: Classic Leather Bag
+            T: Accessories
+            T: SonicAir
+            T: 85
+            T: Sep 13, 12:40 pm
+            T: R12.99
+            T: 350
+            T: R1,569,45.00
+            T: Active
+              T: Wireless Earbuds
+            T: Accessories
+            T: WristCraft
+            T: 45
+            T: Sep 12, 12:40 pm
+            T: R54.99
+            T: 180
+            T: R1,569,45.00
+            T: Active
+              T: Apple Smart Watch
+            T: Fashion
+            T: Breeza
+            T: 0
+            T: Sep 8, 12:40 pm
+            T: R32.99
+            T: 120
+            T: R1,569,45.00
+            T: Out of Stock
+              T: Summer Dress
+            T: Essentials
+            T: Snowy Bear
+            T: 12
+            T: Sep 14, 12:40 pm
+            T: R49.99
+            T: 250
+            T: R1,569,45.00
+            T: Low Stock
+              T: White Teddy Bear
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 5 of 120 products
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+    [Actions]
+        T: Edit Product
+        T: Duplicate Product
+        T: Archive Product
+        T: Delete Product
+        T: View Analytics
+        T: Change Status
+          T: View Product
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products Active]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers

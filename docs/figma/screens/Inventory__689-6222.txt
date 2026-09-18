@@ -1,0 +1,144 @@
+[Inventory]
+  [Top Header]
+    [Bread Crums]
+      T: Inventory
+      T: Dashboard / Inventory
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory Active]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
+  [Content Frame]
+      T: Inventory
+      T: Track your stock levels, product availability and inventory movements.
+    [I:Button | State=Default]
+      T: Export
+    [KPI - 1]
+          T: 124 Variants
+              T: 1,284 Products
+              T: Total Products
+    [KPI - 5]
+          T: 70% Average of total products
+              T: 1,284
+              T: Total Stock
+    [KPI - 7]
+          T: Immediate
+              T: 4 Products
+              T: Out of Stock
+    [KPI - 8]
+          T: Need Attention
+              T: 24 Products
+              T: Low Stock
+    [Tabs]
+        T: Low Stock (24)
+        T: Out of Stock (4)
+        T: Recently Updated (12)
+          T: All Inventory (45)
+    [Table]
+          T: Inventory List
+            [Search Bar]
+                T: Search products...
+            [Brand]
+                T: Brand
+            [Brand]
+                T: Category
+            [Brand]
+                T: Status
+            [Brand]
+                T: Stock Status
+            [Brand]
+                T: Sort: Recently Updated
+            T: Category
+            T: Brand
+            T: Product Name
+            T: Stock
+            T: Last Updated
+            T: Available
+            T: Status
+            T: Action
+            T: Product
+            T: Bags
+            T: Dior
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: 24
+            T: In Stock
+            T: Classic Leather Bag
+            T: Accessories
+            T: SonicAir
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: 24
+            T: In Stock
+            T: Wireless Earbuds
+            T: Essentials
+            T: Snowy Bear
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: 0
+            T: Out of Stock
+            T: White Teddy Bear
+            T: Fashion
+            T: Bareeza
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: 24
+            T: In Stock
+            T: Summer Dress
+            T: Accessories
+            T: Wrist Craft
+            T: 24
+            T: Sep 14, 12:40 pm
+            T: 4
+            T: Low Stock
+            T: Smart Watch
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 5 of 120 products
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next

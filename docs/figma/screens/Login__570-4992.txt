@@ -1,0 +1,22 @@
+[Login]
+    T: Manage your store, track orders, grow your business, all in one place.
+    T: Welcome to Seller Portal
+        T: Login to your seller portal
+        T: Enter your credentials to access your seller portal.
+      [I:Input Fields | Property 1=Default]
+        T: Email Address
+          T: Enter your email
+      [I:Input Fields | Property 1=Default]
+        T: Password
+          T: Enter your password
+        T: Remember me
+      T: Forgot Password?
+      [I:Button | State=Default]
+        T: Login
+      T: Don’t have an account? Sign Up
+        T: or continue with
+          T: Apple
+          T: Google
+      T: Easy product management
+      T: Real-time order tracking
+      T: Secure payments

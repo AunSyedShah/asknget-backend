@@ -1,8 +1,8 @@
 {
   "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
   "page": "Web UI Design",
-  "version": "2397968989373819673",
-  "lastModified": "2026-09-11T13:50:30Z",
+  "version": "2400578314618599958",
+  "lastModified": "2026-09-18T14:45:48Z",
   "screens": [
     {
       "name": "Landing Page",
@@ -93,6 +93,30 @@
       "node_id": "447:7950",
       "file": "Signup_Create_Account__447-7950.txt",
       "lines": 27
+    },
+    {
+      "name": "Login",
+      "node_id": "570:4992",
+      "file": "Login__570-4992.txt",
+      "lines": 22
+    },
+    {
+      "name": "Seller Dashboard",
+      "node_id": "573:5141",
+      "file": "Seller_Dashboard__573-5141.txt",
+      "lines": 167
+    },
+    {
+      "name": "Products",
+      "node_id": "626:5220",
+      "file": "Products__626-5220.txt",
+      "lines": 166
+    },
+    {
+      "name": "Products",
+      "node_id": "664:8452",
+      "file": "Products__664-8452.txt",
+      "lines": 218
     },
     {
       "name": "Email OTP Verification",
@@ -231,6 +255,42 @@
       "node_id": "312:4875",
       "file": "Logout_Popup__312-4875.txt",
       "lines": 7
+    },
+    {
+      "name": "Inventory",
+      "node_id": "689:6222",
+      "file": "Inventory__689-6222.txt",
+      "lines": 144
+    },
+    {
+      "name": "Orders Overview",
+      "node_id": "697:8989",
+      "file": "Orders_Overview__697-8989.txt",
+      "lines": 124
+    },
+    {
+      "name": "Customers Overview",
+      "node_id": "743:6101",
+      "file": "Customers_Overview__743-6101.txt",
+      "lines": 114
+    },
+    {
+      "name": "Customers",
+      "node_id": "755:7590",
+      "file": "Customers__755-7590.txt",
+      "lines": 161
+    },
+    {
+      "name": "Orders",
+      "node_id": "704:9564",
+      "file": "Orders__704-9564.txt",
+      "lines": 160
+    },
+    {
+      "name": "View Order/ Order Detail",
+      "node_id": "736:7069",
+      "file": "View_Order_Order_Detail__736-7069.txt",
+      "lines": 101
     }
   ]
 }
