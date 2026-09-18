@@ -1,9 +1,11 @@
 """Seller portal: products wizard + review, inventory, orders, customers, dashboard."""
 
 import io
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
+from django.utils import timezone
 
 from catalog.models import Brand, Category, Product, ProductVariant, StockMovement
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
@@ -369,3 +371,60 @@ class OrderTests(PortalBase):
         # foreign order is 404, not 403 (no information leak)
         other = self._order((self.foreign, 1), user=self.olivia)
         self.assertEqual(self.get(f"{self.O}/{other.pk}", token=self.token).status_code, 404)
+
+
+class CustomerTests(PortalBase):
+    C = "/api/v1/seller/customers"
+
+    def setUp(self):
+        super().setUp()
+        self.bb = make_product(self.store, self.makeup, "BB Cream", 4999, None, stock=10)
+        self.foreign = make_product(self.other_store, self.makeup, "Foreign Lamp", 1000, None, stock=10)
+        now = timezone.now()
+        self.olivia = make_user(full_name="Olivia Martin")
+        self._order((self.bb, 1), user=self.olivia, placed_at=now - timedelta(days=100))   # returning: 2 orders
+        self._order((self.bb, 2), user=self.olivia, placed_at=now - timedelta(days=5))
+        self._order((self.bb, 1), user=self.olivia, status="cancelled")                        # ignored
+        self._order((self.bb, 1), email="daniel@example.com", name=("Daniel", "Peters"))        # guest, new
+        self._order((self.bb, 1), email="EMMA@example.com", name=("Emma", "Roberts"), placed_at=now - timedelta(days=200))  # one-time, inactive
+        self._order((self.foreign, 1), email="notmine@example.com")                             # other store only
+
+    def test_list_tabs_and_types(self):
+        body = self.get(self.C, token=self.token).json()
+        self.assertEqual(body["total"], 3)
+        rows = {r["email"]: r for r in body["items"]}
+        self.assertEqual((rows[self.olivia.email]["type"], rows[self.olivia.email]["orders_count"], rows[self.olivia.email]["total_spent_cents"]), ("returning", 2, 3 * 4999))
+        self.assertEqual((rows["daniel@example.com"]["type"], rows["daniel@example.com"]["status"]), ("new", "active"))
+        self.assertEqual((rows["EMMA@example.com"]["type"], rows["EMMA@example.com"]["status"], rows["EMMA@example.com"]["key"]), ("one_time", "inactive", "emma@example.com"))
+        self.assertEqual(body["items"][0]["name"], "Daniel Peters")  # most recent first
+        self.assertEqual(self.get(f"{self.C}/tabs", token=self.token).json(), {"all": 3, "new": 1, "returning": 1, "one_time": 1})
+        self.assertEqual(self.get(self.C, token=self.token, tab="returning").json()["items"][0]["name"], "Olivia Martin")
+        self.assertEqual(self.get(self.C, token=self.token, q="emma").json()["total"], 1)
+        self.assertEqual(self.get(self.C, token=self.token, status="inactive").json()["total"], 1)
+
+    def test_overview(self):
+        body = self.get(f"{self.C}/overview", token=self.token).json()
+        self.assertEqual(body["total_customers"]["value"], 3)
+        self.assertEqual(body["new_customers"]["value"], 1)          # Daniel's first order this month
+        self.assertEqual(body["breakdown"]["returning"], {"count": 1, "pct": 33.3})
+        self.assertEqual(len(body["monthly"]), 12)
+        self.assertEqual(len(body["recent"]), 3)
+
+    def test_detail_notes_and_export(self):
+        key = str(self.olivia.pk)
+        body = self.get(f"{self.C}/{key}", token=self.token).json()
+        self.assertEqual(len(body["orders"]), 3)  # includes the cancelled one in history
+        self.assertEqual(body["notes"], [])
+        res = self.post(f"{self.C}/{key}/notes", {"body": "Prefers evening delivery"}, token=self.token)
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(res.json()["author"], "Sirosh Bashir")
+        note_id = res.json()["id"]
+        self.assertEqual(len(self.get(f"{self.C}/{key}", token=self.token).json()["notes"]), 1)
+        # another store can't see the customer nor the note
+        other_owner = self.other_store.owner
+        self.assertEqual(self.get(f"{self.C}/{key}", token=self.token_for(other_owner)).status_code, 404)
+        self.assertEqual(self.delete(f"{self.C}/{key}/notes/{note_id}", token=self.token).status_code, 204)
+        self.assertEqual(self.get(f"{self.C}/nobody@example.com", token=self.token).status_code, 404)
+        res = self.get(f"{self.C}/export.csv", token=self.token)
+        lines = b"".join(res.streaming_content).decode().strip().splitlines()
+        self.assertEqual(len(lines), 4)

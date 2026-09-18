@@ -518,3 +518,75 @@ class OrderStatusIn(Schema):
 
 class OrderCancelIn(Schema):
     reason: NonEmptyStr = Field(max_length=255)
+
+
+# --------------------------------------------------------------------------- #
+# Customers
+# --------------------------------------------------------------------------- #
+
+CustomerTabLit = Literal["all", "new", "returning", "one_time"]
+CustomerSortLit = Literal["recent", "spent", "orders", "name"]
+
+
+class CustomerQuery(FilterSchema):
+    tab: CustomerTabLit = "all"
+    q: Optional[str] = Field(None, max_length=120, description="'Search by customer name or email...'")
+    status: Optional[Literal["active", "inactive"]] = None
+    sort: CustomerSortLit = "recent"
+
+
+class CustomerRowOut(Schema):
+    key: str = Field(..., description="Buyer user id, or lower-cased email for guests")
+    user_id: Optional[str] = None
+    name: str
+    email: str
+    phone: str
+    orders_count: int
+    total_spent_cents: int
+    currency: str
+    first_order_at: Optional[datetime] = None
+    last_order_at: Optional[datetime] = None
+    last_order_number: str
+    last_order_id: str
+    type: Literal["new", "returning", "one_time"]
+    status: Literal["active", "inactive"]
+
+
+class CustomerTabsOut(Schema):
+    all: int
+    new: int
+    returning: int
+    one_time: int
+
+
+class BreakdownSliceOut(Schema):
+    count: int
+    pct: float
+
+
+class CustomersOverviewOut(Schema):
+    period: str
+    total_customers: Kpi
+    new_customers: Kpi
+    returning_customers: Kpi
+    avg_customer_value_cents: Kpi
+    monthly: list[SeriesPoint]
+    breakdown: dict[str, BreakdownSliceOut]
+    recent: list[CustomerRowOut]
+    tabs: CustomerTabsOut
+
+
+class CustomerNoteOut(Schema):
+    id: UUID
+    body: str
+    author: Optional[str] = None
+    created_at: datetime
+
+
+class CustomerDetailOut(CustomerRowOut):
+    orders: list[SellerOrderRowOut]
+    notes: list[CustomerNoteOut]
+
+
+class CustomerNoteIn(Schema):
+    body: NonEmptyStr = Field(max_length=2000)

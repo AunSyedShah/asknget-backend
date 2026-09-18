@@ -19,7 +19,7 @@ from core.auth import StaffAuth
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
-from . import inventory, orders, products
+from . import customers, inventory, orders, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -29,6 +29,13 @@ from .schemas import (
     InventoryVariantOut,
     StockAdjustIn,
     StockMovementOut,
+    CustomerDetailOut,
+    CustomerNoteIn,
+    CustomerNoteOut,
+    CustomerQuery,
+    CustomerRowOut,
+    CustomersOverviewOut,
+    CustomerTabsOut,
     OrderCancelIn,
     OrderStatusIn,
     OrderTabsOut,
@@ -59,6 +66,7 @@ products_router = Router(tags=["seller: products"], auth=StoreAuth())
 admin_products_router = Router(tags=["admin: products"], auth=StaffAuth())
 inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth())
 orders_router = Router(tags=["seller: orders"], auth=StoreAuth())
+customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
 
 _NOT_FOUND = {404: ErrorOut}
 _EDIT = {200: SellerProductOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}
@@ -272,3 +280,45 @@ def order_cancel(request, order_id: UUID, payload: OrderCancelIn):
 @orders_router.get("/{order_id}/invoice", response={200: SellerInvoiceOut, 404: ErrorOut}, summary="'Print / Download Invoice' — invoice data (PDF layout is UI-side)")
 def order_invoice(request, order_id: UUID):
     return orders.invoice(orders.get_order(request.store, order_id), request.store)
+
+
+# --------------------------------------------------------------------------- #
+# Customers
+# --------------------------------------------------------------------------- #
+
+
+@customers_router.get("/overview", response=CustomersOverviewOut, summary="Customers Overview: KPIs, growth chart, breakdown, recent")
+def customers_overview(request, period: PeriodLit = "month"):
+    return customers.overview(request.store, period)
+
+
+@customers_router.get("", response=list[CustomerRowOut], summary="Customers table (tabs, search, sort)")
+@paginate(PagePagination)
+def customers_list(request, filters: CustomerQuery = Query(...)):
+    return customers.list_customers(request.store, tab=filters.tab, q=filters.q, status=filters.status, sort=filters.sort)
+
+
+@customers_router.get("/tabs", response=CustomerTabsOut)
+def customers_tabs(request):
+    return customers.tabs(request.store)
+
+
+@customers_router.get("/export.csv", summary="'Export Customers' — CSV")
+def customers_export(request):
+    return customers.export(request.store)
+
+
+@customers_router.get("/{key}", response={200: CustomerDetailOut, 404: ErrorOut}, summary="View Customer: profile, their orders with this store, notes")
+def customer_detail(request, key: str):
+    return customers.detail(request.store, key)
+
+
+@customers_router.post("/{key}/notes", response={201: CustomerNoteOut, 404: ErrorOut}, summary="'Add Note' (private to the store)")
+def customer_note_add(request, key: str, payload: CustomerNoteIn):
+    return 201, customers.note_out(customers.add_note(request.store, key, body=payload.body, author=request.auth))
+
+
+@customers_router.delete("/{key}/notes/{note_id}", response={204: None, 404: ErrorOut})
+def customer_note_delete(request, key: str, note_id: UUID):
+    customers.delete_note(request.store, key, note_id)
+    return 204, None
