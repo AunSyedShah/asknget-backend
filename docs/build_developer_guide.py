@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.4"
+VERSION = "0.5"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -217,7 +217,9 @@ story += [
         ["Recommendations: similar, frequently bought together, trending, 'Recommended for you'", "Implemented", "/api/v1/products/{slug}/similar|frequently-bought-together, /recommendations"],
         ["Docker packaging: API image (uv), Postgres+pgvector, embeddings worker", "Implemented", "compose.yaml (+ compose.override.yaml for live reload)"],
         ["Payment provider: card tokenisation, capture, webhooks, 'save card'", "Planned", "Next sprint. Checkout records the chosen method only; orders stay unpaid until then."],
-        ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "Requested by team lead; not in Figma; schema proposal pending"],
+        ["Seller dashboard: home KPIs, products wizard + review, inventory, orders (per-store fulfilment), customers", "Implemented", "/api/v1/seller/dashboard|products|inventory|orders|customers|search; /admin/products (Figma 2026-09-18)"],
+        ["Seller portal: Returns, Chat, Analytics page, Notifications, Team/Managers, social login, invoice PDF", "Not designed", "Sidebar entries only - see data-model.md section 10 Q20-Q34"],
+        ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "'Team/Managers' and 'Chat' now appear in the seller sidebar; still no screens"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
 
@@ -239,7 +241,7 @@ story += [
         ["Images", "Pillow", "Avatar, product, banner, store images"],
         ["Config", "python-dotenv + dj-database-url", "All settings via environment variables / backend/.env"],
         ["Docs", "Swagger UI (built in)", "/api/v1/docs and /api/v1/openapi.json"],
-        ["Tests", "Django TestCase", "End-to-end through the real URL config; 103 tests, green on SQLite and on Postgres+pgvector inside the container"],
+        ["Tests", "Django TestCase", "End-to-end through the real URL config; 121 tests, green on SQLite and on Postgres+pgvector inside the container"],
     ], (34 * mm, 52 * mm, 86 * mm)),
 ]
 
@@ -569,7 +571,33 @@ story += [
         ["Ops: switch to a real embedding model", "EMBEDDING_PROVIDER=voyage + VOYAGE_API_KEY, then manage.py embed_products --all", "Default 'hash' provider is offline/lexical (dev + tests); the worker service keeps embeddings fresh as products change"],
     ]),
 
-    P("6.13 Support and marketing", "h2"),
+    P("6.13 Seller dashboard", "h2"),
+    P("Every route below needs a seller <b>with an active store</b> (403 <font face='Courier'>no_active_store</font> otherwise, so the "
+      "portal can send the user back to the application status page). Everything shown is computed <b>per store</b>: a buyer "
+      "order that spans several stores appears to each seller as only <i>their</i> lines (a <b>store order</b>) with its own "
+      "fulfilment status; the buyer-facing order status is derived from the parts. KPI cards return "
+      "<font face='Courier'>{value, previous, change_pct}</font> for the requested <font face='Courier'>period</font> "
+      "(today | week | month | quarter | year). Full field contract: docs/sprint-3-plan.md."),
+    flow([
+        ["Seller Dashboard (home)", "GET /seller/dashboard?period=month", "sales (booked) vs revenue (delivered), orders, products, low stock, 12-month series, performance (views, conversion, AOV, customer growth), latest 5 orders, stock breakdown"],
+        ["Header 'Search anything...'", "GET /seller/search?q=", "Own products, order numbers/customers, customers"],
+        ["Products table + tabs + KPI cards", "GET /seller/products?status=&q=&brand=&category=&stock=&sort=, GET /seller/products/kpis", "Tabs all/active/pending/draft/rejected/archived; sold_qty and earned_cents per row"],
+        ["'+ Add New Product' step 1 Basic Info", "POST /seller/products {name, category_id, brand_id?, tags[], short_description}", "Creates a draft with one default variant; category_id is the leaf (subcategory)"],
+        ["Steps 2-4 (Media, Pricing & Inventory, Shipping)", "POST .../images (multipart), PUT .../images/order, PATCH /seller/products/{id} (price, compare-at, threshold, shipping), PUT .../options {options}, PATCH .../variants/{vid} {sku, price_cents, stock_qty}", "Options regenerate variants for every combination, keeping matching SKUs/stock; stock changes are logged movements"],
+        ["Step 5 Review -> submit", "POST /seller/products/{id}/status {action: submit}", "422 lists what is missing (image, price, variant, stock); product becomes pending until staff approve"],
+        ["Staff review (no screen yet)", "GET /admin/products?status=pending, POST /admin/products/{id}/approve | reject {reason}", "Approve publishes; reject stores the reason the seller sees under the Rejected tab"],
+        ["Row actions", "unpublish/archive/unarchive via .../status, POST .../duplicate, DELETE (draft/rejected/archived only), GET .../analytics", "Analytics: views, sold, earned, conversion, 30-day series"],
+        ["Inventory", "GET /seller/inventory?tab=all|low|out|recent, GET /seller/inventory/kpis, POST /seller/inventory/{variant_id}/adjust {set | delta, note}, GET .../movements, GET /seller/inventory/export.csv", "on_hand = sum of variant stock; reserved = paid but unshipped units; every adjustment is a StockMovement"],
+        ["Orders Overview", "GET /seller/orders/overview?period=", "KPIs, monthly delivered/pending/refunded, status share, latest 5"],
+        ["Orders table", "GET /seller/orders?tab=pending|processing|shipped|delivered|cancelled|returned&q=&date_from=&date_to=", "Unpaid orders are not shown to sellers (Q27)"],
+        ["View Order", "GET /seller/orders/{id}", "Customer info, addresses, payment, per-store timeline (Placed, Payment Confirmed, Processing, Packed, Shipped, Delivered), this store's items, summary with multi_store flag, allowed_next"],
+        ["'Update Status' / 'Cancel Order'", "POST /seller/orders/{id}/status {status, note?}, POST .../cancel {reason}", "pending -> processing -> packed -> shipped -> delivered; returned after delivery; cancel/return restore stock"],
+        ["'Print / Download Invoice', 'Export'", "GET /seller/orders/{id}/invoice, GET /seller/orders/export.csv", "Invoice data only - PDF layout is a UI concern until designed (Q28)"],
+        ["Customers Overview / table / detail", "GET /seller/customers/overview, GET /seller/customers?tab=new|returning|one_time&q=&status=, GET /seller/customers/{key}", "Derived from orders; key = user id or guest email; type/status rules in sprint-3-plan.md section 5"],
+        ["'Add Note', 'Export Customers'", "POST /seller/customers/{key}/notes {body}, DELETE .../notes/{id}, GET /seller/customers/export.csv", "Notes are private to the store"],
+    ]),
+
+    P("6.14 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -581,7 +609,8 @@ story += [
 story += [
     PageBreak(),
     P("7. Endpoint reference", "h1"),
-    P("All paths are prefixed with <font face='Courier'>/api/v1</font>. 'Auth' = requires <font face='Courier'>Authorization: Bearer</font>."),
+    P("All paths are prefixed with <font face='Courier'>/api/v1</font>. 'Auth' = requires <font face='Courier'>Authorization: Bearer</font>; "
+      "'store' = seller with an active store; 'staff' = is_staff."),
     table([
         ["Method + path", "Auth", "Request body", "Success", "Errors"],
         ["POST /auth/register", "-", "RegisterIn", "201 AuthOut", "409, 422"],
@@ -652,6 +681,43 @@ story += [
         ["GET /products/{slug}/frequently-bought-together", "optional", "?limit=", "200 [ProductCardOut]", "404"],
         ["GET /search/suggest", "-", "?q=&limit=", "200 SuggestOut", "422"],
         ["GET /recommendations", "optional", "?limit= (+X-Cart-Token)", "200 RecommendationsOut", ""],
+        ["GET /seller/dashboard", "store", "?period=", "200 DashboardOut", "403"],
+        ["GET /seller/search", "store", "?q=&limit=", "200 PortalSearchOut", "403"],
+        ["GET /seller/products", "store", "SellerProductQuery + page", "200 page[SellerProductRowOut]", "403"],
+        ["GET /seller/products/kpis", "store", "?period=", "200 SellerProductKpisOut", ""],
+        ["POST /seller/products", "store", "ProductCreateIn", "201 SellerProductOut", "422"],
+        ["GET|PATCH|DELETE /seller/products/{id}", "store", "ProductPatchIn", "200 SellerProductOut / 204", "404, 409, 422"],
+        ["PUT /seller/products/{id}/options", "store", "OptionsIn", "200 SellerProductOut", "404, 409, 422"],
+        ["PATCH /seller/products/{id}/variants/{vid}", "store", "VariantPatchIn", "200 SellerVariantOut", "404, 409, 422"],
+        ["POST /seller/products/{id}/images", "store", "multipart file, alt", "201 SellerImageOut", "404, 422"],
+        ["PUT /seller/products/{id}/images/order", "store", "ImageOrderIn", "200 SellerProductOut", "422"],
+        ["DELETE /seller/products/{id}/images/{iid}", "store", "-", "204", "404"],
+        ["PUT /seller/products/{id}/content", "store", "ContentIn", "200 SellerProductOut", ""],
+        ["POST /seller/products/{id}/status", "store", "StatusChangeIn", "200 SellerProductOut", "409, 422"],
+        ["POST /seller/products/{id}/duplicate", "store", "-", "201 SellerProductOut", "404"],
+        ["GET /seller/products/{id}/analytics", "store", "?period=", "200 ProductAnalyticsOut", "404"],
+        ["GET /admin/products", "staff", "?status=&page", "200 page[AdminProductRowOut]", ""],
+        ["POST /admin/products/{id}/approve|reject", "staff", "RejectIn (reject)", "200 MessageOut", "404, 409"],
+        ["GET /seller/inventory", "store", "InventoryQuery + page", "200 page[InventoryRowOut]", ""],
+        ["GET /seller/inventory/kpis", "store", "-", "200 InventoryKpisOut", ""],
+        ["POST /seller/inventory/{vid}/adjust", "store", "StockAdjustIn", "200 InventoryVariantOut", "404, 409, 422"],
+        ["GET /seller/inventory/{vid}/movements", "store", "?limit=", "200 [StockMovementOut]", "404"],
+        ["GET /seller/inventory/export.csv", "store", "-", "200 text/csv", ""],
+        ["GET /seller/orders/overview", "store", "?period=", "200 SellerOrdersOverviewOut", ""],
+        ["GET /seller/orders", "store", "SellerOrderQuery + page", "200 page[SellerOrderRowOut]", ""],
+        ["GET /seller/orders/tabs", "store", "-", "200 OrderTabsOut", ""],
+        ["GET /seller/orders/{id}", "store", "-", "200 SellerOrderDetailOut", "404"],
+        ["POST /seller/orders/{id}/status", "store", "OrderStatusIn", "200 SellerOrderDetailOut", "404, 409"],
+        ["POST /seller/orders/{id}/cancel", "store", "OrderCancelIn", "200 SellerOrderDetailOut", "404, 409"],
+        ["GET /seller/orders/{id}/invoice", "store", "-", "200 SellerInvoiceOut", "404"],
+        ["GET /seller/orders/export.csv", "store", "-", "200 text/csv", ""],
+        ["GET /seller/customers/overview", "store", "?period=", "200 CustomersOverviewOut", ""],
+        ["GET /seller/customers", "store", "CustomerQuery + page", "200 page[CustomerRowOut]", ""],
+        ["GET /seller/customers/tabs", "store", "-", "200 CustomerTabsOut", ""],
+        ["GET /seller/customers/{key}", "store", "-", "200 CustomerDetailOut", "404"],
+        ["POST /seller/customers/{key}/notes", "store", "CustomerNoteIn", "201 CustomerNoteOut", "404"],
+        ["DELETE /seller/customers/{key}/notes/{id}", "store", "-", "204", "404"],
+        ["GET /seller/customers/export.csv", "store", "-", "200 text/csv", ""],
         ["GET /products/{slug}/reviews?sort=", "-", "-", "200 Page[ReviewOut]", "404"],
         ["GET /products/{slug}/reviews/summary", "-", "-", "200 RatingBreakdownOut", "404"],
         ["POST /products/{slug}/reviews", "optional", "multipart ReviewIn + files[]", "201 ReviewCreatedOut", "404, 409, 422"],
@@ -768,7 +834,7 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
     table([
         ["Order", "Scope", "Depends on"],
         ["1", "Payment provider: client-side tokenisation, POST /checkout/{id}/pay, webhooks -> payment_status/paid, saved cards, refunds on cancel", "Provider decision (see data-model.md section 10)"],
-        ["2", "Seller dashboard APIs: product CRUD, inventory, delivery setup, order fulfilment per store", "Design (referenced by 'Quick Start' but not drawn)"],
+        ["2", "Seller portal remainder: Returns flow, Chat, Analytics page, Notifications, Team/Managers (sub-roles), invoice PDF, social login", "Design for those screens + answers to Q20-Q34"],
         ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
         ["4", "Vendor sub-roles/permissions, premium tier, vendor-customer messaging", "Product decisions + design"],
         ["5", "Email/SMS providers; more worker jobs (category counts, rating refresh, cart expiry)", "Worker service exists; add commands"],

@@ -90,6 +90,23 @@ How the pieces fit:
 - Behind HTTPS/a proxy set `BEHIND_PROXY=1`, `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`,
   and put your domain in `ALLOWED_HOSTS`.
 
+## Seller portal (`portal` app)
+
+Everything under `/api/v1/seller/*` (except onboarding, which lives in `sellers`) needs a seller **with an
+active store** — `StoreAuth` sets `request.store` and returns `403 no_active_store` otherwise. Every number is
+derived per store from orders / products / events; the contract for each screen (definitions of Sales vs
+Revenue, customer types, fulfilment states, what the design left undefined) is `docs/sprint-3-plan.md`.
+
+- **Store orders** — a buyer order can span stores. Each seller sees only their lines; their fulfilment status
+  is `OrderItem.status` (`pending → processing → packed → shipped → delivered`, `cancelled`, `returned`) and
+  the buyer-facing `Order.status` is derived from the parts (`orders.services.derive_order_status`).
+- **Stock** — `catalog.services.adjust_stock` is the only write path (checkout, cancel, return, manual);
+  it logs a `StockMovement` and refreshes the derived `Product.stock_status` (in / low / out; `preorder` is manual).
+- **Products** — one `PATCH` for every wizard step plus sub-resources (images, options → variants, content).
+  Sellers submit → `pending`; staff approve/reject at `/admin/products`.
+- **Customers** are computed from orders (key = user id or guest email) and cached per store for 60 s; the
+  cache key changes whenever the store's order lines change.
+
 ## Search & recommendations (`discovery` app)
 
 - **Search** — `GET /products?q=` is hybrid: filters apply first, then keyword ranking (Postgres websearch

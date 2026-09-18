@@ -1,5 +1,7 @@
 # Sprint 3 — Seller Dashboard (Figma 2026-09-18, 10 new frames)
 
+> Status 2026-09-19: steps 1–7 implemented (`portal` app, 121 tests). Open questions Q20–Q34 in `docs/data-model.md`.
+
 Field contract first, code second. Every number on these screens is **derived** from
 orders / order items / products / events for **one store** — nothing below adds a stored
 "total" column. Where the design is silent or inconsistent the decision is stated here and
@@ -57,7 +59,7 @@ Store-order statuses (per store, on `OrderItem.status`):
 sellers (nothing to fulfil yet; PSP is next sprint) — Q27.
 
 Derived buyer `Order.status` after each store update: all parts cancelled → `cancelled`; all delivered/returned
-→ `delivered`; any shipped → `shipped`; any processing/packed → `processing`; else `confirmed`.
+→ `delivered` (all returned → `returned`); any shipped → `shipped`; any store has started or finished its part → `processing`; else `confirmed`.
 `Order.OrderStatus` gains `packed` and `returned` so both sides speak the same vocabulary.
 
 Endpoints: `GET /seller/orders/overview` (KPIs total / pending / processing / delivered with change %, monthly

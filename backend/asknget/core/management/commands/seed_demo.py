@@ -13,14 +13,18 @@ Accounts (password for all: DemoPass123!):
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from datetime import timedelta
+
+from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
 from accounts.models import Address, User
 from catalog.models import Brand, Category, Product, ProductContentSection, ProductOptionType, ProductOptionValue, ProductVariant, Review
-from catalog.services import refresh_category_counts, refresh_product_rating
+from catalog.services import refresh_category_counts, refresh_product_rating, refresh_stock_status
 from core.models import SiteSetting
-from orders.models import Voucher
+from orders import services as order_services
+from orders.models import Order, OrderItem, Voucher
 from sellers.models import SellerApplication, Store
 
 PASSWORD = "DemoPass123!"
@@ -119,6 +123,10 @@ class Command(BaseCommand):
 
         embed_products()
 
+        for product in Product.objects.filter(store=store):
+            refresh_stock_status(product)
+        self._seed_orders(store, seller, customer)
+
         Voucher.objects.get_or_create(code="SAVE20", defaults=dict(type="percent", value=20, min_subtotal_cents=5000))
         Voucher.objects.get_or_create(code="WELCOME5", defaults=dict(type="fixed", value=500, per_user_limit=1))
 
@@ -131,3 +139,73 @@ class Command(BaseCommand):
             SiteSetting.objects.get_or_create(key=key, defaults={"value": value})
 
         self.stdout.write(self.style.SUCCESS(f"Demo data ready ({created} products created). Password for demo accounts: {PASSWORD}"))
+
+    # Seller-dashboard demo: a few months of orders from a handful of customers,
+    # moved through fulfilment so KPIs, charts, timelines and customer types all
+    # have something to show. Skipped when demo orders already exist.
+    DEMO_CUSTOMERS = [
+        ("Olivia", "Martin", "olivia.martin@example.com"),
+        ("Daniel", "Peters", "daniel.peters@example.com"),
+        ("Emma", "Roberts", "emma.roberts@example.com"),
+        ("James", "Khan", "james.khan@example.com"),
+        ("Sarah", "Lewis", "sarah.lewis@example.com"),
+    ]
+    # (days ago, customer index, [(product name, qty)], final fulfilment status, payment method)
+    DEMO_ORDERS = [
+        (120, 0, [("NARS BB Cream", 1)], "delivered", "card"),
+        (95, 1, [("Apple Watch", 1)], "delivered", "bank_transfer"),
+        (80, 0, [("Matte Lipstick", 2), ("Coco Chanel Perfume", 1)], "delivered", "card"),
+        (66, 2, [("White Teddy Bear", 1)], "returned", "card"),
+        (50, 3, [("Selfie Stick", 1), ("Black Earbuds", 1)], "delivered", "paypal"),
+        (35, 0, [("Jimmy Choo Heels", 1)], "shipped", "card"),
+        (21, 4, [("Christian Dior Bag", 1)], "cancelled", "card"),
+        (12, 1, [("NARS BB Cream", 2)], "packed", "card"),
+        (6, 2, [("Golden Teapot", 1), ("Dining Table", 1)], "processing", "bank_transfer"),
+        (3, 3, [("Chocolate Balls", 3)], "pending", "card"),
+        (1, 4, [("Silver Jewellery", 1)], "pending", "card"),
+        (0, 0, [("LED Console", 1)], "pending", "card"),
+    ]
+
+    def _seed_orders(self, store, seller, member):
+        if Order.objects.filter(order_number__startswith="ASK-DEMO").exists():
+            return
+        Fulfilment = OrderItem.FulfilmentStatus
+        steps = {
+            "pending": [], "processing": ["processing"], "packed": ["processing", "packed"],
+            "shipped": ["processing", "packed", "shipped"], "delivered": ["processing", "packed", "shipped", "delivered"],
+            "returned": ["processing", "packed", "shipped", "delivered", "returned"], "cancelled": ["cancelled"],
+        }
+        products = {p.name: p for p in Product.objects.filter(store=store).prefetch_related("variants")}
+        now = timezone.now()
+        for n, (days_ago, who, lines, final, method) in enumerate(self.DEMO_ORDERS, start=1):
+            first, last, email = self.DEMO_CUSTOMERS[who]
+            user = member if who == 0 else None  # Olivia is the signed-in demo customer
+            items = [(products[name], qty) for name, qty in lines if name in products]
+            if not items:
+                continue
+            subtotal = sum(p.price_cents * q for p, q in items)
+            placed_at = now - timedelta(days=days_ago, hours=n % 7)
+            order = Order.objects.create(
+                user=user, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK-DEMO{n:03d}",
+                contact_first_name=first, contact_last_name=last, contact_email=member.email if user else email, contact_phone="+27 82 123 4567",
+                shipping_address={"full_name": f"{first} {last}", "street_address": "123 Main Street", "city": "Cape Town", "postal_code": "6001", "country": "ZA"},
+                subtotal_cents=subtotal, shipping_cents=700, total_cents=subtotal + 700, currency=items[0][0].currency,
+                payment_method_type=method, payment_status=Order.OrderPaymentStatus.PAID,
+            )
+            Order.objects.filter(pk=order.pk).update(placed_at=placed_at, created_at=placed_at)
+            for p, q in items:
+                v = p.variants.first()
+                OrderItem.objects.create(order=order, store=store, product=p, variant=v, product_name=p.name, variant_summary=v.summary(),
+                                         qty=q, unit_price_cents=p.price_cents, line_total_cents=p.price_cents * q, status=Fulfilment.PENDING)
+            order_services._record_event(order, Order.OrderStatus.PENDING_PAYMENT, actor="buyer", actor_user=user, note="Order placed")
+            order_services._record_event(order, Order.OrderStatus.CONFIRMED, actor="system", note="Payment confirmed")
+            for i, status in enumerate(steps[final], start=1):
+                order_services.set_store_status(order, store, status=status, actor_user=seller, note="")
+                # spread the timeline over the following hours/days
+                order.status_events.filter(store=store).order_by("-created_at").update(created_at=placed_at + timedelta(hours=6 * i))
+            order.status_events.update(created_at=models.Case(
+                models.When(status=Order.OrderStatus.PENDING_PAYMENT, then=models.Value(placed_at)),
+                models.When(status=Order.OrderStatus.CONFIRMED, store__isnull=True, then=models.Value(placed_at + timedelta(minutes=3))),
+                default=models.F("created_at"),
+            ))
+        self.stdout.write(f"Seeded {len(self.DEMO_ORDERS)} demo orders for {store.display_name}")
