@@ -28,6 +28,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "dj-database-url" },
     { name = "django-ninja" },
+    { name = "django-zeal" },
     { name = "gunicorn" },
     { name = "pgvector" },
     { name = "pillow" },
@@ -42,6 +43,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=50.0.1" },
     { name = "dj-database-url", specifier = ">=3.1.2" },
     { name = "django-ninja", specifier = ">=1.7.0" },
+    { name = "django-zeal", specifier = ">=2.2.4" },
     { name = "gunicorn", specifier = ">=26.2.0" },
     { name = "pgvector", specifier = ">=0.5.0" },
     { name = "pillow", specifier = ">=12.3.0" },
@@ -211,6 +213,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/25/f7/410af3b53845f04c94a9dabe5934117d9546b6f5ce4028cff5b74deb933c/django_ninja-1.7.0.tar.gz", hash = "sha256:7a0ce06c978a42a808d9a9d7ba1cda383df8eea90040cfc232ad10b7d9024e0d", size = 2341450, upload-time = "2026-08-30T17:49:19.718Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/d6/f4f939b912c696b6fc19e15ed3b2b37ac7cb09600373e83211f44adaf6d5/django_ninja-1.7.0-py3-none-any.whl", hash = "sha256:f1a0f762c9810dabcb040fcff76c6e2f5d0cdb51b4a597799ee06b5df8481f3f", size = 2376156, upload-time = "2026-08-30T17:49:17.552Z" },
+]
+
+[[package]]
+name = "django-zeal"
+version = "2.2.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/b5/d10702bcdb31f0746c014071277b4a59698effe608a2140f4d39a40de976/django_zeal-2.2.4.tar.gz", hash = "sha256:e5caedfc0092e877baa318af2146f3ba9c07104d122af4f900fcf9cc49f46e74", size = 21946, upload-time = "2026-08-28T16:48:41.682Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/29/e4f2879c807693fdc04b8fd0fbfd1d5270f234ea73aaa00a3a53cb5c76f4/django_zeal-2.2.4-py3-none-any.whl", hash = "sha256:f5d424833450e47fcb000fe5cee7cc78be4952c36afbc47ed772375b90a727d8", size = 15758, upload-time = "2026-08-28T16:48:40.535Z" },
 ]
 
 [[package]]

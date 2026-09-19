@@ -16,7 +16,7 @@ from ninja.errors import HttpError
 
 from accounts.models import Address, PaymentMethod
 from catalog.models import Product, ProductVariant, StockMovement
-from catalog.services import adjust_stock
+from catalog.services import adjust_stock, lock_variants
 from discovery import events
 from sellers.models import Store
 
@@ -53,12 +53,15 @@ def resolve_cart(request, *, create: bool = True) -> tuple[Cart, str | None]:
     user = _user(request)
     token = request.headers.get(CART_TOKEN_HEADER) or None
     if user is not None:
-        cart, _ = Cart.objects.get_or_create(user=user)
+        cart = _cart_qs().filter(user=user).first()  # one query in the common case
+        if cart is None:
+            cart = _cart_qs().get(pk=Cart.objects.create(user=user).pk)
         if token:
             guest = Cart.objects.filter(session_token=token, user__isnull=True).first()
             if guest is not None:
                 _merge(guest, into=cart)
-        return _cart_qs().get(pk=cart.pk), None
+                cart = _cart_qs().get(pk=cart.pk)  # prefetched lines changed
+        return cart, None
     if token:
         cart = _cart_qs().filter(session_token=token, user__isnull=True).first()
         if cart is not None:
@@ -317,7 +320,7 @@ def checkout(request, cart: Cart, payload) -> Order:
 
     # Lock stock rows, then re-check quantities.
     items = list(cart.items.select_related("variant__product__store"))
-    variants = {v.id: v for v in ProductVariant.objects.select_for_update().filter(pk__in=[i.variant_id for i in items])}
+    variants = {v.id: v for v in lock_variants(i.variant_id for i in items)}
     for item in items:
         v = variants[item.variant_id]
         if v.stock_qty < item.qty:
@@ -356,7 +359,7 @@ def checkout(request, cart: Cart, payload) -> Order:
             qty=item.qty, unit_price_cents=line["unit_price_cents"], compare_at_price_cents=line["compare_at_price_cents"],
             line_total_cents=line["line_total_cents"],
         )
-        adjust_stock(v, delta=-item.qty, reason=StockMovement.Reason.SALE, order=order)
+        adjust_stock(v, delta=-item.qty, reason=StockMovement.Reason.SALE, order=order, locked=True)
         events.record_for_cart(events.ProductEvent.Kind.PURCHASE, product=v.product, cart=cart)
     if cart.voucher_id:
         VoucherRedemption.objects.create(voucher=cart.voucher, user=user, order=order)
@@ -422,9 +425,10 @@ def cancel(order: Order, *, user, reason: str) -> Order:
 
 
 def _restock(order: Order, items, *, reason: str, actor_user=None) -> None:
+    items = [i for i in items if i.variant_id and i.status not in (Fulfilment.CANCELLED, Fulfilment.RETURNED)]
+    locked = {v.id: v for v in lock_variants(i.variant_id for i in items)}
     for item in items:
-        if item.variant_id and item.status not in (Fulfilment.CANCELLED, Fulfilment.RETURNED):
-            adjust_stock(item.variant, delta=item.qty, reason=reason, order=order, actor_user=actor_user)
+        adjust_stock(locked[item.variant_id], delta=item.qty, reason=reason, order=order, actor_user=actor_user, locked=True)
 
 
 def reorder(order: Order, cart: Cart) -> list[str]:

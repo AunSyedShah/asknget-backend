@@ -45,10 +45,10 @@ Measured counts are flat (3–9 queries per page; dashboard 27 across 8 widgets)
 enforces this**: zero `assertNumQueries`, no detector. The next developer can reintroduce an N+1
 and the suite stays green.
 
-**Action (high value, ~1 h).**
-1. Add `django-zeal` to dev deps; enable in test settings so any lazy load in a loop fails the suite.
-2. Add `assertNumQueries` to the list/detail tests of catalog, orders, portal (fixed upper bounds).
-3. Add `django-silk` to the dev override only (never in the image) for ad-hoc profiling.
+**Done 2026-09-20 (step 1).** `django-zeal` enabled under tests (`ZEAL=1` for a dev server); it found
+and we fixed 7 N+1 sites in write paths (cart resolve, checkout lock, restock, variant option
+links ×2, duplicate, low-stock threshold) plus a 10→5 query reviews endpoint. `core/test_query_budgets.py`
+pins 12 hot endpoints. `django-silk` deferred — `ZEAL=1` + `CaptureQueriesContext` cover current needs.
 
 ## 3. Query-level optimisation
 

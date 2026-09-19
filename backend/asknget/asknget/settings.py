@@ -48,6 +48,12 @@ if TESTING:
     FIELD_ENCRYPTION_KEY = FIELD_ENCRYPTION_KEY or Fernet.generate_key().decode()
     PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
+# N+1 detector (django-zeal). Under `manage.py test` any lazy load inside a loop
+# raises, so a missing select_related/prefetch_related fails the suite instead of
+# shipping. Set ZEAL=1 to get the same in a dev server (logs + raises).
+ZEAL_ENABLED = TESTING or os.environ.get('ZEAL') == '1'
+ZEAL_RAISE = True
+
 # Auth / OTP knobs (asknget.core.auth, accounts.services)
 JWT_ACCESS_TTL_MINUTES = int(os.environ.get('JWT_ACCESS_TTL_MINUTES', 15))
 JWT_REFRESH_TTL_DAYS = int(os.environ.get('JWT_REFRESH_TTL_DAYS', 30))
@@ -85,6 +91,7 @@ INSTALLED_APPS = [
     # third-party
     'ninja',
     'django.contrib.postgres',  # full-text / trigram lookups (no-op on SQLite)
+    *(['zeal'] if ZEAL_ENABLED else []),
     # asknget
     'core',
     'accounts',
@@ -99,6 +106,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
+    *(['zeal.middleware.zeal_middleware'] if ZEAL_ENABLED else []),
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves /static (admin, Swagger UI) from the app image
     'django.contrib.sessions.middleware.SessionMiddleware',

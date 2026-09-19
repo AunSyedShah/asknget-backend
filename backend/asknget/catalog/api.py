@@ -106,7 +106,7 @@ def product_detail(request, slug: str):
 
 @catalog_router.get("/products/{slug}/related", response=list[ProductCardOut], auth=OptionalJWTAuth(), summary="'You may also like'")
 def product_related(request, slug: str, limit: int = Query(6, ge=1, le=12)):
-    return services.related(services.get_product(slug), limit)
+    return services.related(services.get_product(slug, full=False), limit)
 
 
 # --------------------------------------------------------------------------- #
@@ -117,12 +117,12 @@ def product_related(request, slug: str, limit: int = Query(6, ge=1, le=12)):
 @catalog_router.get("/products/{slug}/reviews", response=list[ReviewOut], summary="Reviews tab list")
 @paginate(PagePagination)
 def review_list(request, slug: str, sort: ReviewSortLit = "new"):
-    return services.public_reviews(services.get_product(slug), sort)
+    return services.public_reviews(services.get_product(slug, full=False), sort)
 
 
 @catalog_router.get("/products/{slug}/reviews/summary", response=RatingBreakdownOut, summary="'4.9 out of 5 (205 Reviews)' + star bars")
 def review_summary(request, slug: str):
-    return services.rating_breakdown(services.get_product(slug))
+    return services.rating_breakdown(services.get_product(slug, full=False))
 
 
 @catalog_router.post(
@@ -132,7 +132,7 @@ def review_summary(request, slug: str):
     summary="'Add your review' (multipart; guests must send name + email)",
 )
 def review_create(request, slug: str, payload: Form[ReviewIn], files: list[UploadedFile] = File(None)):
-    product = services.get_product(slug)
+    product = services.get_product(slug, full=False)
     review = services.create_review(
         product, user=_user(request), name=payload.name, email=payload.email, rating=payload.rating, body=payload.body, files=files or []
     )

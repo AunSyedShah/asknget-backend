@@ -57,9 +57,9 @@ def recommended(request, limit: int = Query(8, ge=1, le=24)):
 
 @discovery_router.get("/products/{slug}/similar", response={200: list[ProductCardOut], 404: ErrorOut}, auth=OptionalJWTAuth(), summary="'You may also like' (semantic)")
 def similar(request, slug: str, limit: int = Query(6, ge=1, le=12)):
-    return recommendations.similar(catalog.get_product(slug), limit)
+    return recommendations.similar(catalog.get_product(slug, full=False), limit)
 
 
 @discovery_router.get("/products/{slug}/frequently-bought-together", response={200: list[ProductCardOut], 404: ErrorOut}, auth=OptionalJWTAuth())
 def frequently_bought_together(request, slug: str, limit: int = Query(4, ge=1, le=12)):
-    return recommendations.frequently_bought_together(catalog.get_product(slug), limit)
+    return recommendations.frequently_bought_together(catalog.get_product(slug, full=False), limit)

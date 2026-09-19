@@ -58,7 +58,7 @@ def store_products(store):
     stock = ProductVariant.objects.filter(product=OuterRef("pk"), is_active=True)
     return (
         Product.objects.filter(store=store)
-        .select_related("category", "brand")
+        .select_related("category", "brand", "store")  # store: effective_low_stock_threshold()
         .prefetch_related(Prefetch("images", queryset=ProductImage.objects.order_by("-is_primary", "sort_order")))
         .annotate(
             sold_qty=_subquery_sum(sold, "qty"),
@@ -223,8 +223,8 @@ def set_options(product: Product, options: list) -> Product:
     if product.status == PStatus.PENDING:
         raise HttpError(409, "This product is under review")
     existing = {
-        _combo_key(v.option_values.select_related("option_type")): v
-        for v in product.variants.all()
+        _combo_key(v.option_values.all()): v
+        for v in product.variants.prefetch_related("option_values__option_type")
     }
     product.option_types.all().delete()
     value_objs: list[list[ProductOptionValue]] = []
@@ -232,17 +232,20 @@ def set_options(product: Product, options: list) -> Product:
         ot = ProductOptionType.objects.create(product=product, name=opt.name, sort_order=i)
         value_objs.append([ProductOptionValue.objects.create(option_type=ot, value=v.value, swatch_hex=v.swatch_hex, sort_order=j) for j, v in enumerate(opt.values)])
     combos = list(itertools.product(*value_objs)) if value_objs else [()]
-    kept = set()
+    kept, links = set(), []
+    Link = ProductVariant.option_values.through
     for n, combo in enumerate(combos, start=1):
         key = frozenset((v.option_type.name.lower(), v.value.lower()) for v in combo)
         variant = existing.get(key)
         if variant is None:
             variant = ProductVariant.objects.create(product=product, sku=_unique_sku(product, n), stock_qty=0)
-        variant.option_values.set(combo)
+        # Old option rows were cascade-deleted above, so every surviving variant needs re-linking.
+        links += [Link(productvariant=variant, productoptionvalue=v) for v in combo]
         if not variant.is_active:
             variant.is_active = True
             variant.save(update_fields=["is_active", "updated_at"])
         kept.add(variant.pk)
+    Link.objects.bulk_create(links)  # one INSERT instead of a SELECT+INSERT per variant
     for variant in product.variants.exclude(pk__in=kept):
         if variant.order_items.exists():
             variant.is_active = False
@@ -405,9 +408,12 @@ def duplicate(product: Product) -> Product:
         new_ot = ProductOptionType.objects.create(product=copy, name=ot.name, sort_order=ot.sort_order)
         for v in ot.values.all():
             value_map[v.pk] = ProductOptionValue.objects.create(option_type=new_ot, value=v.value, swatch_hex=v.swatch_hex, sort_order=v.sort_order)
-    for n, v in enumerate(product.variants.filter(is_active=True), start=1):
+    Link = ProductVariant.option_values.through
+    links = []
+    for n, v in enumerate(product.variants.filter(is_active=True).prefetch_related("option_values"), start=1):
         nv = ProductVariant.objects.create(product=copy, sku=_unique_sku(copy, n), price_cents=v.price_cents, compare_at_price_cents=v.compare_at_price_cents, stock_qty=0)
-        nv.option_values.set([value_map[ov.pk] for ov in v.option_values.all()])
+        links += [Link(productvariant=nv, productoptionvalue=value_map[ov.pk]) for ov in v.option_values.all()]
+    Link.objects.bulk_create(links)
     for s in product.content_sections.all():
         ProductContentSection.objects.create(product=copy, section=s.section, title=s.title, body=s.body, sort_order=s.sort_order)
     return copy

@@ -167,17 +167,17 @@ def request_wishlist_ids(request) -> set | None:
     return cached
 
 
-def get_product(slug: str) -> Product:
-    product = (
-        public_products()
-        .prefetch_related(
+def get_product(slug: str, *, full: bool = True) -> Product:
+    """PDP loader. `full=False` skips the option/variant/content prefetches for
+    endpoints that only need the product row (reviews, related, similar)."""
+    qs = public_products()
+    if full:
+        qs = qs.prefetch_related(
             Prefetch("option_types", queryset=ProductOptionType.objects.prefetch_related("values")),
             Prefetch("variants", queryset=ProductVariant.objects.filter(is_active=True).prefetch_related("option_values")),
             "content_sections",
         )
-        .filter(slug=slug)
-        .first()
-    )
+    product = qs.filter(slug=slug).first()
     if product is None:
         raise HttpError(404, "Product not found")
     return product
@@ -229,14 +229,21 @@ def refresh_stock_status(product: Product) -> str:
     return status
 
 
+def lock_variants(ids):
+    """Row-lock several variants in one query (product + store joined). Pass the
+    results to adjust_stock(..., locked=True) when changing stock in a loop."""
+    return ProductVariant.objects.select_for_update(of=("self",)).select_related("product__store").filter(pk__in=list(ids))
+
+
 @transaction.atomic
 def adjust_stock(variant: ProductVariant, *, delta: int | None = None, set_to: int | None = None, reason: str,
-                 actor_user=None, order=None, note: str = "") -> StockMovement:
-    """Change a variant's stock by `delta` or to `set_to` (exactly one). Locks the row,
-    refuses to go negative, logs a StockMovement and refreshes the product's stock status."""
+                 actor_user=None, order=None, note: str = "", locked: bool = False) -> StockMovement:
+    """Change a variant's stock by `delta` or to `set_to` (exactly one). Locks the row
+    (unless the caller already did via lock_variants), refuses to go negative, logs a
+    StockMovement and refreshes the product's stock status."""
     if (delta is None) == (set_to is None):
         raise ValueError("pass exactly one of delta / set_to")
-    locked = ProductVariant.objects.select_for_update().select_related("product__store").get(pk=variant.pk)
+    locked = variant if locked else ProductVariant.objects.select_for_update(of=("self",)).select_related("product__store").get(pk=variant.pk)
     if set_to is not None:
         delta = set_to - locked.stock_qty
     new_qty = locked.stock_qty + delta

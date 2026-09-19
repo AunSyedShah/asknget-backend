@@ -129,6 +129,20 @@ Revenue, customer types, fulfilment states, what the design left undefined) is `
   Python, substring keyword match), so `manage.py test` runs anywhere; the Postgres-only paths are covered
   by running the suite inside the container.
 
+## Performance guard rails
+
+- **N+1 detector** — `django-zeal` is active under `manage.py test` (and in a dev server with `ZEAL=1`):
+  any lazy relation load inside a loop raises `NPlusOneError`, so a missing `select_related` /
+  `prefetch_related` fails the suite. Allow a legitimate case with `zeal_ignore([...])`, never by
+  disabling the detector.
+- **Query budgets** — `core/test_query_budgets.py` pins the SQL query count of every hot endpoint
+  against a > 1-row fixture. Adding a query is fine when a feature needs it: bump the number in the
+  same commit. A number that grows with the rows is a bug.
+- **Write paths too** — lock stock rows in bulk (`catalog.services.lock_variants`) and pass
+  `locked=True` to `adjust_stock` inside loops; create M2M links through the `through` model with
+  `bulk_create` rather than `.set()` per object.
+- Baselines and the wider practice list: `docs/engineering-practices.md`.
+
 ## Conventions
 
 - UUID primary keys, `created_at` / `updated_at` everywhere (`core.models.TimeStampedModel`); soft delete via `SoftDeleteModel` where the design implies history (users' addresses, cards, products, reviews).
