@@ -45,20 +45,23 @@ Without `DATABASE_URL` the project falls back to SQLite; set it to a Postgres UR
 
 ## Running with Docker
 
-Two images: the API (`backend/Dockerfile`, built on Docker Hub's official `astral/uv` image so dependencies are installed by uv from `uv.lock`, and `uv` ships in the container) and `pgvector/pgvector:pg17` (official Postgres 17 + the pgvector extension used by search/recommendations). The API image runs twice: `web` (HTTP) and `worker` (background jobs — today it keeps product embeddings fresh).
+Two images: the API (`backend/Dockerfile`, built on Docker Hub's official `astral/uv` image so dependencies are installed by uv from `uv.lock`, and `uv` ships in the container) and `pgvector/pgvector:pg17` (official Postgres 17 + the pgvector extension used by search/recommendations). The API image runs twice: `web` (gunicorn) and `worker` (background jobs — today it keeps product embeddings fresh). In front sits `proxy` (`nginx:alpine`): it serves `/media/` straight from the uploads volume, gzips and buffers API responses, and is the only published port (`HTTP_PORT`, default 80).
 Your code stays where it is — the image *copies* it at build time, and in dev mode the
 working tree is *bind-mounted* into the container so edits reload live.
 
 ```bash
 cp backend/.env.example backend/.env    # fill SECRET_KEY, FIELD_ENCRYPTION_KEY, POSTGRES_PASSWORD (+ same password in DATABASE_URL)
-docker compose up -d --build            # dev: Postgres + runserver with live reload on :8000
+docker compose up -d --build            # dev: Postgres + runserver with live reload on :8000 (nginx on :80 as well)
 docker compose exec web python manage.py seed_demo   # optional demo data
 ```
 
 | I want to… | Command |
 |---|---|
 | Start / stop (data kept) | `docker compose up -d` · `docker compose down` |
-| Start **production-shaped** (gunicorn, no bind mount) | `docker compose -f compose.yaml up -d --build` |
+| Start **production-shaped** (nginx → gunicorn, no bind mount) | `docker compose -f compose.yaml up -d --build` → http://localhost (or `HTTP_PORT`) |
+| Port 80 not allowed on your PC (Windows reserves it) | put `HTTP_PORT=8080` in a **root** `.env` (compose variable, git-ignored) |
+| Size gunicorn | `WEB_CONCURRENCY=5` / `GUNICORN_CMD_ARGS=--threads 2` in `backend/.env` (defaults 3 × 2) |
+| Reclaim Docker disk after many rebuilds | `docker builder prune -af` (build cache), `docker image prune` |
 | Rebuild after changing `pyproject.toml` / `uv.lock` / `Dockerfile` | `docker compose up -d --build` |
 | Tail logs | `docker compose logs -f web` (or `db`, `worker`) |
 | Re-embed the whole catalogue (after switching `EMBEDDING_PROVIDER`) | `docker compose exec web python manage.py embed_products --all` |
@@ -85,10 +88,11 @@ How the pieces fit:
   within ~30 s.
 - Data lives in named volumes `asknget_pgdata` (database) and `asknget_media` (uploads); they survive
   `down`, rebuilds and image upgrades. In dev, uploads go to `backend/asknget/media` on disk instead.
-- Static files (admin, Swagger) are baked into the image and served by whitenoise; uploads are served
-  by Django while `SERVE_MEDIA=1` — move them to object storage or a reverse proxy before real traffic.
-- Behind HTTPS/a proxy set `BEHIND_PROXY=1`, `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`,
-  and put your domain in `ALLOWED_HOSTS`.
+- Static files (admin, Swagger) are baked into the image and served by whitenoise through the proxy;
+  uploads are served by nginx from the `media` volume (`deploy/nginx.conf`). In dev (`SERVE_MEDIA=1`)
+  Django also serves them on :8000 so the bind-mounted `backend/asknget/media` works without the proxy.
+- The prod stack already sets `BEHIND_PROXY=1`; for HTTPS terminate TLS at nginx (or a cloud LB), set
+  `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`, and put your domain in `ALLOWED_HOSTS`.
 
 ## Seller portal (`portal` app)
 

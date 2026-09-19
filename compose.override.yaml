@@ -6,6 +6,7 @@
 #     so edits on your PC are live inside the container (runserver auto-reloads)
 #   - Django's dev server instead of gunicorn, DEBUG on
 #   - Postgres published on localhost:5432 for DB tools
+#   - Django published directly on :8000 (runserver); the nginx proxy still runs on :80
 #   - uploads land in ./backend/asknget/media on your disk instead of a volume
 
 services:
@@ -15,6 +16,8 @@ services:
 
   web:
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "8000:8000"
     environment:
       DEBUG: "1"
       SERVE_MEDIA: "1"
@@ -22,6 +25,10 @@ services:
     volumes:
       - ./backend/asknget:/app/asknget
       - ./backend/asknget/media:/app/asknget/media
+
+  proxy:
+    volumes:
+      - ./backend/asknget/media:/srv/media:ro   # dev uploads live on disk, not in the volume
 
   worker:
     volumes:

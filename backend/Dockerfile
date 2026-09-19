@@ -35,7 +35,9 @@ FROM docker.io/library/python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE} AS runtim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
-    DJANGO_SETTINGS_MODULE=asknget.settings
+    DJANGO_SETTINGS_MODULE=asknget.settings \
+    WEB_CONCURRENCY=3 \
+    GUNICORN_CMD_ARGS="--threads 2"
 
 # postgresql-client gives the entrypoint `pg_isready`; curl is for the healthcheck.
 RUN apt-get update \
@@ -65,4 +67,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8000/api/v1/health || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["gunicorn", "asknget.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "--access-logfile", "-"]
+# Worker count comes from WEB_CONCURRENCY (gunicorn reads it natively); extra flags from GUNICORN_CMD_ARGS.
+CMD ["gunicorn", "asknget.wsgi:application", "--bind", "0.0.0.0:8000", "--timeout", "60", "--access-logfile", "-"]

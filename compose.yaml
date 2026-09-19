@@ -34,13 +34,29 @@ services:
     env_file: backend/.env            # DATABASE_URL must point at db:5432 (see .env.example)
     environment:
       MEDIA_ROOT: /app/asknget/media
-      SERVE_MEDIA: "1"                # Django serves uploads until object storage exists
+      SERVE_MEDIA: "0"                # the proxy serves uploads; Django never touches media requests
+      BEHIND_PROXY: "1"               # trust X-Forwarded-Proto/Host from the proxy
+      # gunicorn sizing: WEB_CONCURRENCY / GUNICORN_CMD_ARGS default in the Dockerfile; override in backend/.env
     volumes:
       - media:/app/asknget/media      # user uploads survive image rebuilds
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"                        # reachable by the proxy only; compose.override.yaml publishes it for dev
     depends_on:
       db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  proxy:
+    # nginx edge: serves /media/ from the shared volume, gzips and buffers API
+    # responses, and is the single published port. TLS terminates here later.
+    image: nginx:1.29-alpine
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - media:/srv/media:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"         # HTTP_PORT is read by compose itself (shell env or a root .env), not backend/.env
+    depends_on:
+      web:
         condition: service_healthy
     restart: unless-stopped
 
