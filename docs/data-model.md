@@ -37,8 +37,8 @@ asknget is a **multi-vendor marketplace**: a buyer storefront (catalog → cart 
 ## 2. Global conventions
 
 - Primary keys: UUID. `created_at` / `updated_at` on every table (omitted below). Soft delete (`deleted_at`) on User, Product, Address, PaymentMethod, Review.
-- Money: integer minor units (`*_cents`) + `currency` (ISO-4217). Design shows `$` only. ❓ single or multi-currency.
-- Phone: E.164 string. Design shows `+92` (PK) and South African addresses (Johannesburg / Gauteng) — ❓ target market(s); affects province/city lookups and VAT/tax fields.
+- Money: integer minor units (`*_cents`) + `currency` (ISO-4217). Design shows `$` only. **Resolved (sprint 4):** one currency per market — every store, product, cart and order belongs to a `markets.Country` whose `currency` it uses.
+- Phone: E.164 string. Design shows `+92` (PK) and South African addresses (Johannesburg / Gauteng). **Resolved (sprint 4):** countries are admin-configured markets (`markets_country`); ZA and PK are seeded as examples — see `docs/sprint-4-plan.md`.
 - Enums are written inline as `enum(...)`.
 - Card numbers, CVV and full bank account numbers are **never stored raw**. Cards go through a PSP token; the bank account number is encrypted at rest and only `last4` is displayed ("Account Number: xxxx 1234").
 
@@ -399,6 +399,41 @@ The post-activation "Quick Start" (Add Product, Setup Delivery, Complete Profile
 
 ---
 
+## 7b. Markets (sprint 4 — team-lead re-scope, not in the Figma)
+
+A country is a separate market. Staff maintain all of this in Django admin; the API resolves the
+market per request (`X-Region` / `?region=` → host subdomain `za.asknget.com` → default) and activates
+its language and timezone. Full contract: `docs/sprint-4-plan.md`.
+
+### `markets_country`
+| field | type | notes |
+|---|---|---|
+| code | char(2) PK | ISO 3166-1 alpha-2 |
+| name, subdomain (unique) | varchar | `za` → za.asknget.com |
+| currency | char(3) | one per market |
+| timezone | varchar | IANA; activated per request |
+| default_language, languages | varchar, json list | subset of `settings.LANGUAGES` |
+| phone_prefix, region_label, postal_code_regex | varchar | address-form hints |
+| is_active, is_default, sort_order | | exactly one default |
+
+### `markets_kycpolicy` (1:1 country)
+`mode` enum(manual — `provider` reserved), `required_documents` json `{account_type: [doc types]}` (empty =
+platform defaults in `sellers/rules.py`), `document_labels` i18n json per type, `id_number_label`,
+`id_number_regex`, `tax_id_label`, `company_registration_label`, `instructions` i18n json.
+
+### `markets_returnpolicy` (1:1 country)
+`window_days` (30), `summary` i18n json, `url`, `is_active`. Snapshotted onto `orders.return_window_days`.
+
+### Country on existing tables
+`seller_applications.country` (from the sign-up region), `stores.country` (copied on approval, immutable),
+`products.country` (denormalised; partial live index), `categories.product_counts` json per market,
+`orders.country` + `return_window_days`, `delivery_methods.country` (name unique per country),
+`vouchers.country` / `banners.country` nullable (= every market), `users.language`,
+`addresses.country` (blank = the market), `seller_documents.type` + `tax_registration`,
+`business_licence`, `other`.
+
+---
+
 ## 8. Marketing & support
 
 ### `banners`
@@ -502,3 +537,13 @@ REST-style JSON; auth via access + refresh JWT.
 32. **Traffic Channel widget** (visitors, socialising, active/inactive users) needs web analytics we do not collect. Omitted; wire to GA/Plausible later if wanted.
 33. **Social login** (Apple/Google) on the seller Login screen — no provider configured; needs OAuth client ids and a decision on account linking.
 34. **Order-level discount allocation** — vouchers apply to the whole buyer order; a store's "sales" currently use undiscounted line totals. Allocate pro-rata per store, or treat vouchers as marketplace-funded?
+
+**Multi-country markets (sprint 4, see `docs/sprint-4-plan.md`)**
+
+35. **Launch countries** — ZA and PK are seeded as examples with plausible KYC (SA ID/CIPC/VAT; CNIC/SECP/NTN) and return windows (30 d / 7 d). Which countries actually launch, and are those policies right? Supersedes Q1.
+36. **Country managers** — should staff reviewers be scoped to a country (a PK reviewer only sees PK applications/orders)? Today every staff user sees every market (`?country=` filter only). This is a role feature, together with the deferred vendor sub-roles.
+37. **Translations of backend text** — error messages, status headlines and e-mails are English. Django's own strings follow the language; ours need `makemessages` and translators for af / zu / ur. Who owns translations, and is Urdu (RTL) in scope for the first launch?
+38. **Bare-domain landing** — `asknget.com` without a country resolves to the default market. Should the frontend suggest a region from GeoIP / browser locale and redirect to the subdomain? (Backend does no GeoIP by design.)
+39. **Per-country site settings** — footer contact details, "We Accept" logos and policy blurbs are still global (`site_settings`). Per-country overrides are a small follow-up once the content exists.
+40. **Return-request flow** — the return window is now snapshotted per order and exposed as `return_eligible_until`, but buyers still cannot *request* a return (Q26). Sellers can mark goodwill returns after the window.
+41. **One currency per market** — a store prices only in its country's currency. Is a cross-border seller (one business selling in ZA and PK) expected? Today that is two stores / two applications.

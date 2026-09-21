@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.5"
+VERSION = "0.6"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -220,6 +220,7 @@ story += [
         ["Seller dashboard: home KPIs, products wizard + review, inventory, orders (per-store fulfilment), customers", "Implemented", "/api/v1/seller/dashboard|products|inventory|orders|customers|search; /admin/products (Figma 2026-09-18)"],
         ["Seller portal: Returns, Chat, Analytics page, Notifications, Team/Managers, social login, invoice PDF", "Not designed", "Sidebar entries only - see data-model.md section 10 Q20-Q34"],
         ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "'Team/Managers' and 'Chat' now appear in the seller sidebar; still no screens"],
+        ["Multi-country markets: per-country currency/timezone/languages, KYC policy and return policy in admin; region, language and timezone resolved per request", "Implemented", "/api/v1/regions, X-Region / X-Language / X-Timezone headers; ZA + PK seeded (sprint 4, team-lead re-scope)"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
 
@@ -241,7 +242,7 @@ story += [
         ["Images", "Pillow", "Avatar, product, banner, store images"],
         ["Config", "python-dotenv + dj-database-url", "All settings via environment variables / backend/.env"],
         ["Docs", "Swagger UI (built in)", "/api/v1/docs and /api/v1/openapi.json"],
-        ["Tests", "Django TestCase", "End-to-end through the real URL config; 121 tests, green on SQLite and on Postgres+pgvector inside the container"],
+        ["Tests", "Django TestCase", "End-to-end through the real URL config; 164 tests, green on SQLite and on Postgres+pgvector inside the container"],
     ], (34 * mm, 52 * mm, 86 * mm)),
 ]
 
@@ -597,7 +598,27 @@ story += [
         ["'Add Note', 'Export Customers'", "POST /seller/customers/{key}/notes {body}, DELETE .../notes/{id}, GET /seller/customers/export.csv", "Notes are private to the store"],
     ]),
 
-    P("6.14 Support and marketing", "h2"),
+    P("6.14 Markets: country, language, timezone", "h2"),
+    P("Every country is a separate <b>market</b> with its own currency, timezone, languages, KYC policy and return policy, "
+      "all edited by staff in Django admin (Markets). A store belongs to one market, so a shopper on "
+      "<font face='Courier'>za.asknget.com</font> only sees South African stores, prices in ZAR and the ZA return window. "
+      "The API resolves the market from the request: <font face='Courier'>X-Region</font> header (or ?region=) first, then the "
+      "host subdomain, then the default country. Language comes from <font face='Courier'>X-Language</font> (the user's saved "
+      "preference from /me) or the browser's Accept-Language, limited to what the country offers; timezone from "
+      "<font face='Courier'>X-Timezone</font> or the country. Every response says what it resolved to "
+      "(<font face='Courier'>X-Region</font>, <font face='Courier'>Content-Language</font>). Contract: docs/sprint-4-plan.md."),
+    flow([
+        ["Country switcher", "GET /regions", "Active countries: code, name, subdomain, languages, currency, phone prefix"],
+        ["App boot / footer policy line", "GET /regions/current", "Resolved country, language, timezone, currency, postal-code regex, localised return policy (window + summary)"],
+        ["Language preference", "PATCH /me {language}; GET /me -> language + locale", "Send the saved value back as X-Language on every call"],
+        ["Add to cart from another market", "POST /cart/items -> 409 cart_region_mismatch", "Offer 'clear cart and switch' = DELETE /cart/items, then add again"],
+        ["Checkout", "POST /checkout", "Blank address country = the market; another country -> 409 ships_outside_region; delivery methods are per market"],
+        ["Order detail", "GET /me/orders/{id}", "country, return_window_days (snapshot) and return_eligible_until"],
+        ["Seller wizard (per-country KYC)", "GET /seller/application -> policy; GET /lookups/seller?country=PK&account_type=", "Required documents, local labels (CNIC / SA ID...), ID-number format, instructions - in the request language"],
+        ["Staff review queue", "GET /admin/seller-applications?country=PK", "Row shows the applicant's market"],
+    ]),
+
+    P("6.15 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -681,6 +702,9 @@ story += [
         ["GET /products/{slug}/frequently-bought-together", "optional", "?limit=", "200 [ProductCardOut]", "404"],
         ["GET /search/suggest", "-", "?q=&limit=", "200 SuggestOut", "422"],
         ["GET /recommendations", "optional", "?limit= (+X-Cart-Token)", "200 RecommendationsOut", ""],
+        ["GET /regions", "-", "-", "200 [CountryOut]", ""],
+        ["GET /regions/current", "-", "X-Region / X-Language / X-Timezone", "200 RegionOut", "400 unknown_region"],
+        ["DELETE /cart/items", "optional", "(+X-Cart-Token)", "200 CartOut", ""],
         ["GET /seller/dashboard", "store", "?period=", "200 DashboardOut", "403"],
         ["GET /seller/search", "store", "?q=&limit=", "200 PortalSearchOut", "403"],
         ["GET /seller/products", "store", "SellerProductQuery + page", "200 page[SellerProductRowOut]", "403"],
@@ -794,7 +818,7 @@ story += [
         ["Topic", "Convention"],
         ["IDs", "UUID strings everywhere (users, addresses, products, orders...)"],
         ["Dates/times", "ISO 8601 in UTC, e.g. 2026-09-12T20:39:00Z. Dates without time are YYYY-MM-DD. Format for display client-side."],
-        ["Money", "Integers in minor units: price_cents = 2599 means $25.99, alongside a currency code. Never send floats."],
+        ["Money", "Integers in minor units: price_cents = 2599 means 25.99 in the accompanying currency code (the market's: ZAR, PKR...). Never send floats."],
         ["Phone numbers", "E.164 (+923001234567). The API accepts spaces/dashes/parentheses and normalises; display formatting is the client's job."],
         ["Email", "Lower-cased by the server"],
         ["Enums", "Lower-snake_case strings exactly as listed in Swagger. Unknown values are rejected with 422."],
@@ -802,6 +826,7 @@ story += [
         ["Partial updates", "Use PATCH and send only the keys that changed. Sending null clears a field."],
         ["Lists", "Small lists (addresses, cards, wishlist) are plain arrays. Products, reviews, orders and admin queues are paginated: {items, total, page, per_page, pages}; per_page defaults to 12 (max 100)."],
         ["Guest cart", "Keep the cart_token from the first /cart response and send it as X-Cart-Token; send it once together with the Bearer token after login to merge."],
+        ["Region / language / timezone", "On a country subdomain nothing is needed; otherwise send X-Region. Send X-Language with the user's saved preference and X-Timezone with the browser zone. Read X-Region / Content-Language on responses. Money is in the market's currency (ZAR, PKR...)."],
         ["Masked PII", "Sellers see their own ID / account numbers masked (id_passport_number_masked, account_number_last4); only staff endpoints return the full values."],
         ["File uploads", "multipart/form-data with the field named 'file' (avatar) or per the endpoint; size/type limits are enforced server-side and returned as 422."],
         ["Idempotency", "Setting a default twice, or verifying an already-verified email, is safe."],

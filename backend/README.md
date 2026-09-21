@@ -23,7 +23,7 @@ backend/
 
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
-- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plan and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md) · Live API docs: `/api/v1/docs`.
+- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets) · Live API docs: `/api/v1/docs`.
 
 ## Setup
 
@@ -92,7 +92,36 @@ How the pieces fit:
   uploads are served by nginx from the `media` volume (`deploy/nginx.conf`). In dev (`SERVE_MEDIA=1`)
   Django also serves them on :8000 so the bind-mounted `backend/asknget/media` works without the proxy.
 - The prod stack already sets `BEHIND_PROXY=1`; for HTTPS terminate TLS at nginx (or a cloud LB), set
-  `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`, and put your domain in `ALLOWED_HOSTS`.
+  `CSRF_TRUSTED_ORIGINS=https://your.domain`, `DEBUG=0`, and put your domain **and its country subdomains**
+  (`asknget.com,.asknget.com`) in `ALLOWED_HOSTS` — `za.asknget.com` is how the API knows the market.
+
+## Markets: countries, language, timezone (`markets` app)
+
+A **country is a market**: it has its own currency, timezone, languages, KYC policy and return policy
+(all edited in Django admin → *Markets*), and every store — hence every product, cart and order — belongs
+to exactly one. Buyers only see their market's stores. Details and the reasons behind each choice:
+`docs/sprint-4-plan.md`.
+
+- **Resolution per request** (`markets.middleware.RegionMiddleware`, `/api/` only):
+  country = `X-Region` / `?region=` → host subdomain (`za.asknget.com`) → default (`DEFAULT_COUNTRY`);
+  language = `X-Language` / `?lang=` → `Accept-Language` within the country's list → country default;
+  timezone = `X-Timezone` → country timezone. Unknown explicit region → `400 unknown_region`. The response
+  carries `X-Region` and `Content-Language`. Everything is reset after the response.
+- **In code**: `markets.context.get_country()` is the active market (**None outside a request** = unscoped);
+  `catalog.services.public_products()` filters by it, so every storefront query, search and recommendation
+  rail is market-scoped in one place. Jobs and tests that need one market use `with markets.context.region("PK"):`.
+  The seller portal switches to the **store's** market (`portal.auth.StoreAuth`).
+- **Endpoints**: `GET /regions` (switcher), `GET /regions/current` (resolved market + localised return policy),
+  `GET /me` → stored `language` + resolved `locale`, `PATCH /me {language}`.
+- **Rules**: one market per cart (`409 cart_region_mismatch`; `DELETE /cart/items` to clear and switch),
+  delivery methods / vouchers / banners per market, checkout refuses another country's address
+  (`409 ships_outside_region`), `Order.country` + `return_window_days` are snapshots.
+- **KYC per country**: `sellers/policy.py` overlays the country's `KycPolicy` (documents, labels such as
+  CNIC / SA ID, ID-number regex, instructions) on the defaults in `sellers/rules.py`; the wizard reads it
+  from `ApplicationOut.policy` or `GET /lookups/seller?country=`.
+- **Seeds**: `seed_lookups` creates ZA and PK (+ delivery methods per market); `seed_demo` adds a PK demo
+  store so `X-Region: PK` shows a different catalogue. Add a country in admin, then re-run `seed_lookups`
+  for its delivery methods (or add them in admin).
 
 ## Seller portal (`portal` app)
 

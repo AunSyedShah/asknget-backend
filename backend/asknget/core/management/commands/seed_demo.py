@@ -125,6 +125,7 @@ class Command(BaseCommand):
                                           ("Bilal Ahmed", 4, "Lightweight and incredibly easy to blend.")):
                     Review.objects.create(product=product, reviewer_name=who, reviewer_email="demo@asknget.demo", rating=rating, body=body, status="approved")
                 refresh_product_rating(product)
+        self._seed_second_market(brands)
         refresh_category_counts()
         from discovery.indexing import embed_products
 
@@ -172,6 +173,55 @@ class Command(BaseCommand):
         (1, 4, [("Silver Jewellery", 1)], "pending", "card"),
         (0, 0, [("LED Console", 1)], "pending", "card"),
     ]
+
+    # A second market so region scoping is visible: pk.<domain> / X-Region: PK shows
+    # only this store; the default market never sees it.
+    PK_PRODUCTS = [
+        ("Kajal Eye Pencil", "makeup", "L'Oréal Paris", 89900, 119900, {"Shade": ["Black", "Brown"]}, "Smudge-proof kajal for all-day definition."),
+        ("Rose Water Toner", "skincare", "NARS", 149900, None, {"Size": ["120 ml"]}, "Pure rose water to refresh and hydrate."),
+        ("Lawn Print Scarf", "fashion", "ZARA", 249900, 349900, {"Color": ["Teal", "Mustard"]}, "Lightweight lawn scarf with a hand-block print."),
+    ]
+
+    def _seed_second_market(self, brands):
+        from markets.models import Country
+
+        country = Country.objects.filter(is_active=True, is_default=False).order_by("sort_order").first()
+        if country is None:
+            return
+        owner, _ = User.objects.get_or_create(email=f"seller.{country.code.lower()}@asknget.demo",
+                                              defaults={"full_name": "Sana Malik", "is_seller": True, "phone": "+923219876543"})
+        owner.set_password(PASSWORD)
+        owner.email_verified_at = owner.email_verified_at or timezone.now()
+        owner.save()
+        app, _ = SellerApplication.objects.get_or_create(
+            user=owner,
+            defaults=dict(account_type="sole_proprietor", status="active", application_number=f"ASK-SLR-00{country.code}1", current_step=5,
+                          country=country, first_name="Sana", last_name="Malik", store_display_name="Karachi Cosmetics",
+                          submitted_at=timezone.now(), approved_at=timezone.now(), activated_at=timezone.now()),
+        )
+        store, _ = Store.objects.get_or_create(
+            application=app, defaults=dict(owner=owner, country=country, display_name="Karachi Cosmetics", slug="karachi-cosmetics", status="active",
+                                           description="Everyday beauty and lawn essentials.", activated_at=timezone.now()),
+        )
+        for name, cat_slug, brand, price, compare, options, blurb in self.PK_PRODUCTS:
+            category = Category.objects.filter(slug=cat_slug).first() or Category.objects.filter(parent__isnull=True).first()
+            product, was_created = Product.objects.get_or_create(
+                slug=slugify(name),
+                defaults=dict(store=store, country=country, currency=country.currency, category=category, brand=brands.get(brand), name=name,
+                              price_cents=price, compare_at_price_cents=compare, short_description=blurb, description=blurb,
+                              status="active", published_at=timezone.now()),
+            )
+            if not was_created:
+                continue
+            combos = [[]]
+            for i, (opt, values) in enumerate(options.items()):
+                ot = ProductOptionType.objects.create(product=product, name=opt, sort_order=i)
+                vals = [ProductOptionValue.objects.create(option_type=ot, value=v, sort_order=j) for j, v in enumerate(values)]
+                combos = [c + [v] for c in combos for v in vals]
+            for i, combo in enumerate(combos):
+                variant = ProductVariant.objects.create(product=product, sku=f"{slugify(name)[:20].upper()}-{i:02d}", stock_qty=15)
+                variant.option_values.set(combo)
+            refresh_stock_status(product)
 
     def _seed_orders(self, store, seller, member):
         if Order.objects.filter(order_number__startswith="ASK-DEMO").exists():
