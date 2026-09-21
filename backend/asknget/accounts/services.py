@@ -47,20 +47,23 @@ def _run_django_password_validators(password: str, user: User | None) -> None:
 
 
 @transaction.atomic
-def register_customer(*, email: str, password: str, phone: str | None, full_name: str | None) -> User:
+def register_customer(*, email: str, password: str, phone: str | None, full_name: str | None, country=None) -> User:
     _assert_unique(email, phone)
     _run_django_password_validators(password, None)
-    return User.objects.create_user(email=email, password=password, phone=phone, full_name=full_name or "")
+    return User.objects.create_user(email=email, password=password, phone=phone, full_name=full_name or "",
+                                    country=country.code if country else "")
 
 
 @transaction.atomic
-def register_seller(*, email: str, password: str, phone: str, account_type: str, ip: str | None) -> User:
-    """'Create your seller account' — user + draft application + terms audit rows."""
+def register_seller(*, email: str, password: str, phone: str, account_type: str, ip: str | None, country=None) -> User:
+    """'Create your seller account' — user + draft application + terms audit rows.
+    `country` is the market the request came from; it becomes the application's market."""
     from sellers.models import SellerApplication
 
     _assert_unique(email, phone)
     _run_django_password_validators(password, None)
-    user = User.objects.create_user(email=email, password=password, phone=phone, is_seller=True)
+    user = User.objects.create_user(email=email, password=password, phone=phone, is_seller=True,
+                                    country=country.code if country else "")
     SellerApplication.objects.create(user=user, account_type=account_type)
     TermsAcceptance.objects.bulk_create([
         TermsAcceptance(user=user, document=TermsAcceptance.TermsDocument.SELLER_TERMS, ip=ip),

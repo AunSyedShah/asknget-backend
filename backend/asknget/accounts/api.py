@@ -50,7 +50,8 @@ me_router = Router(tags=["me"], auth=JWTAuth())
 @auth_router.post("/register", response={201: AuthOut, 409: ErrorOut, 422: ErrorOut}, summary="Register as a customer")
 def register(request, payload: RegisterIn):
     user = services.register_customer(
-        email=payload.email, password=payload.password, phone=payload.phone, full_name=payload.full_name
+        email=payload.email, password=payload.password, phone=payload.phone, full_name=payload.full_name,
+        country=getattr(request, "country", None),
     )
     return 201, {"user": user, "tokens": services.issue_tokens(request, user)}
 
@@ -67,6 +68,7 @@ def seller_register(request, payload: SellerRegisterIn):
         phone=payload.phone,
         account_type=payload.account_type,
         ip=services.client_ip(request),
+        country=getattr(request, "country", None),
     )
     return 201, {"user": user, "tokens": services.issue_tokens(request, user)}
 

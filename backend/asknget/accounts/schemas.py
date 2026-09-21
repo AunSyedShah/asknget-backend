@@ -18,6 +18,7 @@ from pydantic import Field, model_validator
 from core.validators import (
     CountryCode,
     EmailStr,
+    LanguageCode,
     Last4,
     NonEmptyStr,
     OtpCode,
@@ -41,6 +42,13 @@ class TokenOut(Schema):
     expires_in: int = Field(description="Access-token lifetime in seconds")
 
 
+class LocaleOut(Schema):
+    country: str
+    language: str
+    timezone: str
+    currency: str
+
+
 class UserOut(ModelSchema):
     """Personal Info screen + 'Account Information' panel."""
 
@@ -48,18 +56,29 @@ class UserOut(ModelSchema):
     phone_verified: bool
     member_since: datetime = Field(alias="created_at")
     avatar_url: Optional[str] = None
+    locale: Optional[LocaleOut] = None
 
     class Meta:
         model = User
         fields = [
             "id", "email", "phone", "full_name", "first_name", "last_name", "gender",
-            "date_of_birth", "profession", "country", "city", "address_line",
+            "date_of_birth", "profession", "country", "language", "city", "address_line",
             "status", "is_seller", "is_staff",
         ]
 
     @staticmethod
     def resolve_avatar_url(obj: User):
         return obj.avatar.url if obj.avatar else None
+
+    @staticmethod
+    def resolve_locale(obj: User, context):
+        """What this request actually resolved to (region middleware), so the app can
+        show 'Shopping in South Africa · English' next to the stored preference."""
+        request = context.get("request")
+        country = getattr(request, "country", None)
+        if country is None:
+            return None
+        return {"country": country.code, "language": request.language, "timezone": request.timezone, "currency": country.currency}
 
 
 class AuthOut(Schema):
@@ -209,6 +228,7 @@ class UserPatchIn(Schema):
     date_of_birth: Optional[PastDate] = None
     profession: Optional[str] = Field(None, max_length=120)
     country: Optional[CountryCode] = None
+    language: Optional[LanguageCode] = Field(None, description="Preferred UI language; send it back as X-Language on every call")
     city: Optional[str] = Field(None, max_length=100)
     address_line: Optional[str] = Field(None, max_length=255)
 

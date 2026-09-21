@@ -56,6 +56,16 @@ def _country_code(value: str) -> str:
     return value
 
 
+def _language_code(value: str) -> str:
+    from django.conf import settings
+
+    value = value.strip().lower().replace("_", "-").split("-")[0]
+    allowed = [code for code, _ in settings.LANGUAGES]
+    if value not in allowed:
+        raise ValueError(f"Language must be one of: {', '.join(allowed)}")
+    return value
+
+
 PhoneStr = Annotated[str, AfterValidator(_normalize_phone)]
 EmailStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=254), AfterValidator(_normalize_email)]
 PasswordStr = Annotated[str, Field(min_length=8, max_length=128), AfterValidator(_password_strength)]
@@ -63,5 +73,6 @@ OtpCode = Annotated[str, StringConstraints(strip_whitespace=True, pattern=_OTP_R
 PastDate = Annotated[date, AfterValidator(_past_date)]
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 CountryCode = Annotated[str, AfterValidator(_country_code)]
+LanguageCode = Annotated[str, AfterValidator(_language_code)]
 PostalCode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=20)]
 Last4 = Annotated[str, StringConstraints(pattern=r"^\d{4}$")]

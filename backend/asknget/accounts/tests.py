@@ -185,6 +185,19 @@ class ProfileTests(ApiTestCase):
         res = self.patch(ME, {"city": "Lahore"}, self.token)
         self.assertEqual(res.json()["full_name"], "John Ali")
 
+    def test_language_preference_and_resolved_locale(self):
+        from django.conf import settings
+
+        me = self.get(ME, self.token).json()
+        self.assertEqual(me["country"], settings.DEFAULT_COUNTRY)  # filled from the request's market at sign-up
+        self.assertEqual(me["language"], "")
+        self.assertEqual(me["locale"]["country"], settings.DEFAULT_COUNTRY)
+        self.assertEqual(me["locale"]["language"], "en")
+        res = self.patch(ME, {"language": "ur-PK"}, self.token)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["language"], "ur")
+        self.assertEqual(self.patch(ME, {"language": "klingon"}, self.token).status_code, 422)
+
     def test_invalid_enum_and_future_dob(self):
         self.assertEqual(self.patch(ME, {"gender": "unicorn"}, self.token).status_code, 422)
         self.assertEqual(self.patch(ME, {"date_of_birth": "2999-01-01"}, self.token).status_code, 422)
