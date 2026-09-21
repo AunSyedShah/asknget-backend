@@ -131,6 +131,8 @@ class Command(BaseCommand):
 
         embed_products()
 
+        # Demo data seeded before markets existed was priced in USD; a store's products are in its market's currency.
+        Product.objects.filter(store=store).exclude(currency=country.currency).update(currency=country.currency)
         for product in Product.objects.filter(store=store):
             refresh_stock_status(product)
         self._seed_orders(store, seller, customer)
