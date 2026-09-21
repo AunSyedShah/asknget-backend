@@ -61,6 +61,8 @@ STEP_FIELDS_EXEMPT: dict[str, dict[int, tuple[str, ...]]] = {
     AccountType.INDIVIDUAL: {2: ("legal_business_name", "business_type", "company_registration_number")},
 }
 
+# Platform defaults — a country's markets.KycPolicy.required_documents overrides per
+# account type (see sellers.policy.policy_for).
 REQUIRED_DOCUMENTS: dict[str, tuple[str, ...]] = {
     AccountType.INDIVIDUAL: (DocType.ID_PASSPORT, DocType.BANK_CONFIRMATION, DocType.PROOF_OF_ADDRESS),
     AccountType.SOLE_PROPRIETOR: (DocType.ID_PASSPORT, DocType.COMPANY_REGISTRATION, DocType.BANK_CONFIRMATION, DocType.PROOF_OF_ADDRESS),
@@ -71,8 +73,11 @@ REQUIRED_DOCUMENTS: dict[str, tuple[str, ...]] = {
 DOCUMENT_STEP = {
     DocType.ID_PASSPORT: 1,
     DocType.COMPANY_REGISTRATION: 3,
+    DocType.TAX_REGISTRATION: 3,
+    DocType.BUSINESS_LICENCE: 3,
     DocType.BANK_CONFIRMATION: 4,
     DocType.PROOF_OF_ADDRESS: 4,
+    DocType.OTHER: 4,
 }
 
 DOCUMENT_ALLOWED_TYPES = {"application/pdf", "image/jpeg", "image/png"}

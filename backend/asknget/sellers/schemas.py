@@ -22,7 +22,7 @@ AccountTypeLit = Literal["individual", "sole_proprietor", "registered_company"]
 BusinessTypeLit = Literal["private_limited", "public_limited", "partnership", "sole_proprietorship", "ngo", "other"]
 RoleLit = Literal["owner", "director", "partner", "manager", "authorised_signatory", "other"]
 BankAccountTypeLit = Literal["business", "personal", "savings", "current"]
-DocumentTypeLit = Literal["id_passport", "company_registration", "bank_confirmation", "proof_of_address"]
+DocumentTypeLit = Literal["id_passport", "company_registration", "bank_confirmation", "proof_of_address", "tax_registration", "business_licence", "other"]
 
 # --------------------------------------------------------------------------- #
 # Step payloads (seller)
@@ -282,11 +282,33 @@ class StoreOut(ModelSchema):
         return obj.banner.url if obj.banner else None
 
 
+class RequiredDocumentOut(Schema):
+    type: str
+    label: str = Field(description="Country-specific, in the request language")
+    step: int
+
+
+class KycPolicyOut(Schema):
+    """The country's KYC rules for this application: what to upload, how fields are labelled."""
+
+    country: Optional[str]
+    mode: str
+    required_documents: list[RequiredDocumentOut]
+    document_labels: dict[str, str]
+    id_number_label: str
+    id_number_regex: str
+    tax_id_label: str
+    company_registration_label: str
+    instructions: str
+
+
 class ApplicationOut(Schema):
     """Everything the 5-step wizard and the Review & Submit page need."""
 
     id: UUID
     application_number: Optional[str] = Field(None, description="Assigned on submit")
+    country: str = Field(alias="country_id", description="Market the seller applies to")
+    policy: KycPolicyOut
     account_type: str
     status: str
     status_headline: str
@@ -358,10 +380,11 @@ class SellerLookupsOut(Schema):
     business_types: list[ChoiceOut]
     representative_roles: list[ChoiceOut]
     bank_account_types: list[ChoiceOut]
-    document_types: list[ChoiceOut]
+    document_types: list[ChoiceOut] = Field(description="Every type the platform knows; `policy` says which this country requires")
     field_groups: list[ChoiceOut]
     document_max_bytes: int
     document_allowed_types: list[str]
+    policy: KycPolicyOut = Field(description="Rules for ?country= (default: the request's market) and ?account_type=")
 
 
 class BankOut(Schema):
@@ -386,6 +409,7 @@ class AdminApplicantOut(Schema):
 class AdminApplicationListOut(Schema):
     id: UUID
     application_number: Optional[str]
+    country: str
     account_type: str
     status: str
     store_display_name: str

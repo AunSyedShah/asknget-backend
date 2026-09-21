@@ -379,3 +379,90 @@ class LookupTests(SellerTestCase):
         Bank.objects.create(name="FNB", country="ZA")
         self.assertEqual(len(self.client.get("/api/v1/lookups/banks").json()), 2)
         self.assertEqual([b["name"] for b in self.client.get("/api/v1/lookups/banks?country=za").json()], ["FNB"])
+
+
+class CountryPolicyTests(SellerTestCase):
+    """A country's KycPolicy overlays the platform defaults for applicants of that market."""
+
+    def setUp(self):
+        super().setUp()
+        from core.testing import make_country
+
+        self.pk = make_country("PK")
+        kyc = self.pk.kyc_policy
+        kyc.required_documents = {"individual": ["id_passport", "proof_of_address", "tax_registration"]}
+        kyc.document_labels = {"id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"}, "tax_registration": {"en": "NTN certificate"}}
+        kyc.id_number_label = "CNIC / Passport number"
+        kyc.id_number_regex = r"^(\d{13}|[A-Z]{2}\d{7})$"
+        kyc.tax_id_label = "NTN"
+        kyc.instructions = {"en": "Manual review within 2 business days", "ur": "دستی جائزہ"}
+        kyc.save()
+
+    def register_pk(self, account_type="individual"):
+        SellerTestCase._phone_seq += 1
+        res = self.client.post(f"{AUTH}/seller/register", {
+            "email": "pk@example.com", "phone": f"+92 300 {SellerTestCase._phone_seq:07d}", "password": "Str0ngPassw0rd!",
+            "confirm_password": "Str0ngPassw0rd!", "account_type": account_type, "accept_terms": True,
+        }, content_type="application/json", headers={"X-Region": "PK"})
+        self.assertEqual(res.status_code, 201, res.content)
+        return res.json()["tokens"]["access_token"]
+
+    def test_application_carries_its_country_policy(self):
+        token = self.register_pk()
+        body = self.get(f"{SELLER}/application", token).json()
+        self.assertEqual(body["country"], "PK")
+        policy = body["policy"]
+        self.assertEqual([d["type"] for d in policy["required_documents"]], ["id_passport", "proof_of_address", "tax_registration"])
+        self.assertEqual(policy["required_documents"][0]["label"], "CNIC / Passport")
+        # an individual skips the Representative step, so the NTN certificate is collected on Banking
+        self.assertEqual(policy["required_documents"][2], {"type": "tax_registration", "label": "NTN certificate", "step": 4})
+        self.assertEqual((policy["id_number_label"], policy["tax_id_label"]), ("CNIC / Passport number", "NTN"))
+        # the policy is the application's, whatever domain the seller uses
+        body = self.client.get(f"{SELLER}/application", headers={**self._h(token), "X-Region": settings.DEFAULT_COUNTRY}).json()
+        self.assertEqual([d["type"] for d in body["policy"]["required_documents"]], ["id_passport", "proof_of_address", "tax_registration"])
+        # labels and instructions follow the request language
+        body = self.client.get(f"{SELLER}/application", headers={**self._h(token), "X-Region": "PK", "X-Language": "ur"}).json()
+        self.assertEqual(body["policy"]["required_documents"][0]["label"], "شناختی کارڈ / پاسپورٹ")
+        self.assertEqual(body["policy"]["instructions"], "دستی جائزہ")
+        # default-market applicants keep the platform defaults
+        za = self.register_seller(account_type="individual")
+        za_policy = self.get(f"{SELLER}/application", za).json()["policy"]
+        self.assertEqual([d["type"] for d in za_policy["required_documents"]], ["id_passport", "bank_confirmation", "proof_of_address"])
+        self.assertEqual(za_policy["id_number_label"], "ID / Passport number")
+
+    def test_required_documents_and_id_format_follow_the_policy(self):
+        token = self.register_pk()
+        res = self.patch(f"{SELLER}/application/steps/basic-info", {"id_passport_number": "not-a-cnic"}, token)
+        self.assertEqual(res.status_code, 422)
+        self.assertIn("CNIC / Passport number", res.json()["detail"])
+        res = self.patch(f"{SELLER}/application/steps/basic-info", {**self.BASIC, "id_passport_number": "35202-1234567-1".replace("-", "")}, token)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.patch(f"{SELLER}/application/steps/business-info", {**self.BUSINESS, "category_ids": [str(self.cat_beauty.id)]}, token)
+        res = self.patch(f"{SELLER}/application/steps/banking", {"bank_id": str(self.bank.id), "bank_account_type": "personal",
+                                                                "account_holder_name": "PK Seller", "account_number": "001234567891234", "branch_code": "0101"}, token)
+        self.assertEqual(res.status_code, 200, res.content)
+        self.upload(token, "id_passport")
+        self.upload(token, "proof_of_address")
+        steps = {s["step"]: s for s in self.get(f"{SELLER}/application", token).json()["steps"]}
+        self.assertEqual(steps[4]["missing_documents"], ["tax_registration"])  # PK asks for the NTN certificate; no bank letter
+        self.assertFalse(steps[3]["required"])
+        self.upload(token, "tax_registration", name="ntn.pdf")
+        body = self.get(f"{SELLER}/application", token).json()
+        self.assertTrue(body["can_submit"], [s for s in body["steps"] if not s["complete"]])
+
+    def test_lookups_and_admin_queue_by_country(self):
+        body = self.client.get("/api/v1/lookups/seller?country=pk&account_type=individual").json()
+        self.assertEqual([d["type"] for d in body["policy"]["required_documents"]], ["id_passport", "proof_of_address", "tax_registration"])
+        self.assertEqual(self.client.get("/api/v1/lookups/seller").json()["policy"]["country"], settings.DEFAULT_COUNTRY)
+        self.assertEqual(self.client.get("/api/v1/lookups/seller?country=xx").status_code, 404)
+        token = self.register_pk()
+        self.fill_all(token, account_type="individual")
+        self.upload(token, "tax_registration")
+        self.submit(token)
+        rows = self.get(ADMIN, self.staff_token, country="PK").json()["items"]
+        self.assertEqual([r["country"] for r in rows], ["PK"])
+        self.assertEqual(self.get(ADMIN, self.staff_token, country=settings.DEFAULT_COUNTRY).json()["items"], [])
+        # approval copies the market to the store
+        app_id = rows[0]["id"]
+        self.post(f"{ADMIN}/{app_id}/approve", {}, self.staff_token)
+        self.assertEqual(Store.objects.get(application_id=app_id).country_id, "PK")

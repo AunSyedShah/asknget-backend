@@ -171,6 +171,10 @@ class SellerDocument(TimeStampedModel):
         COMPANY_REGISTRATION = "company_registration", "Company Registration"
         BANK_CONFIRMATION = "bank_confirmation", "Bank Confirmation"
         PROOF_OF_ADDRESS = "proof_of_address", "Proof of Address"
+        # Extra types a country's KYC policy may require (markets.KycPolicy.required_documents)
+        TAX_REGISTRATION = "tax_registration", "Tax Registration"
+        BUSINESS_LICENCE = "business_licence", "Business Licence"
+        OTHER = "other", "Other Supporting Document"
 
     class DocumentStatus(models.TextChoices):
         UPLOADED = "uploaded", "Uploaded"

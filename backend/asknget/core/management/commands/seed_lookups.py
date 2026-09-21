@@ -44,9 +44,15 @@ COUNTRIES = {
             id_number_regex=r"^(\d{5}-?\d{7}-?\d|[A-Z]{2}\d{7})$",
             tax_id_label="NTN",
             company_registration_label="SECP registration number",
+            # Companies also upload their NTN certificate; individuals keep the platform defaults.
+            required_documents={
+                "sole_proprietor": ["id_passport", "company_registration", "tax_registration", "bank_confirmation", "proof_of_address"],
+                "registered_company": ["id_passport", "company_registration", "tax_registration", "bank_confirmation", "proof_of_address"],
+            },
             document_labels={
                 "id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"},
                 "company_registration": {"en": "SECP incorporation certificate"},
+                "tax_registration": {"en": "NTN certificate (FBR)"},
                 "bank_confirmation": {"en": "Bank account maintenance certificate"},
                 "proof_of_address": {"en": "Proof of address (utility bill ≤ 3 months)"},
             },

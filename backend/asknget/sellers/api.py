@@ -12,6 +12,7 @@ from uuid import UUID
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
+from ninja.errors import HttpError
 from ninja.files import UploadedFile
 from ninja.pagination import LimitOffsetPagination, paginate
 
@@ -19,10 +20,12 @@ from accounts.services import client_ip
 from core.auth import SellerAuth, StaffAuth
 from core.models import Bank
 from core.schemas import ErrorOut, MessageOut
+from markets import services as markets
 
-from . import rules, services
+from . import policy, rules, services
 from .models import SellerApplication, SellerApplicationDirector, SellerDocument, Store
 from .schemas import (
+    AccountTypeLit,
     AdminApplicationListOut,
     AdminApplicationOut,
     ApplicationOut,
@@ -195,9 +198,14 @@ def store_get(request):
 # --------------------------------------------------------------------------- #
 
 
-@lookups_router.get("/seller", response=SellerLookupsOut, summary="Dropdown options for the seller wizard")
-def lookups_seller(request):
+@lookups_router.get("/seller", response=SellerLookupsOut, summary="Dropdown options for the seller wizard (+ the market's KYC policy)")
+def lookups_seller(request, country: Optional[str] = Query(None, min_length=2, max_length=2),
+                   account_type: AccountTypeLit = Query("registered_company")):
+    market = markets.countries_qs().filter(pk=country.upper(), is_active=True).first() if country else getattr(request, "country", None)
+    if country and market is None:
+        raise HttpError(404, "Unknown country")
     return {
+        "policy": policy.for_country(market, language=getattr(request, "language", None)).as_payload(account_type),
         "account_types": _choices(SellerApplication.AccountType.choices),
         "business_types": _choices(SellerApplication.BusinessType.choices),
         "representative_roles": _choices(SellerApplication.RepresentativeRole.choices),
@@ -224,10 +232,13 @@ def lookups_banks(request, country: Optional[str] = Query(None, min_length=2, ma
 
 @admin_sellers_router.get("", response=list[AdminApplicationListOut], summary="Review queue")
 @paginate(LimitOffsetPagination)
-def admin_list(request, status: Optional[str] = None, account_type: Optional[str] = None, q: Optional[str] = None):
+def admin_list(request, status: Optional[str] = None, account_type: Optional[str] = None, q: Optional[str] = None,
+               country: Optional[str] = Query(None, min_length=2, max_length=2)):
     qs = SellerApplication.objects.select_related("user").exclude(status=SellerApplication.ApplicationStatus.DRAFT)
     if status:
         qs = qs.filter(status=status)
+    if country:
+        qs = qs.filter(country_id=country.upper())
     if account_type:
         qs = qs.filter(account_type=account_type)
     if q:
@@ -238,7 +249,7 @@ def admin_list(request, status: Optional[str] = None, account_type: Optional[str
             | Q(legal_business_name__icontains=q) | Q(user__email__icontains=q)
         )
     return [dict(
-        id=a.id, application_number=a.application_number, account_type=a.account_type, status=a.status,
+        id=a.id, application_number=a.application_number, country=a.country_id, account_type=a.account_type, status=a.status,
         store_display_name=a.store_display_name, legal_business_name=a.legal_business_name,
         applicant=a.user, submitted_at=a.submitted_at, updated_at=a.updated_at,
     ) for a in qs.order_by("submitted_at")]

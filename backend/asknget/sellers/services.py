@@ -16,7 +16,7 @@ from ninja.errors import HttpError
 from accounts.models import TermsAcceptance
 from core.models import Bank, coerce_nulls
 
-from . import rules
+from . import policy, rules
 from .models import (
     SellerApplication,
     SellerApplicationDirector,
@@ -37,7 +37,7 @@ Status = SellerApplication.ApplicationStatus
 
 def get_application(user) -> SellerApplication:
     app = (
-        SellerApplication.objects.select_related("bank", "user", "reviewer")
+        SellerApplication.objects.select_related("bank", "user", "reviewer", "country__kyc_policy")
         .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events")
         .filter(user=user)
         .first()
@@ -72,7 +72,8 @@ def latest_documents(app: SellerApplication) -> dict[str, SellerDocument]:
 
 def step_states(app: SellerApplication) -> list[dict]:
     docs = latest_documents(app)
-    required_docs = set(rules.REQUIRED_DOCUMENTS[app.account_type])
+    kyc = policy.policy_for(app)
+    required_docs = set(kyc.documents_for(app.account_type))
     required_steps = set(rules.REQUIRED_STEPS[app.account_type])
     states = []
     for step, name in rules.STEP_NAMES.items():
@@ -80,8 +81,8 @@ def step_states(app: SellerApplication) -> list[dict]:
             continue
         missing_fields = [f for f in rules.required_fields(app.account_type, step) if not _field_filled(app, f)]
         missing_docs = [
-            d for d, s in rules.DOCUMENT_STEP.items()
-            if s == step and d in required_docs and (d not in docs or docs[d].status == SellerDocument.DocumentStatus.REJECTED)
+            d for d in required_docs
+            if kyc.step_for(d, app.account_type) == step and (d not in docs or docs[d].status == SellerDocument.DocumentStatus.REJECTED)
         ]
         required = step in required_steps
         states.append({
@@ -140,6 +141,8 @@ def serialize(app: SellerApplication, *, admin: bool = False) -> dict:
     data = {
         "id": app.id,
         "application_number": app.application_number,
+        "country_id": app.country_id,
+        "policy": policy.policy_for(app).as_payload(app.account_type),
         "account_type": app.account_type,
         "status": app.status,
         "status_headline": rules.STATUS_HEADLINES[app.status],
@@ -253,6 +256,13 @@ def save_step(app: SellerApplication, step: int, data: dict) -> SellerApplicatio
 
     if step == 4 and "account_number" in data:
         app.account_number_last4 = str(data["account_number"])[-4:] if data["account_number"] else ""
+
+    kyc = policy.policy_for(app)
+    for field in ("id_passport_number", "rep_id_passport_number"):
+        if data.get(field):
+            error = kyc.validate_id_number(data[field])
+            if error:
+                raise HttpError(422, error)
 
     for field, value in data.items():
         setattr(app, field, value)
@@ -448,7 +458,7 @@ def activate_store(app: SellerApplication, *, display_name: str | None, slug: st
 
 def admin_get(application_id) -> SellerApplication:
     app = (
-        SellerApplication.objects.select_related("bank", "user", "reviewer")
+        SellerApplication.objects.select_related("bank", "user", "reviewer", "country__kyc_policy")
         .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events")
         .filter(pk=application_id)
         .first()
