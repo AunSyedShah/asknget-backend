@@ -1,8 +1,8 @@
 {
   "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
   "page": "Web UI Design",
-  "version": "2400578314618599958",
-  "lastModified": "2026-09-18T14:45:48Z",
+  "version": "2401643591580861436",
+  "lastModified": "2026-09-21T11:52:53Z",
   "screens": [
     {
       "name": "Landing Page",
@@ -279,6 +279,18 @@
       "node_id": "755:7590",
       "file": "Customers__755-7590.txt",
       "lines": 161
+    },
+    {
+      "name": "Customer Detail",
+      "node_id": "768:6318",
+      "file": "Customer_Detail__768-6318.txt",
+      "lines": 79
+    },
+    {
+      "name": "Chat",
+      "node_id": "779:6848",
+      "file": "Chat__779-6848.txt",
+      "lines": 38
     },
     {
       "name": "Orders",
