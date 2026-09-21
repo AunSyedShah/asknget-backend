@@ -65,7 +65,11 @@ SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
 PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # seller wizard 'Media' step
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
-DEFAULT_CURRENCY = os.environ.get('DEFAULT_CURRENCY', 'USD')  # TODO(design): §10 Q1 — design shows '$'
+
+# Markets. Countries (currency, timezone, languages, KYC + return policy) live in the
+# `markets.Country` table and are edited in Django admin; this is only the fallback
+# used when a request carries no region (bare domain, tests, management commands).
+DEFAULT_COUNTRY = os.environ.get('DEFAULT_COUNTRY', 'ZA').upper()
 
 # Search & recommendations (discovery app). Provider `hash` is offline and needs
 # no key — good for dev/tests; switch to `voyage` or `openai` for real semantics.
@@ -101,6 +105,7 @@ INSTALLED_APPS = [
     'marketing',
     'discovery',
     'portal',
+    'markets',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -110,6 +115,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves /static (admin, Swagger UI) from the app image
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'markets.middleware.RegionMiddleware',  # country → language + timezone for /api/ requests
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -179,9 +185,19 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
 
-TIME_ZONE = 'UTC'
+# Every language any country may offer; a Country picks a subset. Add here first,
+# then in admin.
+LANGUAGES = [
+    ('en', 'English'),
+    ('af', 'Afrikaans'),
+    ('zu', 'isiZulu'),
+    ('ur', 'Urdu'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
+
+TIME_ZONE = 'UTC'  # storage; the request timezone is activated per country by markets.middleware
 
 USE_I18N = True
 

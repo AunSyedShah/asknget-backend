@@ -12,6 +12,7 @@ from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
 from discovery.api import discovery_router
 from marketing.api import marketing_router
+from markets.api import regions_router
 from portal.api import (
     admin_products_router,
     customers_router,
@@ -57,6 +58,7 @@ def health(request):
     return {"status": "ok"}
 
 
+api.add_router("/regions", regions_router)
 api.add_router("/auth", auth_router)
 me_router.add_router("", wishlist_router)
 me_router.add_router("", my_orders_router)

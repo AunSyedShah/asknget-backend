@@ -10,7 +10,52 @@ from django.utils.text import slugify
 
 from catalog.models import Brand, Category
 from core.models import Bank
+from markets.models import Country, KycPolicy, ReturnPolicy
 from orders.models import DeliveryMethod
+
+# Markets. Each country is a separate market (own currency, timezone, languages,
+# KYC + return policy). Staff edit these in admin; this is the starting point.
+COUNTRIES = {
+    "ZA": {
+        "country": dict(name="South Africa", subdomain="za", currency="ZAR", timezone="Africa/Johannesburg",
+                        default_language="en", languages=["en", "af", "zu"], phone_prefix="+27",
+                        region_label="Province", postal_code_regex=r"^\d{4}$", sort_order=1),
+        "kyc": dict(
+            id_number_label="SA ID / Passport number",
+            id_number_regex=r"^(\d{13}|[A-Z0-9]{6,9})$",
+            tax_id_label="VAT number",
+            company_registration_label="CIPC registration number",
+            document_labels={
+                "id_passport": {"en": "SA ID / Passport", "af": "SA ID / Paspoort", "zu": "I-ID yase-SA / Ipasipoti"},
+                "company_registration": {"en": "CIPC company registration"},
+                "bank_confirmation": {"en": "Bank confirmation letter"},
+                "proof_of_address": {"en": "Proof of address (≤ 3 months)"},
+            },
+            instructions={"en": "Upload clear copies. We verify every application manually within 2 business days."},
+        ),
+        "returns": dict(window_days=30, summary={"en": "Return eligible items within 30 days", "af": "Stuur geskikte items binne 30 dae terug"}),
+    },
+    "PK": {
+        "country": dict(name="Pakistan", subdomain="pk", currency="PKR", timezone="Asia/Karachi",
+                        default_language="en", languages=["en", "ur"], phone_prefix="+92",
+                        region_label="Province", postal_code_regex=r"^\d{5}$", sort_order=2),
+        "kyc": dict(
+            id_number_label="CNIC / Passport number",
+            id_number_regex=r"^(\d{5}-?\d{7}-?\d|[A-Z]{2}\d{7})$",
+            tax_id_label="NTN",
+            company_registration_label="SECP registration number",
+            document_labels={
+                "id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"},
+                "company_registration": {"en": "SECP incorporation certificate"},
+                "bank_confirmation": {"en": "Bank account maintenance certificate"},
+                "proof_of_address": {"en": "Proof of address (utility bill ≤ 3 months)"},
+            },
+            instructions={"en": "Upload clear copies. We verify every application manually within 2 business days.",
+                          "ur": "واضح کاپیاں اپ لوڈ کریں۔ ہر درخواست کی تصدیق 2 کاروباری دنوں میں دستی طور پر کی جاتی ہے۔"},
+        ),
+        "returns": dict(window_days=7, summary={"en": "Return eligible items within 7 days", "ur": "اہل اشیاء 7 دن کے اندر واپس کریں"}),
+    },
+}
 
 # (name, [children]) — top-level list is the union of the seller form,
 # buyer filter sidebar and landing "Shop by Categories". TODO(design): confirm canonical tree.
@@ -53,10 +98,19 @@ DELIVERY_METHODS = [
 
 
 class Command(BaseCommand):
-    help = "Seed categories, brands, banks and delivery methods from the design."
+    help = "Seed countries (markets), categories, brands, banks and delivery methods from the design."
 
     def handle(self, *args, **options):
-        created = {"categories": 0, "brands": 0, "banks": 0, "delivery_methods": 0}
+        created = {"countries": 0, "categories": 0, "brands": 0, "banks": 0, "delivery_methods": 0}
+
+        for code, spec in COUNTRIES.items():
+            country, was_created = Country.objects.update_or_create(code=code, defaults={**spec["country"], "is_active": True})
+            if was_created and not Country.objects.filter(is_default=True).exclude(pk=code).exists():
+                country.is_default = True
+                country.save()
+            KycPolicy.objects.update_or_create(country=country, defaults=spec["kyc"])
+            ReturnPolicy.objects.update_or_create(country=country, defaults=spec["returns"])
+            created["countries"] += was_created
 
         for order, (name, children) in enumerate(CATEGORIES):
             parent, was_created = Category.objects.update_or_create(

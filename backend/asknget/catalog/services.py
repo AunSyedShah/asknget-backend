@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch, Q, Sum, When
 from ninja.errors import HttpError
 
+from markets import services as markets
 from sellers.models import Store
 
 from .models import (
@@ -148,7 +149,7 @@ def filters_payload() -> dict:
         "colors": list(colours),
         "price_min_cents": price["lo"] or 0,
         "price_max_cents": price["hi"] or 0,
-        "currency": settings.DEFAULT_CURRENCY,
+        "currency": markets.current_currency(),
     }
 
 

@@ -7,6 +7,9 @@ scales with the number of rows (that is what django-zeal catches) or a slow
 creep nobody noticed (that is what these pins catch).
 
 Fixture sizes are deliberately > 1 so per-row queries would show up.
+
+Every request pays one query up front: `markets.middleware.RegionMiddleware`
+loads the country (with its policies) that the request resolves to.
 """
 
 from datetime import timedelta
@@ -68,46 +71,46 @@ class QueryBudgetTests(ApiTestCase):
     # Storefront -----------------------------------------------------------
 
     def test_product_list(self):
-        body = self.budget(3, "/api/v1/products", per_page=12)
+        body = self.budget(4, "/api/v1/products", per_page=12)
         self.assertEqual(body["total"], PRODUCTS)
 
     def test_product_list_signed_in_adds_wishlist_lookup_only(self):
-        self.budget(5, "/api/v1/products", token=self.member, per_page=12)  # +auth user, +wishlist ids (once)
+        self.budget(6, "/api/v1/products", token=self.member, per_page=12)  # +auth user, +wishlist ids (once)
 
     def test_product_search(self):
-        body = self.budget(8, "/api/v1/products", q="cream")
+        body = self.budget(9, "/api/v1/products", q="cream")
         self.assertEqual(body["total"], PRODUCTS)
 
     def test_product_detail(self):
-        self.budget(9, f"/api/v1/products/{self.products[0].slug}")
+        self.budget(10, f"/api/v1/products/{self.products[0].slug}")
 
     def test_product_reviews(self):
-        self.budget(5, f"/api/v1/products/{self.products[0].slug}/reviews")
+        self.budget(6, f"/api/v1/products/{self.products[0].slug}/reviews")
 
     def test_recommendations_guest_and_member(self):
-        self.budget(3, "/api/v1/recommendations")
-        self.budget(14, "/api/v1/recommendations", token=self.member)  # profile + kNN + trending top-up + seeds; constant in rows
+        self.budget(4, "/api/v1/recommendations")
+        self.budget(15, "/api/v1/recommendations", token=self.member)  # profile + kNN + trending top-up + seeds; constant in rows
 
     def test_my_orders(self):
-        body = self.budget(5, "/api/v1/me/orders", token=self.member)
+        body = self.budget(6, "/api/v1/me/orders", token=self.member)
         self.assertEqual(len(body["items"]), ORDERS)
 
     # Seller portal --------------------------------------------------------
 
     def test_seller_products(self):
-        body = self.budget(4, "/api/v1/seller/products", token=self.seller)
+        body = self.budget(5, "/api/v1/seller/products", token=self.seller)
         self.assertEqual(body["total"], PRODUCTS)
 
     def test_seller_inventory(self):
-        self.budget(7, "/api/v1/seller/inventory", token=self.seller)
+        self.budget(8, "/api/v1/seller/inventory", token=self.seller)
 
     def test_seller_orders_list_and_detail(self):
-        body = self.budget(3, "/api/v1/seller/orders", token=self.seller)
+        body = self.budget(4, "/api/v1/seller/orders", token=self.seller)
         self.assertEqual(body["total"], ORDERS)
-        self.budget(6, f"/api/v1/seller/orders/{body['items'][0]['id']}", token=self.seller)
+        self.budget(7, f"/api/v1/seller/orders/{body['items'][0]['id']}", token=self.seller)
 
     def test_seller_customers(self):
-        self.budget(4, "/api/v1/seller/customers", token=self.seller)
+        self.budget(5, "/api/v1/seller/customers", token=self.seller)
 
     def test_seller_dashboard(self):
-        self.budget(21, "/api/v1/seller/dashboard", token=self.seller)
+        self.budget(22, "/api/v1/seller/dashboard", token=self.seller)

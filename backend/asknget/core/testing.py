@@ -51,25 +51,29 @@ def make_product(store, category, name="NARS BB Cream", price=2599, compare_at=4
 
 
 class ApiTestCase(TestCase):
-    """Thin JSON client helpers. Pass `token` to send a Bearer header."""
+    """Thin JSON client helpers. Pass `token` to send a Bearer header and `region`
+    to send X-Region (otherwise the request resolves to settings.DEFAULT_COUNTRY)."""
 
-    def _headers(self, token):
-        return {"Authorization": f"Bearer {token}"} if token else {}
+    def _headers(self, token, region=None):
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        if region:
+            headers["X-Region"] = region
+        return headers
 
-    def get(self, url, token=None, **params):
-        return self.client.get(url, params, headers=self._headers(token))
+    def get(self, url, token=None, region=None, **params):
+        return self.client.get(url, params, headers=self._headers(token, region))
 
-    def post(self, url, data=None, token=None):
-        return self.client.post(url, data=data or {}, content_type="application/json", headers=self._headers(token))
+    def post(self, url, data=None, token=None, region=None):
+        return self.client.post(url, data=data or {}, content_type="application/json", headers=self._headers(token, region))
 
-    def put(self, url, data=None, token=None):
-        return self.client.put(url, data=data or {}, content_type="application/json", headers=self._headers(token))
+    def put(self, url, data=None, token=None, region=None):
+        return self.client.put(url, data=data or {}, content_type="application/json", headers=self._headers(token, region))
 
-    def patch(self, url, data=None, token=None):
-        return self.client.patch(url, data=data or {}, content_type="application/json", headers=self._headers(token))
+    def patch(self, url, data=None, token=None, region=None):
+        return self.client.patch(url, data=data or {}, content_type="application/json", headers=self._headers(token, region))
 
-    def delete(self, url, token=None):
-        return self.client.delete(url, headers=self._headers(token))
+    def delete(self, url, token=None, region=None):
+        return self.client.delete(url, headers=self._headers(token, region))
 
     def login(self, email, password=PASSWORD) -> str:
         res = self.post("/api/v1/auth/login", {"email": email, "password": password})

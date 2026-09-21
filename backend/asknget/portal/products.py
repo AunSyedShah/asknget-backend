@@ -28,6 +28,7 @@ from catalog.models import (
 )
 from core.models import coerce_nulls
 from discovery.models import ProductEvent
+from markets import services as markets
 from orders.models import Order, OrderItem
 
 from .periods import Period, change_pct, period_range
@@ -178,7 +179,7 @@ def _validate_refs(data: dict) -> None:
 def create(store, data: dict) -> Product:
     _validate_refs(data)
     product = Product.objects.create(
-        store=store, slug=_unique_slug(data["name"]), price_cents=0, currency=settings.DEFAULT_CURRENCY,
+        store=store, slug=_unique_slug(data["name"]), price_cents=0, currency=markets.current_currency(),
         stock_status=Product.StockStatus.OUT_OF_STOCK, **coerce_nulls(Product, data),
     )
     # One default variant until options are defined, so pricing/stock always has a home.

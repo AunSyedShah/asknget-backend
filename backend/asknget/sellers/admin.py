@@ -36,7 +36,10 @@ class SellerApplicationAdmin(admin.ModelAdmin):
                     "current_step", "submitted_at")
     list_filter = ("status", "account_type")
     search_fields = ("application_number", "store_display_name", "legal_business_name", "user__email")
-    readonly_fields = ("account_number_last4", "created_at", "updated_at")
+    # Encrypted identifiers are shown decrypted to staff but never edited here —
+    # the review API is the write path and it logs who did what.
+    readonly_fields = ("id_passport_number", "rep_id_passport_number", "account_number", "account_number_last4",
+                       "created_at", "updated_at")
     filter_horizontal = ("categories",)
     inlines = [DirectorInline, DocumentInline, StatusEventInline]
 

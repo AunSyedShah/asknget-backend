@@ -18,6 +18,7 @@ from accounts.models import Address, PaymentMethod
 from catalog.models import Product, ProductVariant, StockMovement
 from catalog.services import adjust_stock, lock_variants
 from discovery import events
+from markets import services as markets
 from sellers.models import Store
 
 from .models import Cart, CartItem, DeliveryMethod, Order, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
@@ -180,7 +181,7 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
             problems.append(f"Voucher {voucher.code}: {reason}")
         else:
             discount = voucher_discount(voucher, subtotal)
-    currency = lines[0]["currency"] if lines else settings.DEFAULT_CURRENCY
+    currency = lines[0]["currency"] if lines else markets.current_currency()
     return {
         "id": cart.id,
         "cart_token": token,
