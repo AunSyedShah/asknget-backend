@@ -41,7 +41,7 @@ class PortalBase(ApiTestCase):
         store = store or self.store
         user = user if user is not None else None
         order = Order.objects.create(
-            user=user, status=order_status, order_number=f"ASK{Order.objects.count() + 1:05d}",
+            user=user, status=order_status, order_number=f"ASK{Order.objects.count() + 1:05d}", country_id=store.country_id,
             contact_first_name=name[0], contact_last_name=name[1], contact_email=email or (user.email if user else "guest@example.com"),
             contact_phone="+27 82 123 4567", shipping_address={"line1": "123 Main Street", "city": "Cape Town", "postal_code": "6001", "country": "ZA"},
             subtotal_cents=sum(p.price_cents * q for p, q in lines), total_cents=sum(p.price_cents * q for p, q in lines) + 700,

@@ -34,7 +34,7 @@ class StatusEventInline(admin.TabularInline):
 class SellerApplicationAdmin(admin.ModelAdmin):
     list_display = ("application_number", "store_display_name", "user", "account_type", "status",
                     "current_step", "submitted_at")
-    list_filter = ("status", "account_type")
+    list_filter = ("country", "status", "account_type")
     search_fields = ("application_number", "store_display_name", "legal_business_name", "user__email")
     # Encrypted identifiers are shown decrypted to staff but never edited here —
     # the review API is the write path and it logs who did what.
@@ -64,6 +64,10 @@ class SellerDocumentAdmin(admin.ModelAdmin):
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
     list_display = ("display_name", "slug", "owner", "status", "activated_at")
-    list_filter = ("status",)
+    list_filter = ("country", "status")
     search_fields = ("display_name", "slug", "owner__email")
     prepopulated_fields = {"slug": ("display_name",)}
+
+    def get_readonly_fields(self, request, obj=None):
+        # A store's market never changes: its products, prices and orders live there.
+        return ("country", "application", "owner") if obj else ()

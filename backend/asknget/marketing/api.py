@@ -8,6 +8,7 @@ from ninja import Query, Router
 from core.auth import OptionalJWTAuth
 from core.models import SiteSetting
 from core.schemas import ErrorOut, MessageOut
+from markets.context import get_country
 
 from .models import Banner, ContactMessage, NewsletterSubscriber
 from .schemas import BannerOut, ContactCreatedOut, ContactIn, NewsletterSubscribeIn, PlacementLit, SiteInfoOut
@@ -25,6 +26,9 @@ def banners(request, placement: PlacementLit | None = Query(None)):
     )
     if placement:
         qs = qs.filter(placement=placement)
+    country = get_country()
+    if country is not None:
+        qs = qs.filter(Q(country__isnull=True) | Q(country=country))
     return qs.order_by("placement", "sort_order")
 
 

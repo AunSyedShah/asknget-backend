@@ -1,5 +1,6 @@
 """End-to-end tests for cart, checkout, orders and tracking."""
 
+from django.conf import settings
 from django.core import mail
 from django.utils import timezone
 
@@ -21,8 +22,8 @@ class OrdersTestCase(ApiTestCase):
         self.buds = make_product(self.store, self.beauty, "Black Earbuds", 1299, 2099, options={"Color": ["Black"]}, stock=2)
         self.bb_variant = self.bb.variants.first()
         self.buds_variant = self.buds.variants.first()
-        self.standard = DeliveryMethod.objects.create(name="Standard Delivery", eta_min_days=5, eta_max_days=7, price_cents=1099, sort_order=1)
-        self.express = DeliveryMethod.objects.create(name="Express Delivery", eta_min_days=2, eta_max_days=3, price_cents=1999, sort_order=2)
+        self.standard = DeliveryMethod.objects.create(country_id=settings.DEFAULT_COUNTRY, name="Standard Delivery", eta_min_days=5, eta_max_days=7, price_cents=1099, sort_order=1)
+        self.express = DeliveryMethod.objects.create(country_id=settings.DEFAULT_COUNTRY, name="Express Delivery", eta_min_days=2, eta_max_days=3, price_cents=1999, sort_order=2)
         self.user = make_user(email="john.ali@gmail.com", full_name="John Ali")
         self.token = self.token_for(self.user)
 

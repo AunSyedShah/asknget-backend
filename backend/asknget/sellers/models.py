@@ -61,6 +61,10 @@ class SellerApplication(TimeStampedModel):
         CURRENT = "current", "Current / Cheque Account"
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="seller_application")
+    country = models.ForeignKey(
+        "markets.Country", on_delete=models.PROTECT, related_name="seller_applications",
+        help_text="The market the seller applies to — set from the request's region at sign-up; staff may change it before approval",
+    )
     application_number = models.CharField(max_length=20, unique=True, null=True, blank=True, help_text="Assigned on submit, e.g. ASK-SLR-004821")
     account_type = models.CharField(max_length=20, choices=AccountType.choices)
     status = models.CharField(max_length=20, choices=ApplicationStatus.choices, default=ApplicationStatus.DRAFT, db_index=True)
@@ -244,6 +248,10 @@ class Store(TimeStampedModel):
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="stores")
     application = models.OneToOneField(SellerApplication, on_delete=models.PROTECT, related_name="store")
+    country = models.ForeignKey(
+        "markets.Country", on_delete=models.PROTECT, related_name="stores",
+        help_text="Copied from the application on approval. Immutable: products, prices and orders belong to this market",
+    )
     display_name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True, help_text="asknget.com/store/<slug>")
     description = models.CharField(max_length=250, blank=True)

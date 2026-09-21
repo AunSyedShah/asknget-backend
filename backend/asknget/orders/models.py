@@ -52,6 +52,8 @@ class Voucher(TimeStampedModel):
         FIXED = "fixed", "Fixed amount"
 
     code = models.CharField(max_length=40, unique=True)
+    country = models.ForeignKey("markets.Country", on_delete=models.PROTECT, null=True, blank=True, related_name="vouchers",
+                                help_text="Blank = valid in every market (amounts are in the cart's currency)")
     type = models.CharField(max_length=10, choices=VoucherType.choices)
     value = models.PositiveIntegerField(help_text="Percent (0–100) or amount in cents")
     min_subtotal_cents = models.PositiveIntegerField(null=True, blank=True)
@@ -84,7 +86,8 @@ class VoucherRedemption(TimeStampedModel):
 class DeliveryMethod(TimeStampedModel):
     """Standard (5–7 days) / Express (2–3 days)."""
 
-    name = models.CharField(max_length=60, unique=True)
+    country = models.ForeignKey("markets.Country", on_delete=models.PROTECT, related_name="delivery_methods")
+    name = models.CharField(max_length=60)
     eta_min_days = models.PositiveSmallIntegerField()
     eta_max_days = models.PositiveSmallIntegerField()
     price_cents = models.PositiveIntegerField()
@@ -93,6 +96,7 @@ class DeliveryMethod(TimeStampedModel):
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["sort_order"]
+        constraints = [models.UniqueConstraint(fields=["country", "name"], name="uniq_delivery_method_per_country")]
 
     def __str__(self):
         return f"{self.name} ({self.eta_min_days}–{self.eta_max_days} days)"
@@ -135,6 +139,8 @@ class Order(TimeStampedModel):
 
     order_number = models.CharField(max_length=20, unique=True, help_text="e.g. ORD-00123")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
+    country = models.ForeignKey("markets.Country", on_delete=models.PROTECT, related_name="orders", help_text="The market the cart belonged to")
+    return_window_days = models.PositiveSmallIntegerField(default=0, help_text="Return policy in force at checkout (snapshot)")
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING_PAYMENT, db_index=True)
 
     # Checkout – Contact Info

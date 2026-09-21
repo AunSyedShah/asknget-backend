@@ -2,6 +2,7 @@
 
 import tempfile
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
@@ -282,8 +283,8 @@ class ReviewTests(SellerTestCase):
         # slug check
         res = self.get(f"{SELLER}/store/slug-available", token, slug="Huda Beauty")
         self.assertTrue(res.json()["available"])  # own store excluded
-        Store.objects.create(owner=self.staff, application=SellerApplication.objects.create(user=self.staff, account_type="individual"),
-                             display_name="Other", slug="taken")
+        other_app = SellerApplication.objects.create(user=self.staff, account_type="individual", country_id=settings.DEFAULT_COUNTRY)
+        Store.objects.create(owner=self.staff, application=other_app, country_id=settings.DEFAULT_COUNTRY, display_name="Other", slug="taken")
         res = self.get(f"{SELLER}/store/slug-available", token, slug="taken")
         self.assertEqual((res.json()["available"], res.json()["suggestion"]), (False, "taken-2"))
 

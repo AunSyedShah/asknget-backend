@@ -503,6 +503,7 @@ def approve(app: SellerApplication, *, reviewer, note: str = "") -> SellerApplic
         Store.objects.create(
             owner=app.user,
             application=app,
+            country_id=app.country_id,  # the market is fixed from here on
             display_name=name,
             slug=suggest_slug(slug_for(name)),
             description=app.store_description,

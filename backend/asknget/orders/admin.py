@@ -28,7 +28,7 @@ class CartAdmin(admin.ModelAdmin):
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
     list_display = ("code", "type", "value", "used_count", "usage_limit", "starts_at", "ends_at", "is_active")
-    list_filter = ("type", "is_active")
+    list_filter = ("country", "type", "is_active")
     search_fields = ("code",)
 
 
@@ -39,7 +39,8 @@ class VoucherRedemptionAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryMethod)
 class DeliveryMethodAdmin(admin.ModelAdmin):
-    list_display = ("name", "eta_min_days", "eta_max_days", "price_cents", "is_active")
+    list_display = ("name", "country", "eta_min_days", "eta_max_days", "price_cents", "is_active")
+    list_filter = ("country", "is_active")
 
 
 class OrderItemInline(admin.TabularInline):
@@ -62,7 +63,7 @@ class PaymentInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ("order_number", "user", "contact_email", "status", "payment_status", "total_cents", "placed_at")
-    list_filter = ("status", "payment_status", "payment_method_type")
+    list_filter = ("country", "status", "payment_status", "payment_method_type")
     search_fields = ("order_number", "contact_email", "user__email")
     readonly_fields = ("placed_at",)
     inlines = [OrderItemInline, OrderStatusEventInline, PaymentInline]

@@ -28,7 +28,6 @@ from catalog.models import (
 )
 from core.models import coerce_nulls
 from discovery.models import ProductEvent
-from markets import services as markets
 from orders.models import Order, OrderItem
 
 from .periods import Period, change_pct, period_range
@@ -179,7 +178,7 @@ def _validate_refs(data: dict) -> None:
 def create(store, data: dict) -> Product:
     _validate_refs(data)
     product = Product.objects.create(
-        store=store, slug=_unique_slug(data["name"]), price_cents=0, currency=markets.current_currency(),
+        store=store, slug=_unique_slug(data["name"]), price_cents=0, country=store.country, currency=store.country.currency,
         stock_status=Product.StockStatus.OUT_OF_STOCK, **coerce_nulls(Product, data),
     )
     # One default variant until options are defined, so pricing/stock always has a home.
@@ -398,7 +397,7 @@ def change_status(product: Product, action: str) -> Product:
 def duplicate(product: Product) -> Product:
     name = f"{product.name} (copy)"
     fields = {
-        f.name: getattr(product, f.name) for f in Product._meta.fields
+        f.attname: getattr(product, f.attname) for f in Product._meta.fields  # attname → FK ids, no extra queries
         if f.name not in ("id", "slug", "name", "status", "published_at", "submitted_at", "rejection_reason",
                           "rating_avg", "rating_count", "created_at", "updated_at", "deleted_at", "stock_status",
                           "is_featured", "is_best_seller", "is_new_arrival")

@@ -4,7 +4,7 @@ Screens: Cart, Checkout, Order Placed, Track Order, My Account – My Orders.
 Money is integer cents + currency everywhere.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -88,6 +88,7 @@ class CartSummaryOut(Schema):
 class CartOut(Schema):
     id: UUID
     cart_token: Optional[str] = Field(None, description="Guests: send back as X-Cart-Token on every cart/checkout call")
+    country: Optional[str] = Field(None, description="Market the cart belongs to: its lines' country, or the request's market while empty")
     items: list[CartLineOut]
     order_note: str
     voucher: Optional[VoucherOut]
@@ -118,7 +119,7 @@ class AddressIn(Schema):
     city: NonEmptyStr = Field(max_length=100)
     postal_code: PostalCode
     province: str = Field("", max_length=100)
-    country: str = Field("", max_length=2)
+    country: str = Field("", max_length=2, description="ISO-2; blank = the market you are shopping in")
     delivery_instructions: str = Field("", max_length=500)
 
 
@@ -228,10 +229,22 @@ class OrderDetailOut(OrderSummaryOut):
     events: list[OrderEventOut]
     cancelled_at: Optional[datetime]
     cancel_reason: str
+    country: str = Field(alias="country_id", description="Market the order was placed in")
+    return_window_days: int = Field(description="Return policy snapshotted at checkout (0 = no returns)")
+    return_eligible_until: Optional[datetime] = Field(None, description="Last delivery event + return window; null until delivered")
 
     @staticmethod
     def resolve_events(obj):
         return obj.status_events.all()
+
+    @staticmethod
+    def resolve_return_eligible_until(obj):
+        if not obj.return_window_days:
+            return None
+        delivered = [e.created_at for e in obj.status_events.all() if e.status == "delivered"]
+        if not delivered:
+            return None
+        return max(delivered) + timedelta(days=obj.return_window_days)
 
 
 class OrderPlacedOut(Schema):

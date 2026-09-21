@@ -19,6 +19,7 @@ from catalog.models import Product, ProductVariant, StockMovement
 from catalog.services import adjust_stock, lock_variants
 from discovery import events
 from markets import services as markets
+from markets.context import get_country
 from sellers.models import Store
 
 from .models import Cart, CartItem, DeliveryMethod, Order, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
@@ -74,9 +75,28 @@ def resolve_cart(request, *, create: bool = True) -> tuple[Cart, str | None]:
     return _cart_qs().get(pk=cart.pk), token
 
 
+def cart_country_id(cart: Cart) -> str | None:
+    """A cart belongs to the market of its first line (lines are already prefetched).
+    An empty cart belongs to no market yet — the first item decides."""
+    first = next(iter(cart.items.all()), None)
+    return first.variant.product.country_id if first else None
+
+
+def market_country_id() -> str | None:
+    country = get_country()
+    return country.code if country else None
+
+
+def _cart_target_country(cart: Cart) -> str | None:
+    return cart_country_id(cart) or market_country_id()
+
+
 @transaction.atomic
 def _merge(guest: Cart, *, into: Cart) -> None:
-    for item in guest.items.all():
+    target = _cart_target_country(into)
+    for item in guest.items.select_related("variant__product"):
+        if target and item.variant.product.country_id != target:
+            continue  # a guest line from another market never crosses into this cart
         line, created = CartItem.objects.get_or_create(cart=into, variant=item.variant, defaults={"qty": item.qty})
         if not created:
             line.qty = min(line.qty + item.qty, 99)
@@ -94,8 +114,13 @@ def _merge(guest: Cart, *, into: Cart) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def default_delivery_method() -> DeliveryMethod | None:
-    return DeliveryMethod.objects.filter(is_active=True).order_by("sort_order", "price_cents").first()
+def delivery_methods_for(country_id: str | None):
+    qs = DeliveryMethod.objects.filter(is_active=True)
+    return qs.filter(country_id=country_id) if country_id else qs
+
+
+def default_delivery_method(country_id: str | None = None) -> DeliveryMethod | None:
+    return delivery_methods_for(country_id).order_by("sort_order", "price_cents").first()
 
 
 def _variant_purchasable(variant: ProductVariant) -> bool:
@@ -145,11 +170,13 @@ def voucher_label(voucher: Voucher) -> str:
     return f"Discount ({voucher.value}%)" if voucher.type == Voucher.VoucherType.PERCENT else "Discount"
 
 
-def validate_voucher(voucher: Voucher, *, subtotal: int, user) -> str | None:
+def validate_voucher(voucher: Voucher, *, subtotal: int, user, country_id: str | None = None) -> str | None:
     """Return a human reason the voucher can't be used, or None."""
     now = timezone.now()
     if not voucher.is_active:
         return "This voucher is no longer active"
+    if voucher.country_id and country_id and voucher.country_id != country_id:
+        return "This voucher is not valid in your region"
     if voucher.starts_at and voucher.starts_at > now:
         return "This voucher is not valid yet"
     if voucher.ends_at and voucher.ends_at < now:
@@ -167,8 +194,11 @@ def validate_voucher(voucher: Voucher, *, subtotal: int, user) -> str | None:
 
 def cart_out(cart: Cart, token: str | None = None) -> dict:
     lines = [line_out(i) for i in cart.items.all()]
+    country_id = _cart_target_country(cart)
     subtotal = sum(l["line_total_cents"] for l in lines)
-    method = cart.delivery_method if cart.delivery_method and cart.delivery_method.is_active else default_delivery_method()
+    method = cart.delivery_method
+    if not (method and method.is_active and method.country_id == country_id):
+        method = default_delivery_method(country_id)
     shipping = method.price_cents if (method and lines) else 0
     problems: list[str] = []
     if not lines:
@@ -176,7 +206,7 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
     problems += [f"{l['product_name']}: only {l['available_qty']} left" for l in lines if not l["in_stock"]]
     voucher, discount = cart.voucher, 0
     if voucher is not None:
-        reason = validate_voucher(voucher, subtotal=subtotal, user=cart.user)
+        reason = validate_voucher(voucher, subtotal=subtotal, user=cart.user, country_id=country_id)
         if reason:
             problems.append(f"Voucher {voucher.code}: {reason}")
         else:
@@ -185,6 +215,7 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
     return {
         "id": cart.id,
         "cart_token": token,
+        "country": country_id,
         "items": lines,
         "order_note": cart.order_note,
         "voucher": {"code": voucher.code, "type": voucher.type, "value": voucher.value, "label": voucher_label(voucher)} if voucher else None,
@@ -213,6 +244,11 @@ def add_item(cart: Cart, *, variant_id, qty: int) -> None:
         raise HttpError(404, "This item is not available")
     if variant.stock_qty <= 0:
         raise HttpError(409, "This item is out of stock")
+    current = cart_country_id(cart)
+    if current and variant.product.country_id != current:
+        # One market per cart: currencies, delivery methods and return rules differ.
+        # The UI offers "clear cart and switch" (DELETE /cart/items).
+        raise HttpError(409, "cart_region_mismatch")
     line, created = CartItem.objects.get_or_create(cart=cart, variant=variant, defaults={"qty": min(qty, variant.stock_qty)})
     if not created:
         line.qty = min(line.qty + qty, variant.stock_qty, 99)
@@ -236,6 +272,11 @@ def remove_item(cart: Cart, item_id) -> None:
         raise HttpError(404, "Cart item not found")
 
 
+def clear_items(cart: Cart) -> None:
+    """Empty the cart (keeps note / voucher) — the 'clear cart and switch region' action."""
+    CartItem.objects.filter(cart=cart).delete()
+
+
 def update_cart(cart: Cart, data: dict) -> None:
     if "order_note" in data:
         cart.order_note = data["order_note"] or ""
@@ -243,7 +284,7 @@ def update_cart(cart: Cart, data: dict) -> None:
         if data["delivery_method_id"] is None:
             cart.delivery_method = None
         else:
-            method = DeliveryMethod.objects.filter(pk=data["delivery_method_id"], is_active=True).first()
+            method = delivery_methods_for(_cart_target_country(cart)).filter(pk=data["delivery_method_id"]).first()
             if method is None:
                 raise HttpError(422, "Unknown delivery method")
             cart.delivery_method = method
@@ -255,7 +296,7 @@ def apply_voucher(cart: Cart, code: str) -> None:
     if voucher is None:
         raise HttpError(404, "Voucher code not recognised")
     subtotal = sum(i.variant.effective_price_cents * i.qty for i in cart.items.all())
-    reason = validate_voucher(voucher, subtotal=subtotal, user=cart.user)
+    reason = validate_voucher(voucher, subtotal=subtotal, user=cart.user, country_id=_cart_target_country(cart))
     if reason:
         raise HttpError(422, reason)
     cart.voucher = voucher
@@ -311,7 +352,18 @@ def checkout(request, cart: Cart, payload) -> Order:
     shipping = payload.shipping_address.dict() if payload.ship_to_different_address else primary
     billing = primary if payload.ship_to_different_address else None
 
-    method = DeliveryMethod.objects.filter(pk=payload.delivery_method_id, is_active=True).first()
+    # One market per order: the cart's country decides currency, delivery methods and
+    # the return window. A blank address country means "this market"; another country
+    # cannot be shipped to from here.
+    country_id = view["country"]
+    for addr in (primary, shipping):
+        addr["country"] = (addr.get("country") or country_id or "").upper()
+    if shipping["country"] != country_id:
+        raise HttpError(409, "ships_outside_region")
+    active = get_country()
+    country = active if (active and active.code == country_id) else markets.countries_qs().get(pk=country_id)
+
+    method = delivery_methods_for(country_id).filter(pk=payload.delivery_method_id).first()
     if method is None:
         raise HttpError(422, "Unknown delivery method")
 
@@ -335,6 +387,8 @@ def checkout(request, cart: Cart, payload) -> Order:
     order = Order.objects.create(
         order_number=_order_number(),
         user=user,
+        country=country,
+        return_window_days=country.return_window_days,
         contact_first_name=payload.contact.first_name,
         contact_last_name=payload.contact.last_name,
         contact_email=payload.contact.email,

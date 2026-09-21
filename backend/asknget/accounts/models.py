@@ -175,7 +175,7 @@ class Address(SoftDeleteModel):
     city = models.CharField(max_length=100)
     province = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=2, default="PK")
+    country = models.CharField(max_length=2, help_text="ISO 3166-1 alpha-2; defaults to the request's market")
     delivery_instructions = models.TextField(blank=True)
     is_default = models.BooleanField(default=False)
 

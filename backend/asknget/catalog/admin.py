@@ -17,7 +17,7 @@ from .models import (
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "parent", "slug", "product_count", "sort_order", "is_active")
+    list_display = ("name", "parent", "slug", "product_counts", "sort_order", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
@@ -55,7 +55,7 @@ class ProductVariantInline(admin.TabularInline):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "store", "category", "brand", "price_cents", "compare_at_price_cents",
                     "stock_status", "rating_avg", "status")
-    list_filter = ("status", "stock_status", "is_featured", "is_best_seller", "is_new_arrival", "category")
+    list_filter = ("country", "status", "stock_status", "is_featured", "is_best_seller", "is_new_arrival", "category")
     search_fields = ("name", "slug", "store__display_name")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [ProductImageInline, ProductContentSectionInline, ProductOptionTypeInline, ProductVariantInline]

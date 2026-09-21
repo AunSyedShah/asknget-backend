@@ -62,9 +62,13 @@ def register_seller(*, email: str, password: str, phone: str, account_type: str,
 
     _assert_unique(email, phone)
     _run_django_password_validators(password, None)
-    user = User.objects.create_user(email=email, password=password, phone=phone, is_seller=True,
-                                    country=country.code if country else "")
-    SellerApplication.objects.create(user=user, account_type=account_type)
+    from markets import services as markets
+
+    country = country or markets.default_country()
+    if country is None:
+        raise HttpError(503, "No market configured")
+    user = User.objects.create_user(email=email, password=password, phone=phone, is_seller=True, country=country.code)
+    SellerApplication.objects.create(user=user, account_type=account_type, country=country)
     TermsAcceptance.objects.bulk_create([
         TermsAcceptance(user=user, document=TermsAcceptance.TermsDocument.SELLER_TERMS, ip=ip),
         TermsAcceptance(user=user, document=TermsAcceptance.TermsDocument.PRIVACY_POLICY, ip=ip),
@@ -269,6 +273,11 @@ def accept_terms(user: User, *, document: str, version: str, ip: str | None) -> 
 @transaction.atomic
 def create_address(user: User, data: dict) -> Address:
     data = coerce_nulls(Address, data)
+    if not data.get("country"):  # the popup has no country field: it is the market being shopped in
+        from markets import services as markets
+
+        country = markets.current_or_default()
+        data["country"] = country.code if country else ""
     if data.get("is_default") or not user.addresses.exists():
         user.addresses.update(is_default=False)
         data["is_default"] = True

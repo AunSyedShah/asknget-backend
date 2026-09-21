@@ -22,7 +22,16 @@ class Category(TimeStampedModel):
     image = models.ImageField(upload_to="categories/", null=True, blank=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
-    product_count = models.PositiveIntegerField(default=0, help_text="Denormalised for the filter sidebar; refreshed by a job")
+    product_counts = models.JSONField(
+        default=dict, blank=True,
+        help_text='Denormalised "128 items" per market, e.g. {"ZA": 128, "PK": 40}; refreshed by catalog.services.refresh_category_counts',
+    )
+
+    def product_count_for(self, country) -> int:
+        code = getattr(country, "code", country)
+        if code is None:  # no market active → every market
+            return sum(self.product_counts.values())
+        return int(self.product_counts.get(code, 0))
 
     class Meta(TimeStampedModel.Meta):
         verbose_name_plural = "categories"
@@ -67,6 +76,10 @@ class Product(SoftDeleteModel):
         ARCHIVED = "archived", "Archived"
 
     store = models.ForeignKey("sellers.Store", on_delete=models.PROTECT, related_name="products")
+    country = models.ForeignKey(
+        "markets.Country", on_delete=models.PROTECT, related_name="products",
+        help_text="Denormalised from the store so every storefront query filters by market without a join",
+    )
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="products")
 
@@ -107,6 +120,8 @@ class Product(SoftDeleteModel):
         indexes = [
             models.Index(fields=["status", "category"]),
             models.Index(fields=["status", "price_cents"]),
+            # Every storefront query is `country = ? AND status='active' AND deleted_at IS NULL`.
+            models.Index(fields=["country", "-published_at"], condition=Q(status="active", deleted_at__isnull=True), name="product_country_live_idx"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -117,6 +132,11 @@ class Product(SoftDeleteModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.country_id and self.store_id:
+            self.country_id = self.store.country_id
+        super().save(*args, **kwargs)
 
     @property
     def discount_percent(self) -> int | None:

@@ -18,7 +18,7 @@ from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
 from . import services
-from .models import DeliveryMethod, Order
+from .models import Order
 from .schemas import (
     AdminOrderStatusIn,
     CancelIn,
@@ -83,6 +83,13 @@ def cart_remove_item(request, item_id: UUID, x_cart_token: str | None = Header(N
     return services.cart_out(services.resolve_cart(request)[0], token)
 
 
+@cart_router.delete("/items", response=_CART, summary="Empty the cart ('clear cart and switch region')")
+def cart_clear(request, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
+    cart, token = services.resolve_cart(request)
+    services.clear_items(cart)
+    return services.cart_out(services.resolve_cart(request)[0], token)
+
+
 @cart_router.patch("", response=_CART, summary="Order note / delivery type")
 def cart_update(request, payload: CartPatchIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
@@ -111,7 +118,7 @@ def cart_remove_voucher(request, x_cart_token: str | None = Header(None, descrip
 
 @orders_public_router.get("/delivery-methods", response=list[DeliveryMethodOut], summary="'Delivery Type' options")
 def delivery_methods(request):
-    return DeliveryMethod.objects.filter(is_active=True)
+    return services.delivery_methods_for(services.market_country_id())
 
 
 @checkout_router.post(

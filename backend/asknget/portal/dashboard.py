@@ -71,7 +71,7 @@ def summary(store, user, period_name: str) -> dict:
     return {
         "period": period_name,
         "seller": {"name": user.full_name or user.email, "first_name": (user.full_name or user.email).split()[0], "role": "Store Owner"},
-        "store": {"id": store.id, "name": store.display_name, "slug": store.slug, "currency": store.products.values_list("currency", flat=True).first() or "USD"},
+        "store": {"id": store.id, "name": store.display_name, "slug": store.slug, "currency": store.country.currency},
         "sales_cents": _kpi(cs, ps),
         "orders": _kpi(co, po),
         "products": _kpi(live.count(), live.filter(created_at__lt=p.start).count()),

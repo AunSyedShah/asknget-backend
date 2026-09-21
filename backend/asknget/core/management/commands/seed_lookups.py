@@ -91,7 +91,7 @@ BANKS = [
 ]
 
 DELIVERY_METHODS = [
-    # name, eta_min, eta_max, price_cents, sort_order
+    # name, eta_min, eta_max, price_cents (in each market's own currency), sort_order — seeded per active country
     ("Standard Delivery", 5, 7, 1099, 1),
     ("Express Delivery", 2, 3, 1999, 2),
 ]
@@ -131,12 +131,13 @@ class Command(BaseCommand):
             _, was_created = Bank.objects.update_or_create(country=country, name=name, defaults={"swift": swift})
             created["banks"] += was_created
 
-        for name, eta_min, eta_max, price, order in DELIVERY_METHODS:
-            _, was_created = DeliveryMethod.objects.update_or_create(
-                name=name,
-                defaults={"eta_min_days": eta_min, "eta_max_days": eta_max, "price_cents": price, "sort_order": order},
-            )
-            created["delivery_methods"] += was_created
+        for country in Country.objects.filter(is_active=True):
+            for name, eta_min, eta_max, price, order in DELIVERY_METHODS:
+                _, was_created = DeliveryMethod.objects.update_or_create(
+                    country=country, name=name,
+                    defaults={"eta_min_days": eta_min, "eta_max_days": eta_max, "price_cents": price, "sort_order": order},
+                )
+                created["delivery_methods"] += was_created
 
         for key, n in created.items():
             self.stdout.write(f"{key}: {n} created")

@@ -14,6 +14,7 @@ loads the country (with its policies) that the request resolves to.
 
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.utils import timezone
 
 from catalog.models import Brand, Review
@@ -48,7 +49,7 @@ class QueryBudgetTests(ApiTestCase):
         now = timezone.now()
         for i in range(ORDERS):
             order = Order.objects.create(
-                user=cls.buyer, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK{i:05d}", contact_first_name="Olivia", contact_last_name="Martin",
+                user=cls.buyer, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK{i:05d}", country_id=cls.store.country_id, contact_first_name="Olivia", contact_last_name="Martin",
                 contact_email=cls.buyer.email, contact_phone="0", shipping_address={"city": "Cape Town"}, subtotal_cents=1000, total_cents=1700,
                 shipping_cents=700, payment_method_type="card", payment_status="paid",
             )
@@ -59,6 +60,7 @@ class QueryBudgetTests(ApiTestCase):
         embed_products()
 
     def setUp(self):
+        cache.clear()  # pins are cold-cache numbers (customers rollup, FBT), independent of test order
         self.seller = self.token_for(self.owner)
         self.member = self.token_for(self.buyer)
 

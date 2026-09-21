@@ -66,20 +66,27 @@ class Command(BaseCommand):
             u.email_verified_at = u.email_verified_at or timezone.now()
             u.save()
 
+        from markets import services as markets
+
+        country = markets.default_country()
+        if country is None:
+            self.stderr.write("No market configured — run `manage.py seed_lookups` first.")
+            return
+
         app, _ = SellerApplication.objects.get_or_create(
             user=seller,
-            defaults=dict(account_type="registered_company", status="active", application_number="ASK-SLR-004821", current_step=5,
+            defaults=dict(account_type="registered_company", status="active", application_number="ASK-SLR-004821", current_step=5, country=country,
                           first_name="Ahmad", last_name="Khan", store_display_name="Huda Beauty", legal_business_name="Huda Beauty (Pty) Ltd",
                           submitted_at=timezone.now(), approved_at=timezone.now(), activated_at=timezone.now()),
         )
         store, _ = Store.objects.get_or_create(
-            application=app, defaults=dict(owner=seller, display_name="Huda Beauty", slug="huda-beauty", status="active",
+            application=app, defaults=dict(owner=seller, country=country, display_name="Huda Beauty", slug="huda-beauty", status="active",
                                            description="Premium beauty and lifestyle products.", activated_at=timezone.now()),
         )
 
         Address.objects.get_or_create(
             user=customer, street_address="123 Main Street",
-            defaults=dict(full_name="John Ali", phone="+923007654321", city="Lahore", postal_code="45009", country="PK", is_default=True),
+            defaults=dict(full_name="John Ali", phone="+923007654321", city="Lahore", postal_code="45009", country=country.code, is_default=True),
         )
 
         brands = {b.name: b for b in Brand.objects.all()}
@@ -88,7 +95,7 @@ class Command(BaseCommand):
             category = Category.objects.filter(slug=cat_slug).first() or Category.objects.filter(parent__isnull=True).first()
             product, was_created = Product.objects.get_or_create(
                 slug=slugify(name),
-                defaults=dict(store=store, category=category, brand=brands.get(brand), name=name, price_cents=price, compare_at_price_cents=compare,
+                defaults=dict(store=store, country=country, currency=country.currency, category=category, brand=brands.get(brand), name=name, price_cents=price, compare_at_price_cents=compare,
                               short_description=blurb, description_title=f"Perfecting {name}", description=blurb,
                               status="active", published_at=timezone.now(), **flags),
             )
@@ -187,8 +194,9 @@ class Command(BaseCommand):
             placed_at = now - timedelta(days=days_ago, hours=n % 7)
             order = Order.objects.create(
                 user=user, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK-DEMO{n:03d}",
+                country=store.country, return_window_days=store.country.return_window_days,
                 contact_first_name=first, contact_last_name=last, contact_email=member.email if user else email, contact_phone="+27 82 123 4567",
-                shipping_address={"full_name": f"{first} {last}", "street_address": "123 Main Street", "city": "Cape Town", "postal_code": "6001", "country": "ZA"},
+                shipping_address={"full_name": f"{first} {last}", "street_address": "123 Main Street", "city": "Cape Town", "postal_code": "6001", "country": store.country_id},
                 subtotal_cents=subtotal, shipping_cents=700, total_cents=subtotal + 700, currency=items[0][0].currency,
                 payment_method_type=method, payment_status=Order.OrderPaymentStatus.PAID,
             )

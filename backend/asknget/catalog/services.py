@@ -8,6 +8,8 @@ from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch,
 from ninja.errors import HttpError
 
 from markets import services as markets
+from markets.context import get_country
+from markets.models import Country
 from sellers.models import Store
 
 from .models import (
@@ -31,11 +33,12 @@ from .models import (
 
 
 def category_tree(*, only_active: bool = True) -> list[dict]:
+    country = get_country()
     qs = Category.objects.all()
     if only_active:
         qs = qs.filter(is_active=True)
     nodes = {c.id: {"id": c.id, "name": c.name, "slug": c.slug, "image_url": c.image.url if c.image else None,
-                    "product_count": c.product_count, "children": [], "_parent": c.parent_id} for c in qs}
+                    "product_count": c.product_count_for(country), "children": [], "_parent": c.parent_id} for c in qs}
     roots = []
     for node in nodes.values():
         parent = nodes.get(node.pop("_parent"))
@@ -56,17 +59,18 @@ def category_with_descendants(slug: str) -> list[Category]:
 
 
 def refresh_category_counts() -> None:
-    """Denormalised '128 items' per category (own + descendants). Call from a job or after seeding."""
-    counts = dict(public_products().values_list("category_id").annotate(n=Count("id")).values_list("category_id", "n"))
+    """Denormalised '128 items' per category **per market** (own + descendants).
+    Call from a job or after seeding."""
     parents = dict(Category.objects.values_list("id", "parent_id"))
-    totals: dict = defaultdict(int)
-    for cat_id, n in counts.items():
+    per_country: dict = defaultdict(lambda: defaultdict(int))
+    rows = public_products(country=None).values_list("country_id", "category_id").annotate(n=Count("id"))
+    for code, cat_id, n in rows:
         node = cat_id
         while node is not None:
-            totals[node] += n
+            per_country[node][code] += n
             node = parents.get(node)
     for cat in Category.objects.all():
-        Category.objects.filter(pk=cat.pk).update(product_count=totals.get(cat.pk, 0))
+        Category.objects.filter(pk=cat.pk).update(product_counts=dict(per_country.get(cat.pk, {})))
 
 
 # --------------------------------------------------------------------------- #
@@ -74,10 +78,20 @@ def refresh_category_counts() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def public_products():
+CURRENT = object()  # sentinel: "the market of the current request"
+
+
+def public_products(country=CURRENT):
+    """Everything a shopper may see. Scoped to one market: by default the request's
+    (`markets.context.get_country()`); pass a `Country` to pick one, or `None` for
+    every market (jobs, counts). Outside a request nothing is active → unscoped."""
+    if country is CURRENT:
+        country = get_country()
+    qs = Product.objects.filter(status=Product.ProductStatus.ACTIVE, store__status=Store.StoreStatus.ACTIVE)
+    if country is not None:
+        qs = qs.filter(country_id=country.code if isinstance(country, Country) else country)
     return (
-        Product.objects.filter(status=Product.ProductStatus.ACTIVE, store__status=Store.StoreStatus.ACTIVE)
-        .select_related("category", "brand", "store")
+        qs.select_related("category", "brand", "store")
         .prefetch_related(Prefetch("images", queryset=ProductImage.objects.order_by("-is_primary", "sort_order")))
     )
 

@@ -5,8 +5,11 @@ import itertools
 from django.test import TestCase
 from django.utils import timezone
 
+from django.conf import settings
+
 from accounts.models import User
 from catalog.models import Brand, Category, Product, ProductOptionType, ProductOptionValue, ProductVariant
+from markets.models import Country, KycPolicy, ReturnPolicy
 from sellers.models import SellerApplication, Store
 
 _seq = itertools.count(1)
@@ -19,11 +22,23 @@ def make_user(email=None, **extra) -> User:
     return User.objects.create_user(email=email or f"user{n}@example.com", password=PASSWORD, **extra)
 
 
-def make_store(owner=None, name="Huda Beauty", status=Store.StoreStatus.ACTIVE) -> Store:
+def make_country(code="PK", **extra) -> Country:
+    """A second market for cross-region tests (the default one comes from the migration)."""
+    profiles = {"PK": dict(name="Pakistan", currency="PKR", timezone="Asia/Karachi", languages=["en", "ur"], phone_prefix="+92", sort_order=2)}
+    country, created = Country.objects.get_or_create(code=code, defaults={**profiles.get(code, dict(name=code, currency="USD", timezone="UTC")), **extra})
+    if created:
+        ReturnPolicy.objects.create(country=country, window_days=7, summary={"en": "Return eligible items within 7 days"})
+        KycPolicy.objects.create(country=country)
+    return country
+
+
+def make_store(owner=None, name="Huda Beauty", status=Store.StoreStatus.ACTIVE, country=None) -> Store:
+    """`country`: a Country or ISO code; defaults to settings.DEFAULT_COUNTRY (created by the markets migration)."""
     owner = owner or make_user(is_seller=True)
-    app = SellerApplication.objects.create(user=owner, account_type="registered_company", status="active", store_display_name=name)
+    country_id = getattr(country, "code", country) or settings.DEFAULT_COUNTRY
+    app = SellerApplication.objects.create(user=owner, account_type="registered_company", status="active", store_display_name=name, country_id=country_id)
     n = next(_seq)
-    return Store.objects.create(owner=owner, application=app, display_name=name, slug=f"{name.lower().replace(' ', '-')}-{n}", status=status)
+    return Store.objects.create(owner=owner, application=app, country_id=country_id, display_name=name, slug=f"{name.lower().replace(' ', '-')}-{n}", status=status)
 
 
 def make_category(name, parent=None) -> Category:
@@ -35,7 +50,7 @@ def make_product(store, category, name="NARS BB Cream", price=2599, compare_at=4
     """options: {"Size": ["15 ml", "30 ml"], "Shade": ["Ivory", "Natural"]} → one variant per combination."""
     n = next(_seq)
     product = Product.objects.create(
-        store=store, category=category, brand=brand, name=name, slug=f"{name.lower().replace(' ', '-')}-{n}",
+        store=store, country_id=store.country_id, category=category, brand=brand, name=name, slug=f"{name.lower().replace(' ', '-')}-{n}",
         price_cents=price, compare_at_price_cents=compare_at, status=status,
         published_at=timezone.now() if status == Product.ProductStatus.ACTIVE else None, **extra,
     )

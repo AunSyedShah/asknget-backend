@@ -21,6 +21,7 @@ PRODUCTS = "/api/v1/products"
 
 def _order(user, *products, status=Order.OrderStatus.DELIVERED) -> Order:
     order = Order.objects.create(user=user, status=status, order_number=f"T-{Order.objects.count() + 1}", contact_email=user.email,
+                                 country_id=products[0].country_id,
                                  contact_first_name="T", contact_last_name="U", contact_phone="0", shipping_address={},
                                  subtotal_cents=0, total_cents=0, payment_method_type="cod")
     for p in products:

@@ -16,6 +16,8 @@ class Banner(TimeStampedModel):
         TOP_DISCOUNT = "top_discount", "Top Discounted tile"
         CATEGORY_STRIP = "category_strip", "Category strip"
 
+    country = models.ForeignKey("markets.Country", on_delete=models.CASCADE, null=True, blank=True, related_name="banners",
+                                help_text="Blank = shown in every market")
     placement = models.CharField(max_length=20, choices=BannerPlacement.choices, db_index=True)
     eyebrow = models.CharField(max_length=80, blank=True, help_text='e.g. "TECH ESSENTIALS"')
     title = models.CharField(max_length=120)
