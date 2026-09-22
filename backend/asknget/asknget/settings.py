@@ -82,6 +82,10 @@ VOYAGE_API_KEY = os.environ.get('VOYAGE_API_KEY', '')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 SEARCH_MAX_CANDIDATES = int(os.environ.get('SEARCH_MAX_CANDIDATES', 200))  # deepest page a query can reach
 
+# Advanced Analytics (premium sellers): how many raw events the search-terms report
+# scans before it gives up and says `truncated` (portal/analytics.py).
+ANALYTICS_EVENT_SCAN_LIMIT = int(os.environ.get('ANALYTICS_EVENT_SCAN_LIMIT', 5000))
+
 
 # Application definition
 

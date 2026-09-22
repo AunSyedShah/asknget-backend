@@ -3,7 +3,9 @@
 #   docker compose up -d --build        # dev: also loads compose.override.yaml (live reload)
 #   docker compose -f compose.yaml up -d --build   # prod-like: gunicorn, no bind mounts
 #
-# All configuration comes from backend/.env (copy backend/.env.example).
+# Application configuration comes from backend/.env (copy backend/.env.example);
+# compose's own variables (HTTP_PORT) come from the root .env (copy .env.example).
+# Every variable is documented in docs/environment.md.
 # Data lives in named volumes, so `docker compose down` keeps it and
 # `docker compose down -v` wipes it.
 

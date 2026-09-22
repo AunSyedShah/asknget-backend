@@ -27,3 +27,125 @@ backend = "backend:main"
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.48.0",
+]
+
+# --------------------------------------------------------------------------- #
+# Task runner (poethepoet) — `uv run poe <task>` from anywhere under backend/.
+#
+# Why this exists: manage.py lives in backend/asknget/ while pyproject.toml lives
+# in backend/, and backend/.env points DATABASE_URL at the *Docker* host `db`.
+# So every local command used to be
+#     cd backend/asknget && DATABASE_URL=sqlite:///db.sqlite3 uv run python manage.py test
+# Each task below sets `cwd` and the local DATABASE_URL, so it is just
+#     uv run poe test
+#
+# uv has no built-in task runner (astral-sh/uv#5903); poethepoet is the usual
+# companion and is a dev-only dependency, so `uv sync --no-dev` in the Docker
+# build never sees it. Install it once with `uv tool install poethepoet` to drop
+# the `uv run` prefix and type `poe test`.
+# --------------------------------------------------------------------------- #
+[tool.poe]
+envfile = ".env"                       # same file Django and compose read
+
+[tool.poe.tasks.manage]
+help = "Any manage.py command against local SQLite, e.g. `poe manage createsuperuser`"
+cmd = "python manage.py ${args}"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+args = [{ name = "args", positional = true, multiple = true }]
+
+[tool.poe.tasks.dev]
+help = "Run the dev server on http://127.0.0.1:8000 (local SQLite)"
+cmd = "python manage.py runserver"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
+[tool.poe.tasks.test]
+help = "Run the test suite; pass labels, e.g. `poe test chat portal.test_analytics`"
+cmd = "python manage.py test ${labels}"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+args = [{ name = "labels", positional = true, multiple = true }]
+
+[tool.poe.tasks.migrate]
+help = "Apply migrations to the local SQLite database"
+cmd = "python manage.py migrate"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
+[tool.poe.tasks.makemigrations]
+help = "Create migrations, e.g. `poe makemigrations chat`"
+cmd = "python manage.py makemigrations ${apps}"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+args = [{ name = "apps", positional = true, multiple = true }]
+
+[tool.poe.tasks.seed]
+help = "Seed lookups + demo data into the local SQLite database"
+sequence = [
+  { cmd = "python manage.py migrate", cwd = "asknget" },
+  { cmd = "python manage.py seed_lookups", cwd = "asknget" },
+  { cmd = "python manage.py seed_demo", cwd = "asknget" },
+]
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
+[tool.poe.tasks.shell]
+help = "Django shell against local SQLite"
+cmd = "python manage.py shell"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
+[tool.poe.tasks.check]
+help = "Django system checks + missing-migration check (what CI should run)"
+sequence = [
+  { cmd = "python manage.py check", cwd = "asknget" },
+  { cmd = "python manage.py makemigrations --check --dry-run", cwd = "asknget" },
+]
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
+[tool.poe.tasks.zeal]
+help = "Dev server with the N+1 detector armed (raises on lazy loads in loops)"
+cmd = "python manage.py runserver"
+cwd = "asknget"
+env = { DATABASE_URL = "sqlite:///db.sqlite3", ZEAL = "1" }
+
+[tool.poe.tasks.guide]
+help = "Rebuild the developer guide PDF"
+cmd = "uv run --with reportlab python ../docs/build_developer_guide.py"
+
+[tool.poe.tasks.figma]
+help = "Check whether the Figma design changed since the last snapshot"
+cmd = "python ../docs/figma/snapshot.py --check"
+
+# --- Docker (the full Postgres + nginx stack) ------------------------------- #
+[tool.poe.tasks.up]
+help = "Start the whole stack (db, web, worker, nginx) in the background"
+cmd = "docker compose up -d --build"
+cwd = ".."
+
+[tool.poe.tasks.down]
+help = "Stop the stack (keeps data; `docker compose down -v` wipes it)"
+cmd = "docker compose down"
+cwd = ".."
+
+[tool.poe.tasks.logs]
+help = "Follow container logs, e.g. `poe logs web`"
+cmd = "docker compose logs -f --tail 100 ${services}"
+cwd = ".."
+args = [{ name = "services", positional = true, multiple = true }]
+
+[tool.poe.tasks.dtest]
+help = "Run the suite inside the container against Postgres"
+cmd = "docker compose exec -T web python manage.py test ${labels}"
+cwd = ".."
+args = [{ name = "labels", positional = true, multiple = true }]
+
+[tool.poe.tasks.dmanage]
+help = "manage.py inside the container, e.g. `poe dmanage seed_demo`"
+cmd = "docker compose exec -T web python manage.py ${args}"
+cwd = ".."
+args = [{ name = "args", positional = true, multiple = true }]

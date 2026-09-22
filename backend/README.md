@@ -23,6 +23,7 @@ backend/
 
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
+- Environment files and every variable: [`../docs/environment.md`](../docs/environment.md).
 - Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers) · Live API docs: `/api/v1/docs`.
 
 ## Setup
@@ -30,18 +31,43 @@ backend/
 ```bash
 uv sync
 cp .env.example .env            # then set FIELD_ENCRYPTION_KEY (see comment in the file)
-cd asknget
-uv run python manage.py migrate
-uv run python manage.py seed_lookups        # categories, brands, banks, delivery methods
-uv run python manage.py seed_demo           # dev only: demo accounts, store, products, vouchers (password DemoPass123!)
-uv run python manage.py createsuperuser     # optional — seed_demo also creates admin@asknget.demo
-uv run python manage.py runserver
+uv run poe seed                 # migrate + seed_lookups + seed_demo (password DemoPass123!)
+uv run poe dev                  # http://127.0.0.1:8000
 ```
 
 - API docs (Swagger): http://127.0.0.1:8000/api/v1/docs · OpenAPI JSON: /api/v1/openapi.json
 - Admin: http://127.0.0.1:8000/admin/
 
+### Tasks (`uv run poe …`)
+
+`manage.py` lives in `backend/asknget/` while `pyproject.toml` lives in `backend/`, and `backend/.env`
+points `DATABASE_URL` at the **Docker** host `db` — so a raw local command was
+`cd asknget && DATABASE_URL=sqlite:///db.sqlite3 uv run python manage.py test`. Each task below sets the
+working directory and the local SQLite URL for you, and works from anywhere under `backend/`.
+
+| Task | Does |
+|---|---|
+| `poe dev` | dev server on :8000 (local SQLite) · `poe zeal` = same with the N+1 detector armed |
+| `poe test` | whole suite · `poe test chat portal.test_analytics` for labels |
+| `poe check` | `manage.py check` + missing-migration check — what CI should run |
+| `poe migrate` · `poe makemigrations [app]` · `poe seed` · `poe shell` | the usual |
+| `poe manage <anything>` | any other command, e.g. `poe manage createsuperuser` |
+| `poe up` · `poe down` · `poe logs [service]` | the Docker stack |
+| `poe dtest [labels]` · `poe dmanage <cmd>` | run inside the container against Postgres |
+| `poe guide` · `poe figma` | rebuild the developer guide PDF · check the design for drift |
+
+`uv run poe` (no task) lists them. `uv tool install poethepoet` once, and you can drop the prefix and
+just type `poe test`. Tasks are defined at the bottom of `pyproject.toml`; poethepoet is a dev-only
+dependency, so the Docker build (`uv sync --no-dev`) never installs it. uv has no built-in task runner
+([astral-sh/uv#5903](https://github.com/astral-sh/uv/issues/5903)).
+
 Without `DATABASE_URL` the project falls back to SQLite; set it to a Postgres URL for anything beyond local experiments.
+
+### Environment files
+
+Two of them: the **repo root** `.env` configures Docker Compose (`HTTP_PORT`), and **`backend/.env`**
+configures Django and every container. Both have a committed `.env.example`; neither is ever committed.
+Every variable is documented in [`../docs/environment.md`](../docs/environment.md).
 
 ## Running with Docker
 

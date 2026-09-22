@@ -207,7 +207,7 @@ def search_terms(store, period_name: str, *, limit: int = 10) -> dict:
     if cached is not None:
         return cached
 
-    limit_rows = getattr(settings, "ANALYTICS_EVENT_SCAN_LIMIT", 5000)
+    limit_rows = settings.ANALYTICS_EVENT_SCAN_LIMIT
     window = timedelta(minutes=SEARCH_WINDOW_MINUTES)
     store_products = set(Product.objects.filter(store=store).values_list("id", flat=True))
     events = list(
