@@ -6,6 +6,7 @@
   /seller/customers    overview, list, detail, notes, export
   /seller/dashboard    KPIs, charts, latest orders
   /seller/plan         what this store's plan unlocks (portal.entitlements)
+  /seller/analytics    premium: overview, funnel, products, search terms, customers, fulfilment
   /seller/search       header "Search anything"
   /admin/products      staff review queue (approve / reject)
 """
@@ -23,7 +24,7 @@ from core.pagination import PagePagination
 from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
 from core.schemas import ErrorOut, MessageOut
 
-from . import customers, dashboard, entitlements, inventory, orders, products
+from . import analytics, customers, dashboard, entitlements, inventory, orders, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -53,9 +54,17 @@ from .schemas import (
     ContentIn,
     ImageOrderIn,
     OptionsIn,
+    AnalyticsCustomersOut,
+    AnalyticsFulfilmentOut,
+    AnalyticsFunnelOut,
+    AnalyticsOverviewOut,
+    AnalyticsProductsOut,
+    AnalyticsSearchOut,
     PeriodLit,
     PlanOut,
     PlanSetIn,
+    ProductSortLit,
+    ReportLit,
     ProductAnalyticsOut,
     ProductCreateIn,
     ProductPatchIn,
@@ -78,6 +87,7 @@ customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
 dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 search_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 plan_router = Router(tags=["seller: plan"], auth=StoreAuth())
+analytics_router = Router(tags=["seller: analytics"], auth=StoreAuth())
 admin_stores_router = Router(tags=["admin: stores"], auth=StaffAuth())
 
 _NOT_FOUND = {404: ErrorOut}
@@ -356,6 +366,53 @@ def dashboard_summary(request, period: PeriodLit = "month"):
 @plan_router.get("", response=PlanOut, summary="Current plan and what it unlocks (drives the sidebar locks and the upgrade card)")
 def seller_plan(request):
     return entitlements.payload(request.store)
+
+
+# --------------------------------------------------------------------------- #
+# Advanced analytics (premium)
+# --------------------------------------------------------------------------- #
+
+_PREMIUM = {403: ErrorOut}
+
+
+def _gate(request):
+    entitlements.require(request.store, entitlements.ANALYTICS_ADVANCED)
+    return request.store
+
+
+@analytics_router.get("/overview", response={200: AnalyticsOverviewOut, **_PREMIUM}, summary="Gross vs net sales, AOV, repeat/cancellation/return rates")
+def analytics_overview(request, period: PeriodLit = "month"):
+    return analytics.overview(_gate(request), period)
+
+
+@analytics_router.get("/funnel", response={200: AnalyticsFunnelOut, **_PREMIUM}, summary="Views → wishlist → cart → purchase, with the biggest drop-off")
+def analytics_funnel(request, period: PeriodLit = "month"):
+    return analytics.funnel(_gate(request), period)
+
+
+@analytics_router.get("/products", response={200: AnalyticsProductsOut, **_PREMIUM}, summary="Best sellers and slow movers")
+def analytics_products(request, period: PeriodLit = "month", sort: ProductSortLit = "revenue", limit: int = Query(10, ge=1, le=50)):
+    return analytics.products(_gate(request), period, sort=sort, limit=limit)
+
+
+@analytics_router.get("/search", response={200: AnalyticsSearchOut, **_PREMIUM}, summary="What shoppers typed; market searches that found nothing")
+def analytics_search(request, period: PeriodLit = "month", limit: int = Query(10, ge=1, le=50)):
+    return analytics.search_terms(_gate(request), period, limit=limit)
+
+
+@analytics_router.get("/customers", response={200: AnalyticsCustomersOut, **_PREMIUM}, summary="Repeat rate, new vs returning per month, top customers")
+def analytics_customers(request, period: PeriodLit = "month", limit: int = Query(10, ge=1, le=50)):
+    return analytics.customers(_gate(request), period, limit=limit)
+
+
+@analytics_router.get("/fulfilment", response={200: AnalyticsFulfilmentOut, **_PREMIUM}, summary="Time to ship and deliver, status mix, cancellation/return rates")
+def analytics_fulfilment(request, period: PeriodLit = "month"):
+    return analytics.fulfilment(_gate(request), period)
+
+
+@analytics_router.get("/export.csv", response={200: None, 403: ErrorOut}, summary="Any report as CSV")
+def analytics_export(request, report: ReportLit = "overview", period: PeriodLit = "month"):
+    return analytics.export(_gate(request), report, period)
 
 
 @admin_stores_router.post("/{store_id}/plan", response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")

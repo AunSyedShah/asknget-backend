@@ -45,6 +45,8 @@ class QueryBudgetTests(ApiTestCase):
             refresh_stock_status(p)
             for n in range(3):
                 Review.objects.create(product=p, reviewer_name=f"R {n}", reviewer_email="r@example.com", rating=4 + n % 2, body="ok", status="approved")
+        cls.store.is_premium = True  # the premium reports are part of the hot path for these stores
+        cls.store.save(update_fields=["is_premium"])
         cls.buyer = make_user(full_name="Olivia Martin")
         now = timezone.now()
         for i in range(ORDERS):
@@ -116,3 +118,11 @@ class QueryBudgetTests(ApiTestCase):
 
     def test_seller_dashboard(self):
         self.budget(22, "/api/v1/seller/dashboard", token=self.seller)
+
+    # Premium (sprint 5) --------------------------------------------------
+
+    def test_seller_chat_inbox(self):
+        self.budget(4, "/api/v1/seller/chat", token=self.seller)  # plan gate is a column on the store, not a query
+
+    def test_seller_analytics_overview(self):
+        self.budget(7, "/api/v1/seller/analytics/overview", token=self.seller)  # two windows x (aggregate + distinct buyers)

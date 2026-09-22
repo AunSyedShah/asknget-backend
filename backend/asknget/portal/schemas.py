@@ -675,3 +675,116 @@ class PortalSearchOut(Schema):
     products: list[SearchHitOut]
     orders: list[SearchHitOut]
     customers: list[SearchHitOut]
+
+
+# --------------------------------------------------------------------------- #
+# Advanced analytics (premium — docs/sprint-5-plan.md §4)
+# --------------------------------------------------------------------------- #
+
+ReportLit = Literal["overview", "funnel", "products", "search", "customers", "fulfilment"]
+ProductSortLit = Literal["revenue", "units", "views", "conversion"]
+
+
+class AnalyticsOverviewOut(Schema):
+    period: str
+    gross_sales_cents: Kpi
+    net_sales_cents: Kpi = Field(description="After cancelled and returned lines")
+    units: Kpi
+    orders: Kpi
+    aov_cents: Kpi
+    repeat_order_rate: Kpi = Field(description="%")
+    cancellation_rate: Kpi = Field(description="%")
+    return_rate: Kpi = Field(description="%")
+
+
+class FunnelStepOut(Schema):
+    step: str
+    count: Kpi
+    from_previous_pct: float
+    drop_off_pct: float
+
+
+class AnalyticsFunnelOut(Schema):
+    period: str
+    steps: list[FunnelStepOut]
+    view_to_purchase_pct: Kpi
+    biggest_drop_off: str
+
+
+class AnalyticsProductRowOut(Schema):
+    product_id: UUID
+    name: str
+    slug: str
+    status: str
+    stock_status: str
+    views: int
+    units: int
+    orders: int
+    revenue_cents: int
+    conversion_rate: float
+
+
+class AnalyticsProductsOut(Schema):
+    period: str
+    sort: str
+    top: list[AnalyticsProductRowOut]
+    slow_movers: list[AnalyticsProductRowOut] = Field(description="Live, in stock, nothing sold this period")
+    products_with_no_sales: int
+    products_total: int
+
+
+class SearchTermOut(Schema):
+    query: str
+    searches: int
+    product_views: int
+
+
+class ZeroResultQueryOut(Schema):
+    query: str
+    searches: int
+
+
+class AnalyticsSearchOut(Schema):
+    period: str
+    store_queries: list[SearchTermOut] = Field(description="Typed shortly before viewing one of your products")
+    market_zero_result_queries: list[ZeroResultQueryOut] = Field(description="Market-wide searches that found nothing — a gap to stock")
+    scanned_events: int
+    truncated: bool
+
+
+class TopCustomerOut(Schema):
+    key: str
+    name: str
+    email: str
+    orders: int
+    total_spent_cents: int
+    last_order_at: Optional[datetime]
+    type: str
+
+
+class AnalyticsCustomersOut(Schema):
+    period: str
+    customers_total: int
+    active_in_period: int
+    repeat_customers: int
+    repeat_rate: float
+    orders_per_customer: float
+    spend_per_customer_cents: int
+    monthly: list[SeriesPoint]
+    top_customers: list[TopCustomerOut]
+
+
+class StageTimingOut(Schema):
+    orders: int
+    median_hours: Optional[float]
+    average_hours: Optional[float]
+
+
+class AnalyticsFulfilmentOut(Schema):
+    period: str
+    orders: int
+    by_status: dict[str, int]
+    to_shipped: StageTimingOut
+    to_delivered: StageTimingOut
+    cancellation_rate: float
+    return_rate: float
