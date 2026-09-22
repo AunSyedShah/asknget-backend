@@ -23,7 +23,7 @@ backend/
 
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
-- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets) · Live API docs: `/api/v1/docs`.
+- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers) · Live API docs: `/api/v1/docs`.
 
 ## Setup
 
@@ -139,6 +139,30 @@ Revenue, customer types, fulfilment states, what the design left undefined) is `
   Sellers submit → `pending`; staff approve/reject at `/admin/products`.
 - **Customers** are computed from orders (key = user id or guest email) and cached per store for 60 s; the
   cache key changes whenever the store's order lines change.
+
+## Seller plans and chat (premium — `portal.entitlements`, `chat` app)
+
+A store is **standard** or **premium** (`Store.is_premium`, staff toggle in Django admin or
+`POST /admin/stores/{id}/plan`). Premium unlocks two things; the contract and the reasoning are in
+`docs/sprint-5-plan.md`.
+
+- **Entitlements** — `portal/entitlements.py` is the only place that reads the flag: `plan_of(store)`,
+  `has(store, feature)`, `require(store, feature)` → `403 premium_required`. Features (`analytics_advanced`,
+  `chat_inbox`) carry their own label and description, so `GET /seller/plan` (also embedded in
+  `GET /seller/dashboard`) renders the sidebar locks and the upgrade card without hard-coded copy.
+  When real subscriptions arrive, only `plan_of()` changes.
+- **Advanced Analytics** — `/seller/analytics/{overview,funnel,products,search,customers,fulfilment}`
+  (+ `export.csv`), all `?period=`. They answer *why*, not *how much*: funnel drop-off, slow movers,
+  the queries shoppers typed before finding you, repeat rate, hours to ship and deliver. Everything is
+  derived from `ProductEvent` / `OrderItem` / `OrderStatusEvent` — no new tracking. The search report is
+  the only non-aggregate: it scans a capped window of events (`ANALYTICS_EVENT_SCAN_LIMIT`) and caches 5 min.
+- **Chat** — one `Conversation` per (store, customer) plus append-only `Message`s. Buyers (signed in)
+  may write to any active store **in their market** and always see `seller_can_reply`; the inbox
+  (`/seller/chat`) is premium, but `GET /seller/chat/summary` works on every plan so a standard seller
+  knows messages are waiting. Clients poll `GET …/messages?after=<message id>` — a timestamp cursor would
+  re-deliver its own anchor, because responses round datetimes to milliseconds. Unread counters are
+  denormalised and written only by `chat.services.send()`. Messages that look like off-platform contact
+  details are flagged for staff (`GET /admin/chat/flagged`), never blocked; 30 messages/minute per user.
 
 ## Search & recommendations (`discovery` app)
 

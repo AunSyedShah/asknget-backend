@@ -434,6 +434,30 @@ platform defaults in `sellers/rules.py`), `document_labels` i18n json per type, 
 
 ---
 
+## 7c. Seller plans and customer chat (sprint 5 — team-lead request, Chat/Analytics screens not yet readable)
+
+### Plan
+`stores.is_premium` (bool) is the whole plan model for now: staff toggle it in Django admin
+(`LogEntry` records who and when). `portal/entitlements.py` maps a plan name to features —
+`analytics_advanced`, `chat_inbox` — and `require()` raises `403 premium_required`.
+Subscriptions, prices and self-serve upgrade wait for the payments sprint (Q42).
+
+### `chat_conversation`
+One thread per `(store, customer)` — unique together. `order` FK nullable (context when opened from an
+order), `subject`, `last_message_at`, `last_message_preview`, `seller_unread`, `customer_unread`,
+`seller_last_read_at`, `customer_last_read_at`, `closed_at`. Counters are denormalised and written only by
+`chat.services.send()` / `mark_read()`, so the inbox costs one query.
+
+### `chat_message`
+`conversation` FK, `sender_role` enum(customer, seller, system), `sender` FK users nullable, `body`,
+`flagged_at` / `flag_reason` (off-platform contact details — flagged for staff, never blocked).
+Append-only; clients poll `?after=<message id>`.
+
+Access: buyers must be signed in and may write to any active store **in their market**; reading and
+replying is premium, except `GET /seller/chat/summary` (counts only) which every plan may call.
+
+---
+
 ## 8. Marketing & support
 
 ### `banners`
@@ -547,3 +571,13 @@ REST-style JSON; auth via access + refresh JWT.
 39. **Per-country site settings** — footer contact details, "We Accept" logos and policy blurbs are still global (`site_settings`). Per-country overrides are a small follow-up once the content exists.
 40. **Return-request flow** — the return window is now snapshotted per order and exposed as `return_eligible_until`, but buyers still cannot *request* a return (Q26). Sellers can mark goodwill returns after the window.
 41. **One currency per market** — a store prices only in its country's currency. Is a cross-border seller (one business selling in ZA and PK) expected? Today that is two stores / two applications.
+
+**Premium sellers (sprint 5, see `docs/sprint-5-plan.md`)**
+
+42. **Subscriptions** — premium is a staff-flipped boolean today. When payments land: price per market, monthly vs annual, trial, proration, what happens to chat threads and analytics when a subscription lapses (proposal: analytics hidden, chat frozen read-only, nothing deleted).
+43. **What else is premium?** Today: advanced analytics and the chat inbox. Candidates the team lead may want to move behind the plan: more product images, featured placement, lower commission, multiple staff accounts (Team/Managers), bulk CSV import.
+44. **Buyers may message free sellers** (your decision) — they are told `seller_can_reply: false`. Confirm the copy, and whether unanswered threads older than N days should alert staff or auto-reply pointing at Contact Support.
+45. **Guest chat** — guests cannot message sellers at all. Confirm, or we add order-number + e-mail thread tokens like Track Order.
+46. **Thread granularity** — one thread per (store, customer). Per-order threads would suit returns/disputes better; the design's "Message Customer" sits on a customer row, so we followed that.
+47. **Chat attachments** — buyers often want to show a photo of a damaged item. Not implemented; needs the same upload limits as review media and a virus-scan decision.
+48. **Notifications** — the seller header badge is polled. E-mail/push for unread messages needs the background worker (perf step 6) and a quiet-hours policy.

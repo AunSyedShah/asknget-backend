@@ -126,6 +126,7 @@ class Command(BaseCommand):
                     Review.objects.create(product=product, reviewer_name=who, reviewer_email="demo@asknget.demo", rating=rating, body=body, status="approved")
                 refresh_product_rating(product)
         self._seed_second_market(brands)
+        self._seed_chat(store, seller, customer)
         refresh_category_counts()
         from discovery.indexing import embed_products
 
@@ -224,6 +225,28 @@ class Command(BaseCommand):
                 variant = ProductVariant.objects.create(product=product, sku=f"{slugify(name)[:20].upper()}-{i:02d}", stock_qty=15)
                 variant.option_values.set(combo)
             refresh_stock_status(product)
+
+    # The demo ZA store is premium so Chat and Advanced Analytics are visible;
+    # the PK store stays standard so the locked state is demoable too.
+    DEMO_CHAT = [
+        ("customer", "Hi! Is the BB Cream shade Natural suitable for oily skin?"),
+        ("seller", "Hello! Yes — it has a matte finish and works well on oily skin."),
+        ("customer", "Great, I just ordered one. When will it ship?"),
+        ("seller", "It goes out tomorrow morning; you will get the tracking link by email."),
+    ]
+
+    def _seed_chat(self, store, seller, member):
+        from chat.models import Conversation
+        from chat.services import send
+
+        if not store.is_premium:
+            store.is_premium = True
+            store.save(update_fields=["is_premium"])
+        convo, created = Conversation.objects.get_or_create(store=store, customer=member)
+        if not created:
+            return
+        for role, body in self.DEMO_CHAT:
+            send(convo, role=role, sender=member if role == "customer" else seller, body=body)
 
     def _seed_orders(self, store, seller, member):
         if Order.objects.filter(order_number__startswith="ASK-DEMO").exists():

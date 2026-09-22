@@ -65,7 +65,7 @@ would be wrong with 3 workers), `SYSTEM_GREETING`.
 |---|---|---|
 | buyer | `GET /me/conversations` | newest first, `unread`, `store`, `last_message` preview, `seller_can_reply` |
 | buyer | `POST /me/conversations` `{store_id\|store_slug, order_id?, body}` | opens or reuses the thread, sends the first message (201) |
-| buyer | `GET /me/conversations/{id}` · `GET …/messages?after=&limit=` | `after` = message id or ISO timestamp → polling |
+| buyer | `GET /me/conversations/{id}` · `GET …/messages?after=&limit=` | `after` = the id of the newest message the client holds (not a timestamp: responses round datetimes to milliseconds, so a timestamp cursor would re-deliver its own anchor) |
 | buyer | `POST …/messages {body}` · `POST …/read` | |
 | buyer | `GET /me/chat/summary` | header badge |
 | seller | `GET /seller/chat` `?tab=all\|unread&q=` | paginated inbox; `403 premium_required` on free |

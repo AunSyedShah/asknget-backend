@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.6"
+VERSION = "0.7"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -221,6 +221,8 @@ story += [
         ["Seller portal: Returns, Chat, Analytics page, Notifications, Team/Managers, social login, invoice PDF", "Not designed", "Sidebar entries only - see data-model.md section 10 Q20-Q34"],
         ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "'Team/Managers' and 'Chat' now appear in the seller sidebar; still no screens"],
         ["Multi-country markets: per-country currency/timezone/languages, KYC policy and return policy in admin; region, language and timezone resolved per request", "Implemented", "/api/v1/regions, X-Region / X-Language / X-Timezone headers; ZA + PK seeded (sprint 4, team-lead re-scope)"],
+        ["Premium sellers: plan entitlements, Advanced Analytics, customer chat", "Implemented", "Store.is_premium (staff toggle); /seller/plan, /seller/analytics/*, /seller/chat, /me/conversations (sprint 5)"],
+        ["Subscriptions / self-serve upgrade to premium", "Planned", "Premium is a staff-flipped flag until the payments sprint - see data-model.md section 10 Q42"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
 
@@ -242,7 +244,7 @@ story += [
         ["Images", "Pillow", "Avatar, product, banner, store images"],
         ["Config", "python-dotenv + dj-database-url", "All settings via environment variables / backend/.env"],
         ["Docs", "Swagger UI (built in)", "/api/v1/docs and /api/v1/openapi.json"],
-        ["Tests", "Django TestCase", "End-to-end through the real URL config; 164 tests, green on SQLite and on Postgres+pgvector inside the container"],
+        ["Tests", "Django TestCase", "End-to-end through the real URL config; 195 tests, green on SQLite and on Postgres+pgvector inside the container"],
     ], (34 * mm, 52 * mm, 86 * mm)),
 ]
 
@@ -618,7 +620,37 @@ story += [
         ["Staff review queue", "GET /admin/seller-applications?country=PK", "Row shows the applicant's market"],
     ]),
 
-    P("6.15 Support and marketing", "h2"),
+    P("6.15 Premium sellers: plan, analytics and chat", "h2"),
+    P("A store is <b>standard</b> or <b>premium</b> (<font face='Courier'>Store.is_premium</font>, flipped by staff in Django admin "
+      "or via POST /admin/stores/{id}/plan - subscriptions come with the payments sprint). Premium unlocks two areas: "
+      "<b>Advanced Analytics</b> and the <b>customer chat inbox</b>. Every gated route answers "
+      "<font face='Courier'>403 premium_required</font>, and GET /seller/plan (also embedded in the dashboard as "
+      "<font face='Courier'>plan</font>) lists which features are included and which are locked, with the label and "
+      "description to render the upgrade card - so the portal never hard-codes plan copy."),
+    P("Chat is deliberately open on the buyer side: <b>any signed-in shopper may message any active store in their market</b>, "
+      "and every buyer payload carries <font face='Courier'>seller_can_reply</font> so the UI can warn that a standard seller "
+      "may not answer. A standard seller still sees GET /seller/chat/summary (counts only) - that is the upgrade prompt. "
+      "Messages are polled, not pushed: pass the id of the newest message you hold as <font face='Courier'>?after=</font>."),
+    flow([
+        ["Sidebar locks / upgrade card", "GET /seller/plan", "plan, plan_label, features[], locked_features[], catalogue[] with label + description"],
+        ["Staff grants premium", "POST /admin/stores/{id}/plan {is_premium}", "Same as the Django admin toggle; admin LogEntry records who and when"],
+        ["Analytics: headline", "GET /seller/analytics/overview?period=", "Gross vs net sales (after cancels/returns), units, orders, AOV, repeat/cancellation/return rates"],
+        ["Analytics: where shoppers drop out", "GET /seller/analytics/funnel?period=", "views -> wishlists -> add_to_cart -> purchases, per-step drop-off, biggest_drop_off"],
+        ["Analytics: what earns its shelf space", "GET /seller/analytics/products?sort=revenue|units|views|conversion", "top[] plus slow_movers[] (live, in stock, nothing sold this period)"],
+        ["Analytics: what people typed", "GET /seller/analytics/search?period=", "store_queries[] (searched, then viewed your product within 30 min) and market_zero_result_queries[] - searches in your market that found nothing"],
+        ["Analytics: do they come back", "GET /seller/analytics/customers?period=", "repeat_rate, orders/spend per customer, new vs returning per month, top customers"],
+        ["Analytics: how fast do you ship", "GET /seller/analytics/fulfilment?period=", "median/average hours pending->shipped and shipped->delivered, status mix, rates"],
+        ["Analytics: download", "GET /seller/analytics/export.csv?report=&period=", "Any of the six reports as CSV"],
+        ["Buyer: message a seller", "POST /me/conversations {store_id|store_slug, order_id?, body}", "Opens or reuses the single thread with that store; 201 with the messages"],
+        ["Buyer: inbox and polling", "GET /me/conversations, GET /me/conversations/{id}/messages?after=, POST .../messages, POST .../read, GET /me/chat/summary", "seller_can_reply tells the buyer whether an answer is possible"],
+        ["Seller: inbox", "GET /seller/chat?tab=all|unread|open|closed&q=", "Premium; 403 premium_required otherwise"],
+        ["Seller: badge on every plan", "GET /seller/chat/summary", "unread, waiting_customers, locked, locked_reason"],
+        ["Seller: reply / resolve", "POST /seller/chat/{id}/messages, POST .../read, POST .../close", "A new customer message reopens a closed thread"],
+        ["Seller: 'Message Customer'", "POST /seller/customers/{key}/message {body}", "From the Customers screen; 409 when that customer checked out as a guest"],
+        ["Staff: off-platform contact details", "GET /admin/chat/flagged", "Email/phone/link/'whatsapp' in a message is flagged for review, never blocked"],
+    ]),
+
+    P("6.16 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -703,6 +735,19 @@ story += [
         ["GET /search/suggest", "-", "?q=&limit=", "200 SuggestOut", "422"],
         ["GET /recommendations", "optional", "?limit= (+X-Cart-Token)", "200 RecommendationsOut", ""],
         ["GET /regions", "-", "-", "200 [CountryOut]", ""],
+        ["GET /seller/plan", "store", "-", "200 PlanOut", "403"],
+        ["POST /admin/stores/{id}/plan", "staff", "PlanSetIn", "200 PlanOut", "404"],
+        ["GET /seller/analytics/overview|funnel|products|search|customers|fulfilment", "store", "?period= (+sort/limit)", "200 Analytics*Out", "403 premium_required"],
+        ["GET /seller/analytics/export.csv", "store", "?report=&period=", "200 text/csv", "403"],
+        ["GET|POST /me/conversations", "member", "ConversationOpenIn", "200 page[CustomerConversationOut] / 201 CustomerThreadOut", "404, 422, 429"],
+        ["GET /me/conversations/{id}[/messages]", "member", "?after=&limit=", "200 CustomerThreadOut / [MessageOut]", "404, 422"],
+        ["POST /me/conversations/{id}/messages|read", "member", "MessageIn", "201 MessageOut / 200", "404, 422, 429"],
+        ["GET /me/chat/summary", "member", "-", "200 CustomerSummaryOut", ""],
+        ["GET /seller/chat", "store", "?tab=&q=&page", "200 page[SellerConversationOut]", "403"],
+        ["GET /seller/chat/summary", "store", "-", "200 SellerSummaryOut", ""],
+        ["GET|POST /seller/chat/{id}[/messages|read|close]", "store", "MessageIn / CloseIn", "200/201", "403, 404, 429"],
+        ["POST /seller/customers/{key}/message", "store", "MessageIn", "201 SellerConversationOut", "403, 404, 409"],
+        ["GET /admin/chat/flagged", "staff", "?store_id=&page", "200 page[FlaggedMessageOut]", ""],
         ["GET /regions/current", "-", "X-Region / X-Language / X-Timezone", "200 RegionOut", "400 unknown_region"],
         ["DELETE /cart/items", "optional", "(+X-Cart-Token)", "200 CartOut", ""],
         ["GET /seller/dashboard", "store", "?period=", "200 DashboardOut", "403"],
@@ -826,6 +871,8 @@ story += [
         ["Partial updates", "Use PATCH and send only the keys that changed. Sending null clears a field."],
         ["Lists", "Small lists (addresses, cards, wishlist) are plain arrays. Products, reviews, orders and admin queues are paginated: {items, total, page, per_page, pages}; per_page defaults to 12 (max 100)."],
         ["Guest cart", "Keep the cart_token from the first /cart response and send it as X-Cart-Token; send it once together with the Bearer token after login to merge."],
+        ["Premium features", "403 with detail 'premium_required' means the store's plan does not include that area (analytics, chat inbox). Read GET /seller/plan to decide what to lock; do not hard-code feature names."],
+        ["Chat polling", "Poll GET .../messages?after=<id of the newest message you hold>. Never send a timestamp: responses round datetimes to milliseconds, so a timestamp cursor re-delivers its own anchor."],
         ["Region / language / timezone", "On a country subdomain nothing is needed; otherwise send X-Region. Send X-Language with the user's saved preference and X-Timezone with the browser zone. Read X-Region / Content-Language on responses. Money is in the market's currency (ZAR, PKR...)."],
         ["Masked PII", "Sellers see their own ID / account numbers masked (id_passport_number_masked, account_number_last4); only staff endpoints return the full values."],
         ["File uploads", "multipart/form-data with the field named 'file' (avatar) or per the endpoint; size/type limits are enforced server-side and returned as 422."],
