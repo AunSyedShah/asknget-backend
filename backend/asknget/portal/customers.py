@@ -21,6 +21,7 @@ from django.db.models import Count, Max
 from django.utils import timezone
 from ninja.errors import HttpError
 
+from accounts.models import User
 from orders.models import Order, OrderItem
 
 from .inventory import csv_response
@@ -194,6 +195,21 @@ def detail(store, key: str) -> dict:
         "orders": [order_row(o) for o in qs.order_by("-placed_at")],
         "notes": [note_out(n) for n in CustomerNote.objects.filter(store=store, customer_key=key).select_related("author").order_by("-created_at")],
     }
+
+
+def message(store, key: str, *, body: str, actor):
+    """'Message Customer' on the Customers screen. Guests have no account to read a
+    reply, so the seller is told to use the order's contact details instead."""
+    from chat import services as chat
+
+    c = get_customer(store, key)
+    if not c.user_id:
+        raise HttpError(409, "This customer checked out as a guest — no account to message")
+    user = User.objects.filter(pk=c.user_id).first()
+    if user is None:
+        raise HttpError(409, "This customer's account no longer exists")
+    convo = chat.open_for_store(store, user, body=body, actor=actor)
+    return chat.seller_row(convo)
 
 
 def add_note(store, key: str, *, body: str, author) -> CustomerNote:

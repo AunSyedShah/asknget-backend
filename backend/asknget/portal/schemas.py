@@ -608,6 +608,31 @@ class DashboardStoreOut(Schema):
     name: str
     slug: str
     currency: str
+    plan: str
+    is_premium: bool
+
+
+class FeatureOut(Schema):
+    key: str
+    label: str
+    description: str
+    included: bool
+
+
+class PlanOut(Schema):
+    """`GET /seller/plan` — what this store's plan unlocks. The upgrade card's copy
+    comes from here so the portal never hard-codes feature names."""
+
+    plan: str = Field(description="free | premium")
+    plan_label: str
+    is_premium: bool
+    features: list[str]
+    locked_features: list[str]
+    catalogue: list[FeatureOut]
+
+
+class PlanSetIn(Schema):
+    is_premium: bool
 
 
 class PerformanceOut(Schema):
@@ -627,6 +652,7 @@ class DashboardOut(Schema):
     period: str
     seller: SellerRefOut
     store: DashboardStoreOut
+    plan: PlanOut = Field(description="Sidebar locks 'Chat' and 'Analytics' from locked_features")
     sales_cents: Kpi = Field(..., description="'Total Sales' — booked in the period")
     orders: Kpi
     products: Kpi

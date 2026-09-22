@@ -63,8 +63,9 @@ class SellerDocumentAdmin(admin.ModelAdmin):
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
-    list_display = ("display_name", "slug", "owner", "status", "activated_at")
-    list_filter = ("country", "status")
+    list_display = ("display_name", "slug", "owner", "country", "status", "is_premium", "activated_at")
+    list_editable = ("is_premium",)
+    list_filter = ("country", "status", "is_premium")
     search_fields = ("display_name", "slug", "owner__email")
     prepopulated_fields = {"slug": ("display_name",)}
 

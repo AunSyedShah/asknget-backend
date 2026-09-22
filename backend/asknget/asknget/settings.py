@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'discovery',
     'portal',
     'markets',
+    'chat',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

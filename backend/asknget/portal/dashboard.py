@@ -18,6 +18,7 @@ from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
 
 from . import customers as customers_svc
+from . import entitlements
 from .orders import row as order_row, store_orders
 from .periods import change_pct, month_buckets, period_range
 from .products import _sold_items
@@ -71,7 +72,9 @@ def summary(store, user, period_name: str) -> dict:
     return {
         "period": period_name,
         "seller": {"name": user.full_name or user.email, "first_name": (user.full_name or user.email).split()[0], "role": "Store Owner"},
-        "store": {"id": store.id, "name": store.display_name, "slug": store.slug, "currency": store.country.currency},
+        "store": {"id": store.id, "name": store.display_name, "slug": store.slug, "currency": store.country.currency,
+                  "plan": entitlements.plan_of(store), "is_premium": store.is_premium},
+        "plan": entitlements.payload(store),
         "sales_cents": _kpi(cs, ps),
         "orders": _kpi(co, po),
         "products": _kpi(live.count(), live.filter(created_at__lt=p.start).count()),

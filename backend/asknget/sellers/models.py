@@ -262,6 +262,11 @@ class Store(TimeStampedModel):
     logo = models.ImageField(upload_to="stores/logos/", null=True, blank=True)
     banner = models.ImageField(upload_to="stores/banners/", null=True, blank=True)
     status = models.CharField(max_length=20, choices=StoreStatus.choices, default=StoreStatus.PENDING_ACTIVATION, db_index=True)
+    is_premium = models.BooleanField(
+        default=False,
+        help_text="Premium seller: advanced analytics + customer chat inbox (portal.entitlements). "
+                  "Staff toggle until subscriptions/billing exist (data-model.md §10 Q42).",
+    )
     seller_agreement_accepted_at = models.DateTimeField(null=True, blank=True)
     low_stock_threshold = models.PositiveSmallIntegerField(default=10, help_text="'Low Stock' when 0 < stock <= this (per-product override allowed)")
     info_reconfirmed_at = models.DateTimeField(null=True, blank=True)

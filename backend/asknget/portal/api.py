@@ -5,6 +5,7 @@
   /seller/orders       overview, list, detail, status, cancel, invoice data, export
   /seller/customers    overview, list, detail, notes, export
   /seller/dashboard    KPIs, charts, latest orders
+  /seller/plan         what this store's plan unlocks (portal.entitlements)
   /seller/search       header "Search anything"
   /admin/products      staff review queue (approve / reject)
 """
@@ -12,14 +13,17 @@
 from uuid import UUID
 
 from ninja import File, Form, Query, Router
+from ninja.errors import HttpError
 from ninja.files import UploadedFile
 from ninja.pagination import paginate
 
 from core.auth import StaffAuth
+from sellers.models import Store
 from core.pagination import PagePagination
+from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
 from core.schemas import ErrorOut, MessageOut
 
-from . import customers, dashboard, inventory, orders, products
+from . import customers, dashboard, entitlements, inventory, orders, products
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -50,6 +54,8 @@ from .schemas import (
     ImageOrderIn,
     OptionsIn,
     PeriodLit,
+    PlanOut,
+    PlanSetIn,
     ProductAnalyticsOut,
     ProductCreateIn,
     ProductPatchIn,
@@ -71,6 +77,8 @@ orders_router = Router(tags=["seller: orders"], auth=StoreAuth())
 customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
 dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 search_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
+plan_router = Router(tags=["seller: plan"], auth=StoreAuth())
+admin_stores_router = Router(tags=["admin: stores"], auth=StaffAuth())
 
 _NOT_FOUND = {404: ErrorOut}
 _EDIT = {200: SellerProductOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}
@@ -317,6 +325,13 @@ def customer_detail(request, key: str):
     return customers.detail(request.store, key)
 
 
+@customers_router.post("/{key}/message", response={201: SellerConversationOut, 403: ErrorOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut},
+                       summary="'Message Customer' — opens or reuses the chat thread (premium)")
+def customer_message(request, key: str, payload: CustomerMessageIn):
+    entitlements.require(request.store, entitlements.CHAT_INBOX)
+    return 201, customers.message(request.store, key, body=payload.body, actor=request.auth)
+
+
 @customers_router.post("/{key}/notes", response={201: CustomerNoteOut, 404: ErrorOut}, summary="'Add Note' (private to the store)")
 def customer_note_add(request, key: str, payload: CustomerNoteIn):
     return 201, customers.note_out(customers.add_note(request.store, key, body=payload.body, author=request.auth))
@@ -336,6 +351,22 @@ def customer_note_delete(request, key: str, note_id: UUID):
 @dashboard_router.get("", response=DashboardOut, summary="Seller Dashboard: KPIs, revenue chart, performance, latest orders, stock breakdown")
 def dashboard_summary(request, period: PeriodLit = "month"):
     return dashboard.summary(request.store, request.auth, period)
+
+
+@plan_router.get("", response=PlanOut, summary="Current plan and what it unlocks (drives the sidebar locks and the upgrade card)")
+def seller_plan(request):
+    return entitlements.payload(request.store)
+
+
+@admin_stores_router.post("/{store_id}/plan", response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
+def admin_set_plan(request, store_id: UUID, payload: PlanSetIn):
+    store = Store.objects.filter(pk=store_id).first()
+    if store is None:
+        raise HttpError(404, "Store not found")
+    if store.is_premium != payload.is_premium:
+        store.is_premium = payload.is_premium
+        store.save(update_fields=["is_premium", "updated_at"])
+    return entitlements.payload(store)
 
 
 @search_router.get("", response=PortalSearchOut, summary="Header 'Search anything...' across own products, orders and customers")
