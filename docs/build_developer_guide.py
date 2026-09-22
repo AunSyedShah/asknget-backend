@@ -639,7 +639,7 @@ story += [
         ["Analytics: what earns its shelf space", "GET /seller/analytics/products?sort=revenue|units|views|conversion", "top[] plus slow_movers[] (live, in stock, nothing sold this period)"],
         ["Analytics: what people typed", "GET /seller/analytics/search?period=", "store_queries[] (searched, then viewed your product within 30 min) and market_zero_result_queries[] - searches in your market that found nothing"],
         ["Analytics: do they come back", "GET /seller/analytics/customers?period=", "repeat_rate, orders/spend per customer, new vs returning per month, top customers"],
-        ["Analytics: how fast do you ship", "GET /seller/analytics/fulfilment?period=", "median/average hours pending->shipped and shipped->delivered, status mix, rates"],
+        ["Analytics: how fast do you ship", "GET /seller/analytics/fulfilment?period=", "median/average hours payment->shipped and shipped->delivered, status mix, rates"],
         ["Analytics: download", "GET /seller/analytics/export.csv?report=&period=", "Any of the six reports as CSV"],
         ["Buyer: message a seller", "POST /me/conversations {store_id|store_slug, order_id?, body}", "Opens or reuses the single thread with that store; 201 with the messages"],
         ["Buyer: inbox and polling", "GET /me/conversations, GET /me/conversations/{id}/messages?after=, POST .../messages, POST .../read, GET /me/chat/summary", "seller_can_reply tells the buyer whether an answer is possible"],

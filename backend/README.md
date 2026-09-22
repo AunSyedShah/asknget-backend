@@ -153,7 +153,7 @@ A store is **standard** or **premium** (`Store.is_premium`, staff toggle in Djan
   When real subscriptions arrive, only `plan_of()` changes.
 - **Advanced Analytics** — `/seller/analytics/{overview,funnel,products,search,customers,fulfilment}`
   (+ `export.csv`), all `?period=`. They answer *why*, not *how much*: funnel drop-off, slow movers,
-  the queries shoppers typed before finding you, repeat rate, hours to ship and deliver. Everything is
+  the queries shoppers typed before finding you, repeat rate, hours from payment to shipped and from shipped to delivered. Everything is
   derived from `ProductEvent` / `OrderItem` / `OrderStatusEvent` — no new tracking. The search report is
   the only non-aggregate: it scans a capped window of events (`ANALYTICS_EVENT_SCAN_LIMIT`) and caches 5 min.
 - **Chat** — one `Conversation` per (store, customer) plus append-only `Message`s. Buyers (signed in)

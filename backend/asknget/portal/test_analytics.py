@@ -166,13 +166,13 @@ class ReportTests(AnalyticsTestCase):
         self.assertTrue(body["monthly"])
 
     def test_fulfilment_timings_and_rates(self):
+        # Timings run from payment (Order.placed_at) — a per-store `pending` event is
+        # never written, that state is implicit at checkout.
         placed = self.o1.placed_at
-        OrderStatusEvent.objects.create(order=self.o1, store=self.store, status=Fulfilment.PENDING, actor="system")
-        OrderStatusEvent.objects.create(order=self.o1, store=self.store, status=Fulfilment.SHIPPED, actor="seller")
-        OrderStatusEvent.objects.create(order=self.o1, store=self.store, status=Fulfilment.DELIVERED, actor="seller")
-        events = OrderStatusEvent.objects.filter(order=self.o1).order_by("created_at")
-        for offset, event in zip((0, 24, 72), events):
-            OrderStatusEvent.objects.filter(pk=event.pk).update(created_at=placed + timedelta(hours=offset))
+        shipped = OrderStatusEvent.objects.create(order=self.o1, store=self.store, status=Fulfilment.SHIPPED, actor="seller")
+        delivered = OrderStatusEvent.objects.create(order=self.o1, store=self.store, status=Fulfilment.DELIVERED, actor="seller")
+        OrderStatusEvent.objects.filter(pk=shipped.pk).update(created_at=placed + timedelta(hours=24))
+        OrderStatusEvent.objects.filter(pk=delivered.pk).update(created_at=placed + timedelta(hours=72))
         body = self.get(f"{A}/fulfilment", self.token).json()
         self.assertEqual(body["orders"], 4)
         self.assertEqual(body["by_status"]["delivered"], 1)

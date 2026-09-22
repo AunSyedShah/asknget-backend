@@ -775,7 +775,7 @@ class AnalyticsCustomersOut(Schema):
 
 
 class StageTimingOut(Schema):
-    orders: int
+    orders: int = Field(description="Orders with both ends of the stage recorded")
     median_hours: Optional[float]
     average_hours: Optional[float]
 
@@ -784,7 +784,7 @@ class AnalyticsFulfilmentOut(Schema):
     period: str
     orders: int
     by_status: dict[str, int]
-    to_shipped: StageTimingOut
-    to_delivered: StageTimingOut
+    to_shipped: StageTimingOut = Field(description="Hours from payment to this store's 'shipped'")
+    to_delivered: StageTimingOut = Field(description="Hours from 'shipped' to 'delivered'")
     cancellation_rate: float
     return_rate: float

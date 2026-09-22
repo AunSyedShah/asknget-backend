@@ -284,8 +284,13 @@ class Command(BaseCommand):
             order_services._record_event(order, Order.OrderStatus.CONFIRMED, actor="system", note="Payment confirmed")
             for i, status in enumerate(steps[final], start=1):
                 order_services.set_store_status(order, store, status=status, actor_user=seller, note="")
-                # spread the timeline over the following hours/days
-                order.status_events.filter(store=store).order_by("-created_at").update(created_at=placed_at + timedelta(hours=6 * i))
+                # Spread the timeline so the fulfilment report has real durations.
+                # `.order_by(...).update()` would rewrite every event (no LIMIT on UPDATE),
+                # so backdate the one row this step just created.
+                latest = order.status_events.filter(store=store).order_by("-created_at", "-id").first()
+                if latest is not None:
+                    hours = {"processing": 4, "packed": 16, "shipped": 26, "delivered": 74, "returned": 170, "cancelled": 5}.get(status, 6 * i)
+                    order.status_events.filter(pk=latest.pk).update(created_at=placed_at + timedelta(hours=hours))
             order.status_events.update(created_at=models.Case(
                 models.When(status=Order.OrderStatus.PENDING_PAYMENT, then=models.Value(placed_at)),
                 models.When(status=Order.OrderStatus.CONFIRMED, store__isnull=True, then=models.Value(placed_at + timedelta(minutes=3))),

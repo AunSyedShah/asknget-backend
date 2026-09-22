@@ -90,7 +90,7 @@ dashboard — it answers *why*, not *how much*.
 | `GET …/products?sort=revenue\|units\|views\|conversion&limit=` | best sellers **and slow movers** (live, in stock, zero sales this period), each with views/units/revenue/conversion | `ProductEvent` + `OrderItem` |
 | `GET …/search` | `store_queries`: what shoppers typed before viewing this store's products (search → view by the same actor within 30 min); `market_zero_result_queries`: searches in the store's market that returned nothing (clearly labelled as market-wide — a gap to stock) | `ProductEvent` SEARCH + VIEW |
 | `GET …/customers` | new vs returning per month, repeat rate, average orders per customer, spend per customer, top 10 by spend | cached customers rollup |
-| `GET …/fulfilment` | median/average hours pending→shipped and shipped→delivered, per-status counts, cancellation/return rate | `OrderStatusEvent` (already store-scoped) |
+| `GET …/fulfilment` | median/average hours from payment→shipped and shipped→delivered, per-status counts, cancellation/return rate | `Order.placed_at` + `OrderStatusEvent` (store-scoped; a per-store `pending` event is never written — that state is implicit at checkout) |
 | `GET …/export.csv?report=` | any of the above as CSV | `portal.inventory.csv_response` |
 
 The search report walks a capped window of events (`ANALYTICS_EVENT_SCAN_LIMIT`, default 5000, newest

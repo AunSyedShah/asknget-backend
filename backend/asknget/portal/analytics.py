@@ -298,37 +298,49 @@ def customers(store, period_name: str, *, limit: int = 10) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def _hours_between(store, from_status: str, to_status: str, start, end) -> dict:
-    """Median and average hours between two store-scoped timeline events."""
-    firsts: dict = {}
-    for row in OrderStatusEvent.objects.filter(store=store, status__in=(from_status, to_status), created_at__gte=start, created_at__lt=end).order_by("created_at").values("order_id", "status", "created_at"):
-        firsts.setdefault((row["order_id"], row["status"]), row["created_at"])
-    gaps = []
-    for (order_id, status), at in firsts.items():
-        if status != from_status:
-            continue
-        done = firsts.get((order_id, to_status))
-        if done and done >= at:
-            gaps.append((done - at).total_seconds() / 3600)
+def _timing(pairs) -> dict:
+    """Median and average hours over (start, end) pairs."""
+    gaps = sorted((end - start).total_seconds() / 3600 for start, end in pairs if end >= start)
     if not gaps:
         return {"orders": 0, "median_hours": None, "average_hours": None}
-    gaps.sort()
     mid = len(gaps) // 2
     median = gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2
     return {"orders": len(gaps), "median_hours": round(median, 1), "average_hours": round(sum(gaps) / len(gaps), 1)}
 
 
+def _first_event_times(store, order_ids, statuses) -> dict:
+    """{(order_id, status): first time this store moved that order there}."""
+    firsts: dict = {}
+    rows = (
+        OrderStatusEvent.objects.filter(store=store, order_id__in=order_ids, status__in=statuses)
+        .order_by("created_at").values("order_id", "status", "created_at")
+    )
+    for row in rows:
+        firsts.setdefault((row["order_id"], row["status"]), row["created_at"])
+    return firsts
+
+
 def fulfilment(store, period_name: str) -> dict:
+    """Timings are measured from the moment the buyer paid, not from a per-store
+    `pending` event — that state is implicit at checkout and never written."""
     p = period_range(period_name)
     items = _store_items(store).filter(order__placed_at__gte=p.start, order__placed_at__lt=p.end)
     by_status = dict(items.values_list("status").annotate(n=Count("order_id", distinct=True)).values_list("status", "n"))
-    orders = items.values("order_id").distinct().count()
+    placed = dict(items.values_list("order_id", "order__placed_at"))
+    events = _first_event_times(store, list(placed), (Fulfilment.SHIPPED, Fulfilment.DELIVERED))
+    to_shipped = [(placed[oid], at) for (oid, status), at in events.items() if status == Fulfilment.SHIPPED and oid in placed]
+    to_delivered = [
+        (events[(oid, Fulfilment.SHIPPED)], at)
+        for (oid, status), at in events.items()
+        if status == Fulfilment.DELIVERED and (oid, Fulfilment.SHIPPED) in events
+    ]
+    orders = len(placed)
     return {
         "period": period_name,
         "orders": orders,
         "by_status": {s.value: by_status.get(s.value, 0) for s in Fulfilment},
-        "to_shipped": _hours_between(store, Fulfilment.PENDING, Fulfilment.SHIPPED, p.start, p.end),
-        "to_delivered": _hours_between(store, Fulfilment.SHIPPED, Fulfilment.DELIVERED, p.start, p.end),
+        "to_shipped": _timing(to_shipped),
+        "to_delivered": _timing(to_delivered),
         "cancellation_rate": _ratio(by_status.get(Fulfilment.CANCELLED, 0), orders),
         "return_rate": _ratio(by_status.get(Fulfilment.RETURNED, 0), orders),
     }
