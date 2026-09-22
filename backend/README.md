@@ -63,6 +63,15 @@ dependency, so the Docker build (`uv sync --no-dev`) never installs it. uv has n
 
 Without `DATABASE_URL` the project falls back to SQLite; set it to a Postgres URL for anything beyond local experiments.
 
+### Cross-origin frontends (CORS)
+
+Needed only when the storefront is on a different origin than the API — set `CORS_ALLOWED_ORIGINS` (or
+`CORS_ALLOWED_ORIGIN_REGEXES` for country subdomains) in `backend/.env`; empty means no CORS headers at
+all, and `DEBUG=1` already allows any `localhost` port. The allowed **request** headers include
+`X-Cart-Token`, `X-Region`, `X-Language` and `X-Timezone`, and `X-Region` / `Content-Language` /
+`Content-Disposition` are **exposed** so a cross-origin page can actually read them — both are pinned by
+`core/test_cors.py`. Credentials are off by design: auth is a Bearer header, not cookies.
+
 ### Environment files
 
 Two of them: the **repo root** `.env` configures Docker Compose (`HTTP_PORT`), and **`backend/.env`**

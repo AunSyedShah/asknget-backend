@@ -58,10 +58,38 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | `DEBUG` | `1` | `0` in production. Compose's dev override forces `1`. |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated. **Include the country subdomains** — `asknget.com,.asknget.com` — because `za.asknget.com` is how the API resolves the market. Locally: `localhost,.localhost,127.0.0.1`. |
 | `CSRF_TRUSTED_ORIGINS` | *(empty)* | Comma-separated **with scheme**, e.g. `https://api.asknget.com`. Needed once a browser posts to the admin behind a proxy. |
+| `CORS_ALLOWED_ORIGINS` | *(empty)* | See **CORS** below. |
 | `BEHIND_PROXY` | *(unset)* | `1` makes Django trust `X-Forwarded-Proto`/`Host` from nginx. Set by `compose.yaml` for the `web` service. |
 | `MEDIA_ROOT` | `backend/asknget/media` | Where uploads land. Compose sets `/app/asknget/media`. |
 | `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. |
 | `STOREFRONT_URL` | *(empty)* | Public buyer site, used to build "View Product" links in the seller portal. |
+
+### CORS
+
+Only relevant when the storefront runs on a **different origin** than the API. If each market's frontend
+is served from the same host as its API (`za.asknget.com` serving both the app and `/api/`), leave every
+value empty — the middleware then adds no headers at all and nothing changes.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated, exact origins: scheme + host + port, no trailing slash — `https://asknget.com,http://localhost:3000`. |
+| `CORS_ALLOWED_ORIGIN_REGEXES` | *(empty)* | Comma-separated regexes, for country subdomains: `^https://[a-z]{2}\.asknget\.com$`. Anchor them (`^…$`) or `https://asknget.com.evil.io` matches. |
+| `CORS_ALLOW_ALL_ORIGINS` | `0` | Staging convenience. Safe-ish only because credentials are off; never pair the two. |
+| `CORS_ALLOW_CREDENTIALS` | `0` | The API authenticates with an `Authorization: Bearer` header, not cookies, so a browser has no ambient credentials to send — a hostile page can only ever make *anonymous* calls. Turn on only if cookie auth is added. |
+
+Fixed in code, not env, because they track the API's own headers:
+
+- **Allowed request headers** include our custom ones — `X-Cart-Token` (guest carts) and
+  `X-Region` / `X-Language` / `X-Timezone` (markets). Without these, the browser's preflight fails and
+  the real request is never sent.
+- **Exposed response headers** are `X-Region`, `Content-Language` and `Content-Disposition` — a
+  cross-origin page cannot read *any* custom response header unless it is listed here, so region
+  detection and the CSV export filename would silently break.
+- `CORS_URLS_REGEX = ^/api/.*$` — `/admin` and `/static` never get CORS headers.
+
+While `DEBUG=1` and nothing is configured, any `http://localhost:<port>` / `http://127.0.0.1:<port>`
+origin is allowed, so a local Next/Vite frontend works on a fresh clone. Production sets `DEBUG=0`, where
+that default does not apply.
 
 ### Markets (sprint 4)
 

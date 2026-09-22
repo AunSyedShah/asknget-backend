@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # third-party
     'ninja',
+    'corsheaders',
     'django.contrib.postgres',  # full-text / trigram lookups (no-op on SQLite)
     *(['zeal'] if ZEAL_ENABLED else []),
     # asknget
@@ -118,6 +119,7 @@ AUTH_USER_MODEL = 'accounts.User'
 MIDDLEWARE = [
     *(['zeal.middleware.zeal_middleware'] if ZEAL_ENABLED else []),
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # must come before anything that can return a response
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves /static (admin, Swagger UI) from the app image
     'django.contrib.sessions.middleware.SessionMiddleware',
     'markets.middleware.RegionMiddleware',  # country → language + timezone for /api/ requests
@@ -231,6 +233,43 @@ CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').sp
 if os.environ.get('BEHIND_PROXY') == '1':
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     USE_X_FORWARDED_HOST = True
+
+
+# CORS (django-cors-headers)
+# -----------------------------------------------------------------------------
+# Only needed when the storefront is served from a different origin than the API.
+# When the frontend for a market lives on the same host (za.asknget.com serving
+# both the app and /api/) nothing here applies — leave the lists empty and the
+# middleware adds no headers at all.
+#
+# Origins are exact (scheme + host + port). For country subdomains use a regex:
+#   CORS_ALLOWED_ORIGIN_REGEXES=^https://[a-z]{2}\.asknget\.com$
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+CORS_ALLOWED_ORIGIN_REGEXES = [r.strip() for r in os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',') if r.strip()]
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', '0') == '1'  # staging only; never with credentials
+
+# The API authenticates with a Bearer header, not cookies, so the browser has no
+# ambient credentials to send. Keeping this False means a malicious page can only
+# ever make *unauthenticated* calls. Turn it on only if cookie auth is added, and
+# never together with CORS_ALLOW_ALL_ORIGINS (the spec forbids that combination).
+CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', '0') == '1'
+
+# Local frontends (Next 3000 / Vite 5173) while DEBUG, so a frontend dev never
+# has to debug CORS on a fresh clone. Production always sets DEBUG=0.
+if DEBUG and not (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES or CORS_ALLOW_ALL_ORIGINS):
+    CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://(localhost|127\.0\.0\.1)(:\d+)?$']
+
+CORS_URLS_REGEX = r'^/api/.*$'  # never add CORS headers to /admin or /static
+
+# Our custom request headers must be allowed through preflight...
+CORS_ALLOW_HEADERS = (
+    'accept', 'accept-language', 'authorization', 'content-type', 'origin', 'user-agent',
+    'x-requested-with', 'x-csrftoken',
+    'x-cart-token',   # guest carts (orders.services.CART_TOKEN_HEADER)
+    'x-region', 'x-language', 'x-timezone',  # markets.middleware
+)
+# ...and these response headers must be exposed, or JS cannot read them cross-origin.
+CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
 
 
 # Email
