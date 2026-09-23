@@ -6,6 +6,7 @@
     python docs/figma/snapshot.py --nodes --only "Analytics Overview" Chat
     python docs/figma/snapshot.py --index    # just refresh the frame list (cheapest call there is)
     python docs/figma/snapshot.py --render "Analytics Overview" 779:6848   # PNG of a frame
+    python docs/figma/snapshot.py --file https://figma.com/design/<key>/…   # a different file
 
 Run it before planning or implementing anything that touches a screen; then
 `git diff docs/figma/` shows precisely which labels, fields, options or flows moved.
@@ -45,7 +46,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-FILE_KEY = "dAGMv3hUJXkyW4QmJPw20Q"
+# The design file. Override with FIGMA_FILE_KEY, or `--file <key|url>`, when the
+# design moves (a *copy* into another team gets a new key; a move keeps the old one).
+# Rate limits follow the plan the file lives on, so a file in a Starter space stays
+# Starter-metered however good your own plan is.
+DEFAULT_FILE_KEY = "dAGMv3hUJXkyW4QmJPw20Q"
+FILE_KEY = os.environ.get("FIGMA_FILE_KEY", DEFAULT_FILE_KEY)
 PAGE_NAME = "Web UI Design"
 PAGE_NODE = "0:1"          # the "Web UI Design" canvas; used by the --nodes path
 NODE_BATCH = 2             # frames per /nodes call; each full frame is ~250 KiB of JSON
@@ -58,6 +64,12 @@ RENDERS_DIR = HERE / "renders"
 # Layers that repeat on every screen and add noise to diffs.
 SKIP_NAMES = re.compile(r"^(Navbar|Footer|Breadcrums|Header ?\d*|Top ?Bar|Nav|Icons)$", re.I)
 GENERIC_NAMES = re.compile(r"^(Frame|Group|Rectangle|Vector|Ellipse|Line|Text) ?\d*$")
+
+
+def file_key_from(value: str) -> str:
+    """Accept a raw key or any Figma URL (/file/<key>/…, /design/<key>/…)."""
+    match = re.search(r"/(?:file|design|board)/([A-Za-z0-9]+)", value)
+    return match.group(1) if match else value.strip()
 
 
 def _token() -> str:
@@ -90,6 +102,9 @@ def _get(path: str) -> dict:
     except urllib.error.HTTPError as e:
         if e.code == 429:
             raise RateLimited(path, int(e.headers.get("Retry-After", "0") or 0), e.headers.get("x-figma-plan-tier", "?")) from None
+        if e.code in (403, 404):
+            sys.exit(f"{e.code} on {path} — wrong file key, or this token's account cannot open that file. "
+                     "Pass the file's Figma URL with --file, and make sure the account owning FIGMA_TOKEN has access.")
         raise
 
 
@@ -308,7 +323,11 @@ if __name__ == "__main__":
     ap.add_argument("--only", nargs="+", metavar="FRAME", help="with --nodes: snapshot just these frames (name or node id)")
     ap.add_argument("--render", nargs="+", metavar="FRAME", help="save a PNG of these frames (separate rate limit — works when the rest is locked)")
     ap.add_argument("--scale", type=float, default=1.0, help="with --render: image scale (0.2 for an overview, 1 to read text)")
+    ap.add_argument("--file", metavar="KEY_OR_URL", help="snapshot a different file (paste its Figma URL); also FIGMA_FILE_KEY")
     args = ap.parse_args()
+    if args.file:
+        FILE_KEY = file_key_from(args.file)
+        print(f"file: {FILE_KEY}")
     if args.check:
         sys.exit(check())
     if args.render:
