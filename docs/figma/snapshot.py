@@ -434,8 +434,8 @@ def check() -> int:
     print(f"DESIGN CHANGED: snapshot {saved['lastModified']} -> live {live['lastModified']} by {live['by']}.")
     source = saved.get("content_from")
     if source:
-        print("
-The original is rate-limited (it lives on someone else's Starter plan), so snapshots are taken")
+        print()
+        print("The original is rate-limited (it lives on someone else's Starter plan), so snapshots come")
         print("from a duplicate. Ask for a fresh one — in Figma: right-click the original -> Duplicate, open the")
         print("copy, and paste its URL. Then:")
         print("  python docs/figma/snapshot.py --file <url of the new copy>")
