@@ -7,7 +7,7 @@ from django.utils import timezone
 from catalog.models import ProductVariant
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
 
-from .models import DeliveryMethod, Order, Voucher
+from .models import Order, OrderDelivery, Voucher
 
 CART = "/api/v1/cart"
 CHECKOUT = "/api/v1/checkout"
@@ -22,8 +22,11 @@ class OrdersTestCase(ApiTestCase):
         self.buds = make_product(self.store, self.beauty, "Black Earbuds", 1299, 2099, options={"Color": ["Black"]}, stock=2)
         self.bb_variant = self.bb.variants.first()
         self.buds_variant = self.buds.variants.first()
-        self.standard = DeliveryMethod.objects.create(country_id=settings.DEFAULT_COUNTRY, name="Standard Delivery", eta_min_days=5, eta_max_days=7, price_cents=1099, sort_order=1)
-        self.express = DeliveryMethod.objects.create(country_id=settings.DEFAULT_COUNTRY, name="Express Delivery", eta_min_days=2, eta_max_days=3, price_cents=1999, sort_order=2)
+        # Shipping is the seller's own (sprint 6): make_store() gives every store the
+        # design's three options. Cheapest delivery wins by default; pickup never does.
+        self.express = self.store.delivery_options.get(name="Express Delivery")      # 1999
+        self.standard = self.store.delivery_options.get(name="Seller Delivery")      # 1099, the default
+        self.pickup = self.store.delivery_options.get(name="Customer Pickup")        # 0
         self.user = make_user(email="john.ali@gmail.com", full_name="John Ali")
         self.token = self.token_for(self.user)
 
@@ -31,7 +34,10 @@ class OrdersTestCase(ApiTestCase):
     ADDRESS = {"address": "123 Main Street", "city": "Lahore", "postal_code": "45009"}
 
     def checkout_payload(self, **over):
-        return {"contact": self.CONTACT, "address": self.ADDRESS, "delivery_method_id": str(self.standard.id), "payment_method_type": "card", **over}
+        return {"contact": self.CONTACT, "address": self.ADDRESS, "payment_method_type": "card", **over}
+
+    def delivery(self, option):
+        return [{"store_id": str(self.store.id), "option_id": str(option.id)}]
 
     def cart_with(self, token=None, guest_token=None, variant=None, qty=1):
         headers = {"X-Cart-Token": guest_token} if guest_token else {}
@@ -48,8 +54,9 @@ class CartTests(OrdersTestCase):
         line = body["items"][0]
         self.assertEqual((line["product_name"], line["variant_summary"], line["qty"]), ("NARS BB Cream", "Size: 30 ml | Shade: Natural", 2))
         self.assertEqual(line["line_total_cents"], 5198)
-        self.assertEqual(body["delivery_method"]["name"], "Standard Delivery")  # default = cheapest/first
-        self.assertEqual(body["delivery_method"]["eta_label"], "5 - 7 working days")
+        self.assertEqual([d["store_name"] for d in body["deliveries"]], ["Huda Beauty"])  # one line per seller
+        chosen = next(o for o in body["deliveries"][0]["options"] if o["id"] == body["deliveries"][0]["selected_option_id"])
+        self.assertEqual((chosen["name"], chosen["price_cents"]), ("Seller Delivery", 1099))  # cheapest delivery, not pickup
         self.assertEqual(body["summary"], {"subtotal_cents": 5198, "shipping_cents": 1099, "discount_cents": 0, "total_cents": 6297, "currency": "USD", "item_count": 2})
         self.assertTrue(body["can_checkout"])
         # adding again merges qty
@@ -92,9 +99,16 @@ class CartTests(OrdersTestCase):
 
     def test_note_and_delivery_type(self):
         self.cart_with(self.token)
-        body = self.patch(CART, {"order_note": "Leave at door", "delivery_method_id": str(self.express.id)}, self.token).json()
-        self.assertEqual((body["order_note"], body["delivery_method"]["name"], body["summary"]["shipping_cents"]), ("Leave at door", "Express Delivery", 1999))
-        self.assertEqual(self.patch(CART, {"delivery_method_id": "00000000-0000-0000-0000-000000000000"}, self.token).status_code, 422)
+        body = self.patch(CART, {"order_note": "Leave at door"}, self.token).json()
+        self.assertEqual(body["order_note"], "Leave at door")
+        body = self.patch(f"{CART}/delivery", {"store_id": str(self.store.id), "option_id": str(self.express.id)}, self.token).json()
+        self.assertEqual(body["summary"]["shipping_cents"], 1999)
+        self.assertEqual(body["deliveries"][0]["selected_option_id"], str(self.express.id))
+        # pickup is choosable, just never the default
+        self.assertEqual(self.patch(f"{CART}/delivery", {"store_id": str(self.store.id), "option_id": str(self.pickup.id)},
+                                    self.token).json()["summary"]["shipping_cents"], 0)
+        bogus = self.patch(f"{CART}/delivery", {"store_id": str(self.store.id), "option_id": "00000000-0000-0000-0000-000000000000"}, self.token)
+        self.assertEqual(bogus.status_code, 422)
 
     def test_vouchers(self):
         Voucher.objects.create(code="SAVE20", type="percent", value=20, min_subtotal_cents=5000)
@@ -121,7 +135,7 @@ class CheckoutTests(OrdersTestCase):
 
     def test_payload_validation(self):
         self.cart_with(self.token)
-        res = self.post(CHECKOUT, {"contact": self.CONTACT, "delivery_method_id": str(self.standard.id), "payment_method_type": "card"}, self.token)
+        res = self.post(CHECKOUT, {"contact": self.CONTACT, "payment_method_type": "card"}, self.token)
         self.assertEqual(res.status_code, 422)
         res = self.post(CHECKOUT, self.checkout_payload(ship_to_different_address=True), self.token)
         self.assertEqual(res.status_code, 422)
@@ -148,7 +162,7 @@ class CheckoutTests(OrdersTestCase):
         self.assertEqual(order["special_note"], "Ring twice")
         self.assertEqual(order["shipping_address"]["city"], "Lahore")
         self.assertIsNone(order["billing_address"])
-        self.assertEqual(order["delivery_method"]["name"], "Standard Delivery")
+        self.assertEqual([d["name"] for d in order["delivery_method"]["per_store"]], ["Seller Delivery"])
         self.assertEqual({i["product_name"]: i["qty"] for i in order["items"]}, {"NARS BB Cream": 2, "Black Earbuds": 1})
         self.assertEqual(order["items"][0]["variant_summary"], "Size: 30 ml | Shade: Natural")
         self.assertEqual([e["status"] for e in order["events"]], ["pending_payment"])

@@ -32,7 +32,6 @@ class CartItemPatchIn(Schema):
 
 class CartPatchIn(Schema):
     order_note: Optional[str] = Field(None, max_length=1000, description="'Order Notes (Optional)'")
-    delivery_method_id: Optional[UUID] = Field(None, description="'Delivery Type' — null resets to the default")
 
 
 class VoucherApplyIn(Schema):
@@ -85,6 +84,31 @@ class CartSummaryOut(Schema):
     item_count: int
 
 
+class DeliveryOptionOut(Schema):
+    """One of a seller's own delivery options."""
+
+    id: UUID
+    name: str
+    eta_label: str
+    kind: str = Field(description="delivery | pickup")
+    price_cents: int
+
+
+class CartDeliveryOut(Schema):
+    """Shipping is chosen per seller: each store in the cart gets its own line."""
+
+    store_id: UUID
+    store_name: str
+    options: list[DeliveryOptionOut] = Field(description="Only options every item from this store supports")
+    selected_option_id: Optional[UUID]
+    price_cents: int
+
+
+class DeliveryChoiceIn(Schema):
+    store_id: UUID
+    option_id: UUID
+
+
 class CartOut(Schema):
     id: UUID
     cart_token: Optional[str] = Field(None, description="Guests: send back as X-Cart-Token on every cart/checkout call")
@@ -92,7 +116,7 @@ class CartOut(Schema):
     items: list[CartLineOut]
     order_note: str
     voucher: Optional[VoucherOut]
-    delivery_method: Optional[DeliveryMethodOut]
+    deliveries: list[CartDeliveryOut] = Field(description="One per store in the cart; summary.shipping_cents is their sum")
     summary: CartSummaryOut
     can_checkout: bool
     problems: list[str] = Field(description="Why checkout is blocked, if it is")
@@ -133,10 +157,11 @@ class CheckoutIn(Schema):
     address: Optional[AddressIn] = Field(None, description="…or type one in")
     ship_to_different_address: bool = False
     shipping_address: Optional[AddressIn] = None
-    delivery_method_id: UUID
+    deliveries: list[DeliveryChoiceIn] = Field(default_factory=list, description="Per-store delivery choice; omit to use what the cart already has")
     payment_method_type: PaymentMethodLit
     payment_method_id: Optional[UUID] = Field(None, description="Saved card (members, type=card)")
     special_note: str = Field("", max_length=1000)
+    channel: Literal["web", "mobile_app", "other"] = Field("web", description="Where the order was placed; feeds the seller's Sales by Channel report")
 
     @model_validator(mode="after")
     def _addresses(self):

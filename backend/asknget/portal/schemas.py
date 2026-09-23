@@ -121,6 +121,8 @@ class ProductPatchIn(Schema):
     description: Optional[str] = Field(None, max_length=10000)
     price_cents: Optional[int] = Field(None, ge=0)
     compare_at_price_cents: Optional[int] = Field(None, ge=0, description="Send 0 to clear")
+    cost_price_cents: Optional[int] = Field(None, ge=0, description="Wizard 'Cost Price' — seller-only, never shown to buyers")
+    barcode: Optional[str] = Field(None, max_length=64)
     currency: Optional[str] = Field(None, min_length=3, max_length=3)
     low_stock_threshold: Optional[int] = Field(None, ge=0)
     preorder: Optional[bool] = Field(None, description="Manual 'Pre-order' flag; otherwise stock status is derived")
@@ -240,6 +242,8 @@ class SellerProductOut(Schema):
     description: str
     price_cents: int
     compare_at_price_cents: Optional[int] = None
+    cost_price_cents: Optional[int] = None
+    barcode: str = ""
     currency: str
     stock_qty: int
     stock_status: str
@@ -251,6 +255,7 @@ class SellerProductOut(Schema):
     height_mm: Optional[int] = None
     ships_from: str
     handling_days: int
+    delivery_option_ids: list[UUID] = Field(default_factory=list, description="Empty = all of the store's active options")
     is_featured: bool
     is_new_arrival: bool
     images: list[SellerImageOut]
@@ -631,6 +636,41 @@ class PlanOut(Schema):
     catalogue: list[FeatureOut]
 
 
+class DeliveryOptionIn(Schema):
+    """The seller's own delivery option — the wizard's Shipping step."""
+
+    name: NonEmptyStr = Field(max_length=60, description='e.g. "Express Delivery"')
+    eta_label: str = Field("", max_length=60, description='Free text, e.g. "1-3 business days"')
+    price_cents: int = Field(0, ge=0)
+    kind: Literal["delivery", "pickup"] = "delivery"
+    is_active: bool = True
+    sort_order: int = Field(0, ge=0)
+
+
+class DeliveryOptionPatchIn(Schema):
+    name: Optional[NonEmptyStr] = Field(None, max_length=60)
+    eta_label: Optional[str] = Field(None, max_length=60)
+    price_cents: Optional[int] = Field(None, ge=0)
+    kind: Optional[Literal["delivery", "pickup"]] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+
+
+class DeliveryOptionOut(Schema):
+    id: UUID
+    name: str
+    eta_label: str
+    price_cents: int
+    kind: str
+    is_active: bool
+    sort_order: int
+    products_count: int = Field(0, description="Products that explicitly selected this option")
+
+
+class ProductDeliveryIn(Schema):
+    option_ids: list[UUID] = Field(description="Empty = every active option of the store")
+
+
 class PlanSetIn(Schema):
     is_premium: bool
 
@@ -681,14 +721,43 @@ class PortalSearchOut(Schema):
 # Advanced analytics (premium — docs/sprint-5-plan.md §4)
 # --------------------------------------------------------------------------- #
 
-ReportLit = Literal["overview", "funnel", "products", "search", "customers", "fulfilment"]
+ReportLit = Literal["overview", "sales", "funnel", "products", "search", "customers", "fulfilment"]
+BucketLit = Literal["daily", "weekly", "monthly"]
 ProductSortLit = Literal["revenue", "units", "views", "conversion"]
+
+
+class CategoryShareOut(Schema):
+    category: str
+    orders: int
+    revenue_cents: int
+    share_pct: float
+
+
+class TopProductOut(Schema):
+    rank: int
+    product_id: UUID
+    name: str
+    image_url: Optional[str]
+    orders: int
+    units: int
+    revenue_cents: int
+
+
+class CustomerSnapshotOut(Schema):
+    new: int
+    returning: int
+    one_time: int
 
 
 class AnalyticsOverviewOut(Schema):
     period: str
+    conversion_rate: Kpi = Field(description="Store orders ÷ product views, %")
+    daily: list[SeriesPoint] = Field(description="'Sales Performance': sales and units per day")
+    sales_by_category: list[CategoryShareOut]
+    top_products: list[TopProductOut]
+    customer_snapshot: CustomerSnapshotOut
     gross_sales_cents: Kpi
-    net_sales_cents: Kpi = Field(description="After cancelled and returned lines")
+    net_sales_cents: Kpi = Field(description="After cancelled and returned lines. NOT the Sales Analytics 'Net Sales', which subtracts discounts and refunds instead")
     units: Kpi
     orders: Kpi
     aov_cents: Kpi
@@ -715,6 +784,7 @@ class AnalyticsProductRowOut(Schema):
     product_id: UUID
     name: str
     slug: str
+    image_url: Optional[str] = None
     status: str
     stock_status: str
     views: int
@@ -731,6 +801,37 @@ class AnalyticsProductsOut(Schema):
     slow_movers: list[AnalyticsProductRowOut] = Field(description="Live, in stock, nothing sold this period")
     products_with_no_sales: int
     products_total: int
+    top_selling_count: int
+    avg_product_revenue_cents: int
+
+
+class WaterfallStepOut(Schema):
+    label: str
+    amount_cents: int = Field(description="Negative for the legs that are taken off gross")
+
+
+class ChannelShareOut(Schema):
+    channel: str
+    revenue_cents: int
+    share_pct: float
+
+
+class AnalyticsSalesOut(Schema):
+    """Sales Analytics. `net_sales_cents` here is gross − discounts − refunds −
+    adjustments (the designer's definition), which is a different quantity from the
+    overview's net."""
+
+    period: str
+    bucket: str
+    gross_sales_cents: Kpi
+    discounts_cents: Kpi = Field(description="This store's pro-rata share of order-level vouchers")
+    refunds_cents: Kpi = Field(description="Always 0 until the payment provider exists (data-model.md Q50)")
+    net_sales_cents: Kpi
+    revenue_over_time: list[SeriesPoint]
+    revenue_breakdown: list[WaterfallStepOut]
+    sales_by_channel: list[ChannelShareOut]
+    sales_by_category: list[CategoryShareOut]
+    refunds_tracked: bool = Field(description="False while refunds and adjustments are not recorded anywhere")
 
 
 class SearchTermOut(Schema):

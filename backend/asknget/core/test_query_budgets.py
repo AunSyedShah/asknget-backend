@@ -125,4 +125,9 @@ class QueryBudgetTests(ApiTestCase):
         self.budget(4, "/api/v1/seller/chat", token=self.seller)  # plan gate is a column on the store, not a query
 
     def test_seller_analytics_overview(self):
-        self.budget(7, "/api/v1/seller/analytics/overview", token=self.seller)  # two windows x (aggregate + distinct buyers)
+        # Store Performance is five blocks in one call: KPI windows, conversion, the
+        # daily series, category mix, top products (+images) and the customer rollup.
+        self.budget(15, "/api/v1/seller/analytics/overview", token=self.seller)
+
+    def test_seller_analytics_sales(self):
+        self.budget(10, "/api/v1/seller/analytics/sales", token=self.seller)

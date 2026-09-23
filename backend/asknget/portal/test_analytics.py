@@ -196,3 +196,87 @@ class ReportTests(AnalyticsTestCase):
         self.assertIn("slow_mover,Nail File", body)
         overview = b"".join(self.get(f"{A}/export.csv", self.token, report="overview").streaming_content).decode()
         self.assertIn("gross_sales_cents,4500", overview)
+
+
+class StorePerformanceTests(AnalyticsTestCase):
+    """The blocks the Analytics Overview screen draws beyond the four KPI cards."""
+
+    def test_conversion_daily_series_and_category_mix(self):
+        body = self.get(f"{A}/overview", self.token).json()
+        # 3 store orders (one cancelled, one returned, one delivered, one shipped) over 17 views
+        self.assertEqual(body["conversion_rate"]["value"], round(4 / 17 * 100, 2))
+        self.assertTrue(body["daily"])
+        self.assertEqual(sum(p["values"]["sales"] for p in body["daily"]), 2500.0)  # sold value, cancels excluded
+        self.assertEqual([c["category"] for c in body["sales_by_category"]], ["Beauty"])
+        self.assertEqual(body["sales_by_category"][0]["share_pct"], 100.0)
+
+    def test_top_products_and_customer_snapshot(self):
+        body = self.get(f"{A}/overview", self.token).json()
+        top = body["top_products"]
+        self.assertEqual(top[0]["rank"], 1)
+        self.assertEqual(top[0]["name"], "BB Cream")
+        self.assertEqual(top[0]["revenue_cents"], 2000)
+        self.assertIn("image_url", top[0])
+        snapshot = body["customer_snapshot"]
+        self.assertEqual(sum(snapshot.values()), 1)          # only Olivia has non-cancelled orders
+        self.assertEqual(snapshot["returning"], 1)
+
+    def test_product_analytics_adds_average_revenue(self):
+        body = self.get(f"{A}/products", self.token).json()
+        self.assertEqual(body["top_selling_count"], 2)        # BB Cream and Lip Gloss sold
+        self.assertEqual(body["avg_product_revenue_cents"], round(2500 / 3))
+        self.assertIn("image_url", body["top"][0])
+
+
+class SalesAnalyticsTests(AnalyticsTestCase):
+    def test_gross_net_and_the_waterfall(self):
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual(body["gross_sales_cents"]["value"], 2500)   # sold lines only
+        self.assertEqual(body["discounts_cents"]["value"], 0)
+        self.assertEqual(body["refunds_cents"]["value"], 0)
+        self.assertFalse(body["refunds_tracked"])                    # honest: no PSP yet
+        self.assertEqual(body["net_sales_cents"]["value"], 2500)
+        self.assertEqual([s["label"] for s in body["revenue_breakdown"]],
+                         ["Gross Sales", "Discounts", "Refunds", "Adjustments", "Net Sales"])
+        self.assertEqual(body["revenue_breakdown"][-1]["amount_cents"], 2500)
+
+    def test_discount_is_the_stores_pro_rata_share(self):
+        from orders.models import Order
+        from orders.services import store_discount_cents
+
+        order = self.o1                      # 2 x 1000 from this store only
+        Order.objects.filter(pk=order.pk).update(discount_cents=300)
+        order.refresh_from_db()
+        self.assertEqual(store_discount_cents(order, self.store.pk), 300)
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual(body["discounts_cents"]["value"], 300)
+        self.assertEqual(body["net_sales_cents"]["value"], 2200)
+
+    def test_pro_rata_split_across_two_stores_adds_back_up(self):
+        from orders.models import Order, OrderItem
+        from orders.services import store_discount_cents
+        from core.testing import make_store
+
+        other = make_store(name="Other Co")
+        order = self._order(self.olivia, [(self.bb, 1)], Fulfilment.DELIVERED, days_ago=5)
+        OrderItem.objects.create(order=order, store=other, product=self.lip, variant=self.lip.variants.first(),
+                                 product_name="Lip Gloss", qty=1, unit_price_cents=500, line_total_cents=500,
+                                 status=Fulfilment.DELIVERED)
+        Order.objects.filter(pk=order.pk).update(discount_cents=101)   # odd number: rounding must not lose a cent
+        order.refresh_from_db()
+        mine = store_discount_cents(order, self.store.pk)
+        theirs = store_discount_cents(order, other.pk)
+        self.assertEqual(mine + theirs, 101)
+        self.assertEqual(mine, 67)   # 1000/1500 of 101, largest-remainder rounded
+
+    def test_channel_mix_defaults_to_website(self):
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual([c["channel"] for c in body["sales_by_channel"]], ["web"])
+        self.assertEqual(body["sales_by_channel"][0]["share_pct"], 100.0)
+
+    def test_buckets_and_csv(self):
+        self.assertEqual(self.get(f"{A}/sales", self.token, bucket="monthly").json()["bucket"], "monthly")
+        rows = b"".join(self.get(f"{A}/export.csv", self.token, report="sales").streaming_content).decode()
+        self.assertIn("gross_sales_cents,2500", rows)
+        self.assertIn("breakdown_Net Sales", rows)
+        self.assertIn("channel_web", rows)

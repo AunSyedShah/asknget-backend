@@ -72,7 +72,9 @@ This is the problem the chosen option creates, and the contract for it:
 - Shipping is decided **per store**, not per cart. `cart_out` groups lines by store and returns, for each:
   the options every line in that group supports (intersection), which one is selected, and its price.
 - Selection lives on the cart as `delivery_selections` — `{store_id: option_id}` — defaulting to the
-  cheapest option for that store. `PATCH /cart/delivery {store_id, option_id}` changes one.
+  cheapest **delivery** option for that store — not simply the cheapest, because pickup is usually free and
+  silently defaulting a buyer to collecting in person would be wrong. `PATCH /cart/delivery {store_id,
+  option_id}` changes one.
 - `summary.shipping_cents` is the **sum across stores**; a cart with three sellers has three shipping lines.
 - Checkout takes `deliveries: [{store_id, option_id}]` (optional — the cart's selections are used when
   omitted) and validates every store in the cart has a valid, supported option.

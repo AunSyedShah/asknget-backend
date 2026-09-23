@@ -500,6 +500,19 @@ def request_info(app: SellerApplication, *, reviewer, message: str, items: list[
     return app
 
 
+def ensure_default_delivery_options(store) -> None:
+    """Every store needs at least one way to ship, or its products cannot be bought.
+    Called when the store is created; safe to call again."""
+    from .models import StoreDeliveryOption
+
+    if StoreDeliveryOption.objects.filter(store=store).exists():
+        return
+    StoreDeliveryOption.objects.bulk_create([
+        StoreDeliveryOption(store=store, name=name, eta_label=eta, kind=kind, price_cents=price, sort_order=i)
+        for i, (name, eta, kind, price) in enumerate(rules.DEFAULT_DELIVERY_OPTIONS)
+    ])
+
+
 @transaction.atomic
 def approve(app: SellerApplication, *, reviewer, note: str = "") -> SellerApplication:
     transition(app, Status.APPROVED, actor=reviewer, note=note)
@@ -510,7 +523,7 @@ def approve(app: SellerApplication, *, reviewer, note: str = "") -> SellerApplic
     app.save()
     if not Store.objects.filter(application=app).exists():
         name = app.store_display_name or app.legal_business_name or f"{app.first_name} {app.last_name}".strip() or "Store"
-        Store.objects.create(
+        store = Store.objects.create(
             owner=app.user,
             application=app,
             country_id=app.country_id,  # the market is fixed from here on
@@ -518,6 +531,7 @@ def approve(app: SellerApplication, *, reviewer, note: str = "") -> SellerApplic
             slug=suggest_slug(slug_for(name)),
             description=app.store_description,
         )
+        ensure_default_delivery_options(store)
     return app
 
 

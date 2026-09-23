@@ -17,6 +17,11 @@ class Cart(TimeStampedModel):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="cart")
     session_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     order_note = models.TextField(blank=True, help_text="'Order Notes (Optional)'")
+    delivery_selections = models.JSONField(
+        default=dict, blank=True,
+        help_text="{store_id: store_delivery_option_id} — one choice per seller in the cart; "
+                  "defaults to each store's cheapest option",
+    )
     voucher = models.ForeignKey("Voucher", on_delete=models.SET_NULL, null=True, blank=True)
     delivery_method = models.ForeignKey(
         "DeliveryMethod", on_delete=models.SET_NULL, null=True, blank=True, help_text="Chosen 'Delivery Type'; drives the cart's Shipping Cost"
@@ -84,7 +89,9 @@ class VoucherRedemption(TimeStampedModel):
 
 
 class DeliveryMethod(TimeStampedModel):
-    """Standard (5–7 days) / Express (2–3 days)."""
+    """**Deprecated** (sprint 6): shipping is defined per seller now —
+    `sellers.StoreDeliveryOption`. Kept so existing orders keep their snapshot and
+    nothing is dropped; no new code should read it."""
 
     country = models.ForeignKey("markets.Country", on_delete=models.PROTECT, related_name="delivery_methods")
     name = models.CharField(max_length=60)
@@ -140,6 +147,12 @@ class Order(TimeStampedModel):
     order_number = models.CharField(max_length=20, unique=True, help_text="e.g. ORD-00123")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
     country = models.ForeignKey("markets.Country", on_delete=models.PROTECT, related_name="orders", help_text="The market the cart belonged to")
+    channel = models.CharField(
+        max_length=20, choices=[("web", "Website"), ("mobile_app", "Mobile App"), ("other", "Other")],
+        default="web", db_index=True,
+        help_text="Where the order was placed; drives the seller's 'Sales by Channel' report. "
+                  "Clients send it at checkout — everything reads Website until they do.",
+    )
     return_window_days = models.PositiveSmallIntegerField(default=0, help_text="Return policy in force at checkout (snapshot)")
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING_PAYMENT, db_index=True)
 
@@ -193,6 +206,29 @@ class Order(TimeStampedModel):
     def can_cancel(self) -> bool:
         # TODO(design): confirm cancellation window with team lead.
         return self.status in self.CANCELLABLE_STATUSES
+
+
+class OrderDelivery(TimeStampedModel):
+    """What one store in this order is shipping by, snapshotted at checkout.
+
+    A cart can span several sellers and each defines their own options, so shipping
+    is chosen per store and `Order.shipping_cents` is the sum of these rows.
+    """
+
+    order = models.ForeignKey("Order", on_delete=models.CASCADE, related_name="deliveries")
+    store = models.ForeignKey("sellers.Store", on_delete=models.PROTECT, related_name="order_deliveries")
+    option = models.ForeignKey("sellers.StoreDeliveryOption", on_delete=models.SET_NULL, null=True, blank=True, related_name="order_deliveries")
+    name = models.CharField(max_length=60)
+    eta_label = models.CharField(max_length=60, blank=True)
+    kind = models.CharField(max_length=10, default="delivery")
+    price_cents = models.PositiveIntegerField(default=0)
+
+    class Meta(TimeStampedModel.Meta):
+        ordering = ["created_at"]
+        constraints = [models.UniqueConstraint(fields=["order", "store"], name="uniq_delivery_per_store_per_order")]
+
+    def __str__(self):
+        return f"{self.order_id} / {self.store_id}: {self.name}"
 
 
 class OrderItem(TimeStampedModel):

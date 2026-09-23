@@ -18,6 +18,7 @@ from portal.api import (
     admin_products_router,
     admin_stores_router,
     analytics_router,
+    delivery_router,
     customers_router,
     dashboard_router,
     inventory_router,
@@ -84,6 +85,7 @@ api.add_router("/seller/orders", orders_router)
 api.add_router("/seller/customers", customers_router)
 api.add_router("/seller/dashboard", dashboard_router)
 api.add_router("/seller/plan", plan_router)
+api.add_router("/seller/delivery-options", delivery_router)
 api.add_router("/seller/analytics", analytics_router)
 api.add_router("/admin/stores", admin_stores_router)
 api.add_router("/seller/chat", seller_chat_router)

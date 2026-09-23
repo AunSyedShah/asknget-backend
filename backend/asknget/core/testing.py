@@ -10,6 +10,7 @@ from django.conf import settings
 from accounts.models import User
 from catalog.models import Brand, Category, Product, ProductOptionType, ProductOptionValue, ProductVariant
 from markets.models import Country, KycPolicy, ReturnPolicy
+from sellers import services as seller_services
 from sellers.models import SellerApplication, Store
 
 _seq = itertools.count(1)
@@ -38,7 +39,10 @@ def make_store(owner=None, name="Huda Beauty", status=Store.StoreStatus.ACTIVE, 
     country_id = getattr(country, "code", country) or settings.DEFAULT_COUNTRY
     app = SellerApplication.objects.create(user=owner, account_type="registered_company", status="active", store_display_name=name, country_id=country_id)
     n = next(_seq)
-    return Store.objects.create(owner=owner, application=app, country_id=country_id, display_name=name, slug=f"{name.lower().replace(' ', '-')}-{n}", status=status)
+    store = Store.objects.create(owner=owner, application=app, country_id=country_id, display_name=name,
+                                 slug=f"{name.lower().replace(' ', '-')}-{n}", status=status)
+    seller_services.ensure_default_delivery_options(store)   # as a real store gets on approval
+    return store
 
 
 def make_category(name, parent=None) -> Category:

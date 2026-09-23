@@ -6,6 +6,7 @@
   /seller/customers    overview, list, detail, notes, export
   /seller/dashboard    KPIs, charts, latest orders
   /seller/plan         what this store's plan unlocks (portal.entitlements)
+  /seller/delivery-options  the seller's own delivery options (wizard Shipping step)
   /seller/analytics    premium: overview, funnel, products, search terms, customers, fulfilment
   /seller/search       header "Search anything"
   /admin/products      staff review queue (approve / reject)
@@ -52,14 +53,20 @@ from .schemas import (
     SellerOrderRowOut,
     SellerOrdersOverviewOut,
     ContentIn,
+    DeliveryOptionIn,
+    DeliveryOptionOut,
+    DeliveryOptionPatchIn,
     ImageOrderIn,
+    ProductDeliveryIn,
     OptionsIn,
     AnalyticsCustomersOut,
     AnalyticsFulfilmentOut,
     AnalyticsFunnelOut,
     AnalyticsOverviewOut,
     AnalyticsProductsOut,
+    AnalyticsSalesOut,
     AnalyticsSearchOut,
+    BucketLit,
     PeriodLit,
     PlanOut,
     PlanSetIn,
@@ -87,6 +94,7 @@ customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
 dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 search_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 plan_router = Router(tags=["seller: plan"], auth=StoreAuth())
+delivery_router = Router(tags=["seller: delivery"], auth=StoreAuth())
 analytics_router = Router(tags=["seller: analytics"], auth=StoreAuth())
 admin_stores_router = Router(tags=["admin: stores"], auth=StaffAuth())
 
@@ -363,6 +371,36 @@ def dashboard_summary(request, period: PeriodLit = "month"):
     return dashboard.summary(request.store, request.auth, period)
 
 
+@delivery_router.get("", response=list[DeliveryOptionOut], summary="My delivery options")
+def delivery_list(request):
+    return [products.option_out(o) for o in products.delivery_options(request.store)]
+
+
+@delivery_router.post("", response={201: DeliveryOptionOut, 409: ErrorOut, 422: ErrorOut}, summary="Add a delivery option")
+def delivery_create(request, payload: DeliveryOptionIn):
+    return 201, products.option_out(products.create_delivery_option(request.store, payload.dict()))
+
+
+@delivery_router.patch("/{option_id}", response={200: DeliveryOptionOut, 404: ErrorOut, 422: ErrorOut})
+def delivery_patch(request, option_id: UUID, payload: DeliveryOptionPatchIn):
+    return products.option_out(products.patch_delivery_option(request.store, option_id, payload.dict(exclude_unset=True)))
+
+
+@delivery_router.delete("/{option_id}", response={204: None, 404: ErrorOut, 409: ErrorOut},
+                        summary="Remove one (deactivated instead when orders or products reference it)")
+def delivery_delete(request, option_id: UUID):
+    products.delete_delivery_option(request.store, option_id)
+    return 204, None
+
+
+@products_router.put("/{product_id}/delivery-options", response=_EDIT,
+                     summary="Wizard step 4: which delivery options this product supports (empty = all)")
+def product_delivery_options(request, product_id: UUID, payload: ProductDeliveryIn):
+    product = products.get_product(request.store, product_id)
+    products.set_product_delivery_options(request.store, product, payload.option_ids)
+    return _out(request.store, product_id)
+
+
 @plan_router.get("", response=PlanOut, summary="Current plan and what it unlocks (drives the sidebar locks and the upgrade card)")
 def seller_plan(request):
     return entitlements.payload(request.store)
@@ -383,6 +421,12 @@ def _gate(request):
 @analytics_router.get("/overview", response={200: AnalyticsOverviewOut, **_PREMIUM}, summary="Gross vs net sales, AOV, repeat/cancellation/return rates")
 def analytics_overview(request, period: PeriodLit = "month"):
     return analytics.overview(_gate(request), period)
+
+
+@analytics_router.get("/sales", response={200: AnalyticsSalesOut, **_PREMIUM},
+                      summary="Sales Analytics: gross vs net, discounts, refunds, revenue over time, channel and category mix")
+def analytics_sales(request, period: PeriodLit = "month", bucket: BucketLit = "daily"):
+    return analytics.sales(_gate(request), period, bucket=bucket)
 
 
 @analytics_router.get("/funnel", response={200: AnalyticsFunnelOut, **_PREMIUM}, summary="Views → wishlist → cart → purchase, with the biggest drop-off")

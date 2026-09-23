@@ -10,7 +10,7 @@ import secrets
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import F, Prefetch
+from django.db.models import F, Prefetch, Sum
 from django.utils import timezone
 from ninja.errors import HttpError
 
@@ -22,7 +22,7 @@ from markets import services as markets
 from markets.context import get_country
 from sellers.models import Store
 
-from .models import Cart, CartItem, DeliveryMethod, Order, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
+from .models import Cart, CartItem, Order, OrderDelivery, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
 
 CART_TOKEN_HEADER = "X-Cart-Token"
 Status = Order.OrderStatus
@@ -39,10 +39,11 @@ def _user(request):
 
 
 def _cart_qs():
-    return Cart.objects.select_related("voucher", "delivery_method").prefetch_related(
+    return Cart.objects.select_related("voucher").prefetch_related(
         Prefetch(
             "items",
             queryset=CartItem.objects.select_related("variant__product__store", "variant__product__category")
+            .prefetch_related("variant__product__delivery_options")
             .prefetch_related("variant__option_values__option_type", "variant__product__images")
             .order_by("created_at"),
         )
@@ -114,18 +115,87 @@ def _merge(guest: Cart, *, into: Cart) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def delivery_methods_for(country_id: str | None):
-    qs = DeliveryMethod.objects.filter(is_active=True)
-    return qs.filter(country_id=country_id) if country_id else qs
+def options_for_store(store_id):
+    from sellers.models import StoreDeliveryOption
+
+    return StoreDeliveryOption.objects.filter(store_id=store_id, is_active=True)
 
 
-def default_delivery_method(country_id: str | None = None) -> DeliveryMethod | None:
-    return delivery_methods_for(country_id).order_by("sort_order", "price_cents").first()
+def _product_options(product) -> set:
+    """Options a single product supports. Empty selection means *all* of the
+    store's active options — a product is never unbuyable for want of a tick."""
+    chosen = {o.id for o in product.delivery_options.all() if o.is_active}
+    return chosen or {o.id for o in options_for_store(product.store_id)}
+
+
+def _default_option(options: list):
+    """Cheapest *delivery* option, not simply the cheapest: pickup is usually free
+    and silently defaulting a buyer to collecting in person would be wrong."""
+    shipped = [o for o in options if o.kind != "pickup"]
+    return min(shipped or options, key=lambda o: o.price_cents, default=None)
+
+
+def cart_delivery_groups(cart: Cart) -> list[dict]:
+    """One group per store in the cart: the options every line in that group
+    supports, and which one is selected.
+
+    Shipping is per seller because each seller sets their own prices; a cart with
+    three sellers has three shipping lines (docs/sprint-6-plan.md §3).
+    """
+    from sellers.models import StoreDeliveryOption
+
+    by_store: dict = {}
+    for item in cart.items.all():
+        product = item.variant.product
+        group = by_store.setdefault(product.store_id, {"store": product.store, "supported": None})
+        supported = _product_options(product)
+        group["supported"] = supported if group["supported"] is None else (group["supported"] & supported)
+
+    if not by_store:
+        return []
+    everything = {
+        o.id: o for o in StoreDeliveryOption.objects.filter(store_id__in=by_store, is_active=True)
+    }
+    selections = cart.delivery_selections or {}
+    groups = []
+    for store_id, group in by_store.items():
+        options = sorted(
+            (everything[oid] for oid in (group["supported"] or set()) if oid in everything),
+            key=lambda o: (o.sort_order, o.price_cents, o.name),
+        )
+        chosen_id = selections.get(str(store_id))
+        chosen = next((o for o in options if str(o.id) == str(chosen_id)), None) or _default_option(options)
+        groups.append({
+            "store_id": store_id,
+            "store_name": group["store"].display_name,
+            "options": options,
+            "selected": chosen,
+        })
+    return groups
+
+
+def set_cart_delivery(cart: Cart, *, store_id, option_id) -> None:
+    group = next((g for g in cart_delivery_groups(cart) if str(g["store_id"]) == str(store_id)), None)
+    if group is None:
+        raise HttpError(404, "That store has nothing in your cart")
+    if not any(str(o.id) == str(option_id) for o in group["options"]):
+        raise HttpError(422, "That delivery option is not available for these items")
+    selections = dict(cart.delivery_selections or {})
+    selections[str(store_id)] = str(option_id)
+    cart.delivery_selections = selections
+    cart.save(update_fields=["delivery_selections", "updated_at"])
 
 
 def _variant_purchasable(variant: ProductVariant) -> bool:
     p = variant.product
     return variant.is_active and p.status == Product.ProductStatus.ACTIVE and p.deleted_at is None and p.store.status == Store.StoreStatus.ACTIVE
+
+
+def _option_out(option) -> dict:
+    return {
+        "id": option.id, "name": option.name, "eta_label": option.eta_label,
+        "kind": option.kind, "price_cents": option.price_cents,
+    }
 
 
 def line_out(item: CartItem) -> dict:
@@ -166,6 +236,31 @@ def voucher_discount(voucher: Voucher | None, subtotal: int) -> int:
     return min(discount, subtotal)
 
 
+def store_discount_cents(order, store_id) -> int:
+    """This store's share of an order-level voucher, pro-rata on its share of the
+    subtotal (Q49). Largest-remainder rounding, so the per-store parts always add
+    back up to `order.discount_cents` — no cent appears or vanishes.
+
+    Used by the seller's Sales Analytics today and by payouts later; it is the only
+    place that decides what a discount means to one seller in a multi-store order.
+    """
+    if not order.discount_cents:
+        return 0
+    totals = dict(
+        OrderItem.objects.filter(order=order).values_list("store_id")
+        .annotate(t=Sum("line_total_cents")).values_list("store_id", "t")
+    )
+    subtotal = sum(totals.values())
+    if not subtotal:
+        return 0
+    exact = {sid: order.discount_cents * t / subtotal for sid, t in totals.items()}
+    shares = {sid: int(v) for sid, v in exact.items()}
+    # hand out the rounding remainder to the largest fractional parts first
+    for sid, _ in sorted(exact.items(), key=lambda kv: kv[1] - int(kv[1]), reverse=True)[: order.discount_cents - sum(shares.values())]:
+        shares[sid] += 1
+    return shares.get(store_id, 0)
+
+
 def voucher_label(voucher: Voucher) -> str:
     return f"Discount ({voucher.value}%)" if voucher.type == Voucher.VoucherType.PERCENT else "Discount"
 
@@ -196,13 +291,12 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
     lines = [line_out(i) for i in cart.items.all()]
     country_id = _cart_target_country(cart)
     subtotal = sum(l["line_total_cents"] for l in lines)
-    method = cart.delivery_method
-    if not (method and method.is_active and method.country_id == country_id):
-        method = default_delivery_method(country_id)
-    shipping = method.price_cents if (method and lines) else 0
+    groups = cart_delivery_groups(cart)
+    shipping = sum(g["selected"].price_cents for g in groups if g["selected"])
     problems: list[str] = []
     if not lines:
         problems.append("Your cart is empty")
+    problems += [f"{g['store_name']}: no delivery option covers these items" for g in groups if not g["selected"]]
     problems += [f"{l['product_name']}: only {l['available_qty']} left" for l in lines if not l["in_stock"]]
     voucher, discount = cart.voucher, 0
     if voucher is not None:
@@ -219,7 +313,16 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
         "items": lines,
         "order_note": cart.order_note,
         "voucher": {"code": voucher.code, "type": voucher.type, "value": voucher.value, "label": voucher_label(voucher)} if voucher else None,
-        "delivery_method": method,
+        "deliveries": [
+            {
+                "store_id": g["store_id"],
+                "store_name": g["store_name"],
+                "options": [_option_out(o) for o in g["options"]],
+                "selected_option_id": g["selected"].id if g["selected"] else None,
+                "price_cents": g["selected"].price_cents if g["selected"] else 0,
+            }
+            for g in groups
+        ],
         "summary": {
             "subtotal_cents": subtotal,
             "shipping_cents": shipping,
@@ -280,14 +383,6 @@ def clear_items(cart: Cart) -> None:
 def update_cart(cart: Cart, data: dict) -> None:
     if "order_note" in data:
         cart.order_note = data["order_note"] or ""
-    if "delivery_method_id" in data:
-        if data["delivery_method_id"] is None:
-            cart.delivery_method = None
-        else:
-            method = delivery_methods_for(_cart_target_country(cart)).filter(pk=data["delivery_method_id"]).first()
-            if method is None:
-                raise HttpError(422, "Unknown delivery method")
-            cart.delivery_method = method
     cart.save()
 
 
@@ -363,9 +458,14 @@ def checkout(request, cart: Cart, payload) -> Order:
     active = get_country()
     country = active if (active and active.code == country_id) else markets.countries_qs().get(pk=country_id)
 
-    method = delivery_methods_for(country_id).filter(pk=payload.delivery_method_id).first()
-    if method is None:
-        raise HttpError(422, "Unknown delivery method")
+    # Shipping is per store: apply any explicit choices, then read back what the
+    # cart resolved to. A store with no usable option blocks checkout.
+    for choice in (payload.deliveries or []):
+        set_cart_delivery(cart, store_id=choice.store_id, option_id=choice.option_id)
+    groups = cart_delivery_groups(cart)
+    missing = [g["store_name"] for g in groups if not g["selected"]]
+    if missing:
+        raise HttpError(409, f"No delivery option available for: {', '.join(missing)}")
 
     if payload.payment_method_id:
         if user is None or not PaymentMethod.objects.filter(pk=payload.payment_method_id, user=user).exists():
@@ -381,7 +481,7 @@ def checkout(request, cart: Cart, payload) -> Order:
 
     subtotal = view["summary"]["subtotal_cents"]
     discount = view["summary"]["discount_cents"]
-    shipping_cents = method.price_cents
+    shipping_cents = sum(g["selected"].price_cents for g in groups)
     total = max(subtotal + shipping_cents - discount, 0)
 
     order = Order.objects.create(
@@ -395,8 +495,13 @@ def checkout(request, cart: Cart, payload) -> Order:
         contact_phone=payload.contact.phone,
         shipping_address=shipping,
         billing_address=billing,
-        delivery_method=method,
-        delivery_method_snapshot={"name": method.name, "eta_min_days": method.eta_min_days, "eta_max_days": method.eta_max_days, "price_cents": method.price_cents},
+        delivery_method_snapshot={
+            "per_store": [
+                {"store": g["store_name"], "name": g["selected"].name, "eta_label": g["selected"].eta_label,
+                 "price_cents": g["selected"].price_cents}
+                for g in groups
+            ],
+        },
         special_note=payload.special_note or cart.order_note,
         subtotal_cents=subtotal,
         shipping_cents=shipping_cents,
@@ -405,7 +510,14 @@ def checkout(request, cart: Cart, payload) -> Order:
         total_cents=total,
         currency=view["summary"]["currency"],
         payment_method_type=payload.payment_method_type,
+        channel=getattr(payload, "channel", "web"),
     )
+    for g in groups:
+        option = g["selected"]
+        OrderDelivery.objects.create(
+            order=order, store_id=g["store_id"], option=option, name=option.name,
+            eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents,
+        )
     for item in items:
         v, line = variants[item.variant_id], line_out(item)
         OrderItem.objects.create(

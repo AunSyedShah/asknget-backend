@@ -27,7 +27,7 @@ from .schemas import (
     CartOut,
     CartPatchIn,
     CheckoutIn,
-    DeliveryMethodOut,
+    DeliveryChoiceIn,
     OrderDetailOut,
     OrderPlacedOut,
     OrderSummaryOut,
@@ -116,9 +116,12 @@ def cart_remove_voucher(request, x_cart_token: str | None = Header(None, descrip
 # --------------------------------------------------------------------------- #
 
 
-@orders_public_router.get("/delivery-methods", response=list[DeliveryMethodOut], summary="'Delivery Type' options")
-def delivery_methods(request):
-    return services.delivery_methods_for(services.market_country_id())
+@cart_router.patch("/delivery", response=_CART,
+                   summary="Choose a seller's delivery option for their part of the cart")
+def cart_set_delivery(request, payload: DeliveryChoiceIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
+    cart, token = services.resolve_cart(request)
+    services.set_cart_delivery(cart, store_id=payload.store_id, option_id=payload.option_id)
+    return services.cart_out(services.resolve_cart(request)[0], token)
 
 
 @checkout_router.post(

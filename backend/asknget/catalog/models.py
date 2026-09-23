@@ -92,6 +92,11 @@ class Product(SoftDeleteModel):
 
     price_cents = models.PositiveIntegerField()
     compare_at_price_cents = models.PositiveIntegerField(null=True, blank=True, help_text="Struck-through original price")
+    cost_price_cents = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Wizard 'Cost Price'. Seller-only — never serialise this to a buyer.",
+    )
+    barcode = models.CharField(max_length=64, blank=True, help_text="Wizard 'Barcode' (EAN/UPC); not unique — sellers reuse them")
     currency = models.CharField(max_length=3, default="USD")
 
     stock_status = models.CharField(max_length=20, choices=StockStatus.choices, default=StockStatus.IN_STOCK)
@@ -114,7 +119,12 @@ class Product(SoftDeleteModel):
     width_mm = models.PositiveIntegerField(null=True, blank=True)
     height_mm = models.PositiveIntegerField(null=True, blank=True)
     ships_from = models.CharField(max_length=120, blank=True)
-    handling_days = models.PositiveSmallIntegerField(default=1)
+    handling_days = models.PositiveSmallIntegerField(default=1, help_text="Wizard 'Processing Time'")
+    delivery_options = models.ManyToManyField(
+        "sellers.StoreDeliveryOption", blank=True, related_name="products",
+        help_text="Which of the store's options this product supports. **Empty means all of them**, so a "
+                  "product never becomes unbuyable just because nobody ticked a box.",
+    )
 
     class Meta(SoftDeleteModel.Meta):
         indexes = [

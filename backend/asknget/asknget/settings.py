@@ -63,7 +63,7 @@ OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
 SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
-PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # seller wizard 'Media' step
+PRODUCT_IMAGE_MAX_BYTES = 1 * 1024 * 1024  # seller wizard Media popup: 'PNG, JPG upto 1-MB'
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
 
 # Markets. Countries (currency, timezone, languages, KYC + return policy) live in the

@@ -35,7 +35,7 @@ from .periods import Period, change_pct, period_range
 PStatus = Product.ProductStatus
 Fulfilment = OrderItem.FulfilmentStatus
 SOLD_STATUSES_EXCLUDED = (Fulfilment.CANCELLED, Fulfilment.RETURNED)
-IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+IMAGE_TYPES = {"image/jpeg", "image/png"}   # Media popup says PNG, JPG
 MAX_IMAGES = 8
 TABS = ("active", "pending", "draft", "rejected", "archived")
 
@@ -430,6 +430,60 @@ def delete(product: Product) -> None:
 # --------------------------------------------------------------------------- #
 
 
+def delivery_options(store):
+    return store.delivery_options.all()
+
+
+def create_delivery_option(store, data: dict):
+    from sellers.models import StoreDeliveryOption
+
+    if StoreDeliveryOption.objects.filter(store=store, name__iexact=data["name"]).exists():
+        raise HttpError(409, "You already have an option with that name")
+    return StoreDeliveryOption.objects.create(store=store, **data)
+
+
+def patch_delivery_option(store, option_id, data: dict):
+    option = store.delivery_options.filter(pk=option_id).first()
+    if option is None:
+        raise HttpError(404, "Delivery option not found")
+    for field, value in data.items():
+        setattr(option, field, value)
+    option.save()
+    return option
+
+
+def delete_delivery_option(store, option_id) -> None:
+    """Deactivates rather than deletes once orders reference it, so old orders keep
+    their snapshot and products do not silently lose their only option."""
+    option = store.delivery_options.filter(pk=option_id).first()
+    if option is None:
+        raise HttpError(404, "Delivery option not found")
+    if store.delivery_options.filter(is_active=True).count() <= 1 and option.is_active:
+        raise HttpError(409, "A store needs at least one active delivery option")
+    if option.order_deliveries.exists() or option.products.exists():
+        option.is_active = False
+        option.save(update_fields=["is_active", "updated_at"])
+        return
+    option.delete()
+
+
+def option_out(option) -> dict:
+    return {
+        "id": option.id, "name": option.name, "eta_label": option.eta_label,
+        "price_cents": option.price_cents, "kind": option.kind, "is_active": option.is_active,
+        "sort_order": option.sort_order, "products_count": option.products.count(),
+    }
+
+
+def set_product_delivery_options(store, product: Product, option_ids: list):
+    valid = {str(o.id) for o in store.delivery_options.filter(is_active=True)}
+    unknown = [str(i) for i in option_ids if str(i) not in valid]
+    if unknown:
+        raise HttpError(422, "Unknown or inactive delivery option")
+    product.delivery_options.set(list(store.delivery_options.filter(pk__in=option_ids)))
+    return product
+
+
 def serialize(product: Product) -> dict:
     cat_path = []
     node = product.category if product.category_id else None
@@ -452,6 +506,8 @@ def serialize(product: Product) -> dict:
         "tags": product.tags or [], "short_description": product.short_description,
         "description_title": product.description_title, "description": product.description,
         "price_cents": product.price_cents, "compare_at_price_cents": product.compare_at_price_cents, "currency": product.currency,
+        "cost_price_cents": product.cost_price_cents, "barcode": product.barcode,
+        "delivery_option_ids": [o.id for o in product.delivery_options.all()],
         "stock_qty": sum(v.stock_qty for v in product.variants.all() if v.is_active), "stock_status": product.stock_status,
         "low_stock_threshold": product.low_stock_threshold, "effective_low_stock_threshold": product.effective_low_stock_threshold(),
         "weight_grams": product.weight_grams, "length_mm": product.length_mm, "width_mm": product.width_mm, "height_mm": product.height_mm,

@@ -119,6 +119,17 @@ STATUS_HEADLINES = {
 }
 
 
+# What a brand-new store starts with, matching the wizard's Shipping popup. The
+# seller edits or replaces them; a store with no active option cannot sell, so the
+# set is created up front rather than left to them to discover.
+DEFAULT_DELIVERY_OPTIONS = (
+    # name, eta label, kind, price in minor units
+    ("Express Delivery", "1-3 business days", "delivery", 1999),
+    ("Seller Delivery", "2-5 business days", "delivery", 1099),
+    ("Customer Pickup", "Pickup from store", "pickup", 0),
+)
+
+
 def required_fields(account_type: str, step: int) -> tuple[str, ...]:
     exempt = STEP_FIELDS_EXEMPT.get(account_type, {}).get(step, ())
     return tuple(f for f in STEP_REQUIRED_FIELDS.get(step, ()) if f not in exempt)

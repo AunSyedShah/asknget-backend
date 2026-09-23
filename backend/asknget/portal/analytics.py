@@ -21,9 +21,10 @@ from django.db.models import Avg, Count, F, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from catalog.models import Product
+from catalog.models import Product, ProductImage
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
+from orders.services import store_discount_cents
 
 from . import customers as customers_svc
 from .periods import change_pct, period_range
@@ -35,6 +36,11 @@ Status = Order.OrderStatus
 
 SEARCH_WINDOW_MINUTES = 30
 SEARCH_CACHE_SECONDS = 300
+
+# Refunds and "adjustments" are drawn on the Sales Analytics waterfall but no such
+# amount exists in the data yet — the PSP sprint owns them (data-model.md Q50).
+# They are reported as 0 rather than guessed at.
+REFUNDS_TRACKED = False
 
 
 def _kpi(cur, prev):
@@ -88,8 +94,19 @@ def overview(store, period_name: str) -> dict:
         }
 
     cur, prev = window(p.start, p.end), window(p.prev_start, p.prev_end)
+    views = _events(store, Kind.VIEW)
+
+    def conversion(start, end, orders):
+        seen = views.filter(created_at__gte=start, created_at__lt=end).count()
+        return _ratio(orders, seen)
+
     return {
         "period": period_name,
+        "conversion_rate": _kpi(conversion(p.start, p.end, cur["orders"]), conversion(p.prev_start, p.prev_end, prev["orders"])),
+        "daily": _sales_series(store, p.start, p.end),
+        "sales_by_category": _sales_by_category(store, p.start, p.end),
+        "top_products": _top_products(store, p.start, p.end),
+        "customer_snapshot": _customer_snapshot(store),
         "gross_sales_cents": _kpi(cur["gross"], prev["gross"]),
         "net_sales_cents": _kpi(cur["net"], prev["net"]),
         "units": _kpi(cur["units"], prev["units"]),
@@ -99,6 +116,84 @@ def overview(store, period_name: str) -> dict:
         "cancellation_rate": _kpi(cur["cancel_rate"], prev["cancel_rate"]),
         "return_rate": _kpi(cur["return_rate"], prev["return_rate"]),
     }
+
+
+def _bucket_label(when, bucket: str) -> str:
+    if bucket == "monthly":
+        return when.strftime("%Y-%m")
+    if bucket == "weekly":
+        return (when - timedelta(days=when.weekday())).strftime("%Y-%m-%d")
+    return when.strftime("%Y-%m-%d")
+
+
+def _sales_series(store, start, end, bucket: str = "daily") -> list[dict]:
+    """Sold value per bucket — the design's 'Sales Performance' line."""
+    rows = (
+        _sold_items(store).filter(order__placed_at__gte=start, order__placed_at__lt=end)
+        .values("order__placed_at", "line_total_cents", "qty")
+    )
+    totals: dict = defaultdict(lambda: {"sales": 0.0, "units": 0.0})
+    for r in rows:
+        key = _bucket_label(timezone.localtime(r["order__placed_at"]), bucket)
+        totals[key]["sales"] += float(r["line_total_cents"])
+        totals[key]["units"] += float(r["qty"])
+    return [{"label": label, "values": values} for label, values in sorted(totals.items())]
+
+
+def _sales_by_category(store, start, end, limit: int = 8) -> list[dict]:
+    rows = (
+        _sold_items(store).filter(order__placed_at__gte=start, order__placed_at__lt=end)
+        .values("product__category__name")
+        .annotate(revenue=Sum("line_total_cents"), orders=Count("order_id", distinct=True))
+    )
+    total = sum(r["revenue"] or 0 for r in rows) or 0
+    out = [
+        {
+            "category": r["product__category__name"] or "Uncategorised",
+            "orders": r["orders"],
+            "revenue_cents": r["revenue"] or 0,
+            "share_pct": _ratio(r["revenue"] or 0, total),
+        }
+        for r in rows
+    ]
+    return sorted(out, key=lambda r: -r["revenue_cents"])[:limit]
+
+
+def _top_products(store, start, end, limit: int = 5) -> list[dict]:
+    rows = (
+        _sold_items(store).filter(order__placed_at__gte=start, order__placed_at__lt=end)
+        .values("product_id", "product__name")
+        .annotate(orders=Count("order_id", distinct=True), revenue=Sum("line_total_cents"), units=Sum("qty"))
+        .order_by("-revenue")[:limit]
+    )
+    rows = list(rows)
+    images = dict(
+        ProductImage.objects.filter(product_id__in=[r["product_id"] for r in rows])
+        .order_by("product_id", "-is_primary", "sort_order")
+        .values_list("product_id", "image")
+    )
+    return [
+        {
+            "rank": i,
+            "product_id": r["product_id"],
+            "name": r["product__name"],
+            "image_url": (settings.MEDIA_URL + images[r["product_id"]]) if images.get(r["product_id"]) else None,
+            "orders": r["orders"],
+            "units": r["units"] or 0,
+            "revenue_cents": r["revenue"] or 0,
+        }
+        for i, r in enumerate(rows, start=1)
+    ]
+
+
+def _customer_snapshot(store) -> dict:
+    """New / Returning / One-Time — the three types the customers rollup already
+    computes, which the Store Performance screen shows as counts."""
+    now = timezone.now()
+    counts = defaultdict(int)
+    for c in customers_svc.all_customers(store).values():
+        counts[c.type(now)] += 1
+    return {"new": counts["new"], "returning": counts["returning"], "one_time": counts["one_time"]}
 
 
 # --------------------------------------------------------------------------- #
@@ -160,6 +255,10 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
         .values_list("product_id").annotate(n=Count("id")).values_list("product_id", "n")
     )
     live = Product.objects.filter(store=store).exclude(status=Product.ProductStatus.ARCHIVED).select_related("brand", "category")
+    images = dict(
+        ProductImage.objects.filter(product__store=store).order_by("product_id", "-is_primary", "sort_order")
+        .values_list("product_id", "image")
+    )
 
     rows = []
     for product in live:
@@ -169,6 +268,7 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
         rows.append({
             "product_id": product.id, "name": product.name, "slug": product.slug,
             "status": product.status, "stock_status": product.stock_status,
+            "image_url": (settings.MEDIA_URL + images[product.id]) if images.get(product.id) else None,
             "views": seen, "units": units, "revenue_cents": revenue,
             "orders": stats.get("orders", 0),
             "conversion_rate": _ratio(stats.get("orders", 0), seen),
@@ -184,8 +284,12 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
         and r["units"] == 0
     ]
     slow.sort(key=lambda r: (-r["views"], r["name"]))
+    earned = sum(r["revenue_cents"] for r in rows)
+    selling = [r for r in rows if r["units"]]
     return {"period": period_name, "sort": sort, "top": top, "slow_movers": slow[:limit],
-            "products_with_no_sales": len(slow), "products_total": len(rows)}
+            "products_with_no_sales": len(slow), "products_total": len(rows),
+            "top_selling_count": len(selling),
+            "avg_product_revenue_cents": round(earned / len(rows)) if rows else 0}
 
 
 # --------------------------------------------------------------------------- #
@@ -347,17 +451,91 @@ def fulfilment(store, period_name: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Sales Analytics
+# --------------------------------------------------------------------------- #
+
+
+def _discounts_cents(store, start, end) -> int:
+    """The store's pro-rata share of every voucher in the period (Q49)."""
+    orders = (
+        Order.objects.filter(items__store=store, placed_at__gte=start, placed_at__lt=end, discount_cents__gt=0)
+        .exclude(status=Status.PENDING_PAYMENT).distinct()
+    )
+    return sum(store_discount_cents(o, store.pk) for o in orders)
+
+
+def sales(store, period_name: str, *, bucket: str = "daily") -> dict:
+    """The designer's revenue view: gross, what was taken off it, and what is left.
+
+    Their *net* is gross − discounts − refunds − adjustments, which is a different
+    quantity from `overview.net_sales_cents` (gross − cancelled/returned lines).
+    Both are correct; they answer different questions, so both keep their own name.
+    """
+    p = period_range(period_name)
+
+    def window(start, end):
+        gross = _sold_items(store).filter(order__placed_at__gte=start, order__placed_at__lt=end).aggregate(
+            s=Sum("line_total_cents"))["s"] or 0
+        discounts = _discounts_cents(store, start, end)
+        refunds = adjustments = 0          # no amounts exist until the PSP lands (Q50)
+        return {"gross": gross, "discounts": discounts, "refunds": refunds, "adjustments": adjustments,
+                "net": gross - discounts - refunds - adjustments}
+
+    cur, prev = window(p.start, p.end), window(p.prev_start, p.prev_end)
+
+    series = _sales_series(store, p.start, p.end, bucket)
+    ratio = (cur["net"] / cur["gross"]) if cur["gross"] else 1.0
+    revenue_over_time = [
+        {"label": row["label"], "values": {"gross": row["values"]["sales"], "net": round(row["values"]["sales"] * ratio, 2)}}
+        for row in series
+    ]
+
+    channels = dict(
+        _sold_items(store).filter(order__placed_at__gte=p.start, order__placed_at__lt=p.end)
+        .values_list("order__channel").annotate(s=Sum("line_total_cents")).values_list("order__channel", "s")
+    )
+    total_channel = sum(channels.values()) or 0
+    return {
+        "period": period_name,
+        "bucket": bucket,
+        "gross_sales_cents": _kpi(cur["gross"], prev["gross"]),
+        "discounts_cents": _kpi(cur["discounts"], prev["discounts"]),
+        "refunds_cents": _kpi(cur["refunds"], prev["refunds"]),
+        "net_sales_cents": _kpi(cur["net"], prev["net"]),
+        "revenue_over_time": revenue_over_time,
+        "revenue_breakdown": [
+            {"label": "Gross Sales", "amount_cents": cur["gross"]},
+            {"label": "Discounts", "amount_cents": -cur["discounts"]},
+            {"label": "Refunds", "amount_cents": -cur["refunds"]},
+            {"label": "Adjustments", "amount_cents": -cur["adjustments"]},
+            {"label": "Net Sales", "amount_cents": cur["net"]},
+        ],
+        "sales_by_channel": [
+            {"channel": channel, "revenue_cents": value, "share_pct": _ratio(value, total_channel)}
+            for channel, value in sorted(channels.items(), key=lambda kv: -kv[1])
+        ],
+        "sales_by_category": _sales_by_category(store, p.start, p.end),
+        "refunds_tracked": REFUNDS_TRACKED,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Export
 # --------------------------------------------------------------------------- #
 
 REPORTS = {
     "overview": overview,
+    "sales": sales,
     "funnel": funnel,
     "products": products,
     "search": search_terms,
     "customers": customers,
     "fulfilment": fulfilment,
 }
+
+
+def _is_kpi(value) -> bool:
+    return isinstance(value, dict) and {"value", "previous", "change_pct"} <= set(value)
 
 
 def export(store, report: str, period_name: str):
@@ -386,7 +564,13 @@ def export(store, report: str, period_name: str):
         rows = [["orders", data["orders"]], ["cancellation_rate_%", data["cancellation_rate"]], ["return_rate_%", data["return_rate"]]]
         rows += [[f"{stage}_{k}", v] for stage in ("to_shipped", "to_delivered") for k, v in data[stage].items()]
         rows += [[f"status_{k}", v] for k, v in data["by_status"].items()]
+    elif report == "sales":
+        header = ["metric", "value", "previous", "change_%"]
+        rows = [[k, v["value"], v["previous"], v["change_pct"]] for k, v in data.items() if _is_kpi(v)]
+        rows += [[f"breakdown_{step['label']}", step["amount_cents"] / 100, "", ""] for step in data["revenue_breakdown"]]
+        rows += [[f"channel_{c['channel']}", c["revenue_cents"] / 100, "", c["share_pct"]] for c in data["sales_by_channel"]]
     else:  # overview: every KPI as one row
         header = ["metric", "value", "previous", "change_%"]
-        rows = [[k, v["value"], v["previous"], v["change_pct"]] for k, v in data.items() if isinstance(v, dict)]
+        rows = [[k, v["value"], v["previous"], v["change_pct"]] for k, v in data.items() if _is_kpi(v)]
+        rows += [[f"customers_{k}", v, "", ""] for k, v in data["customer_snapshot"].items()]
     return csv_response(f"{report}-{period_name}.csv", header, rows)

@@ -241,6 +241,35 @@ class SellerApplicationStatusEvent(TimeStampedModel):
         ordering = ["created_at"]
 
 
+class StoreDeliveryOption(TimeStampedModel):
+    """A delivery choice the **seller** defines, with their own name and price.
+
+    The product wizard's Shipping step shows these (Express Delivery R25, Seller
+    Delivery R20, Customer Pickup R15 in the design). They replace the old
+    platform-wide `orders.DeliveryMethod` as what a buyer actually chooses — see
+    docs/sprint-6-plan.md §3 for how a cart spanning several sellers resolves.
+    """
+
+    class Kind(models.TextChoices):
+        DELIVERY = "delivery", "Delivery"
+        PICKUP = "pickup", "Customer pickup"
+
+    store = models.ForeignKey("Store", on_delete=models.CASCADE, related_name="delivery_options")
+    name = models.CharField(max_length=60, help_text='e.g. "Express Delivery"')
+    eta_label = models.CharField(max_length=60, blank=True, help_text='Free text, e.g. "1-3 business days"')
+    price_cents = models.PositiveIntegerField(default=0, help_text="In the store's market currency; 0 is allowed (free delivery)")
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.DELIVERY)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta(TimeStampedModel.Meta):
+        ordering = ["sort_order", "price_cents", "name"]
+        constraints = [models.UniqueConstraint(fields=["store", "name"], name="uniq_delivery_option_per_store")]
+
+    def __str__(self):
+        return f"{self.store_id}: {self.name}"
+
+
 class Store(TimeStampedModel):
     """Public storefront. Created on approval, activated on 'Activate & Start Selling'."""
 

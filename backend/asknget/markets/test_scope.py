@@ -6,7 +6,7 @@ from catalog.models import Category
 from catalog.services import refresh_category_counts
 from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user
 from marketing.models import Banner
-from orders.models import DeliveryMethod, Order, Voucher
+from orders.models import Order, Voucher
 
 CART = "/api/v1/cart"
 CHECKOUT = "/api/v1/checkout"
@@ -22,8 +22,9 @@ class MarketScopeTests(ApiTestCase):
         cls.pk_store = make_store(name="Karachi Cosmetics", country=cls.pk)
         cls.za_product = make_product(cls.za_store, cls.beauty, "ZA Cream", 2599, 4099, stock=5)
         cls.pk_product = make_product(cls.pk_store, cls.beauty, "PK Cream", 1599, None, stock=5, currency="PKR")
-        cls.za_method = DeliveryMethod.objects.create(country_id=DEFAULT, name="Standard", eta_min_days=3, eta_max_days=5, price_cents=700)
-        cls.pk_method = DeliveryMethod.objects.create(country=cls.pk, name="Standard", eta_min_days=3, eta_max_days=5, price_cents=250)
+        # Shipping belongs to the seller (sprint 6); each store got the defaults.
+        cls.za_method = cls.za_store.delivery_options.get(name="Seller Delivery")
+        cls.pk_method = cls.pk_store.delivery_options.get(name="Seller Delivery")
         refresh_category_counts()
 
     def setUp(self):
@@ -54,11 +55,14 @@ class MarketScopeTests(ApiTestCase):
         similar = self.get(f"/api/v1/products/{self.za_product.slug}/similar").json()
         self.assertNotIn("PK Cream", [p["name"] for p in similar])
 
-    def test_delivery_methods_and_banners_follow_the_market(self):
+    def test_delivery_options_belong_to_the_store_and_banners_follow_the_market(self):
         Banner.objects.create(placement="hero", title="Everywhere", image="banners/x.png")
         Banner.objects.create(placement="hero", title="Pakistan only", image="banners/y.png", country=self.pk)
-        self.assertEqual([m["price_cents"] for m in self.get("/api/v1/delivery-methods").json()], [700])
-        self.assertEqual([m["price_cents"] for m in self.get("/api/v1/delivery-methods", region="PK").json()], [250])
+        # A cart is single-market, so its delivery options are whichever store's it holds.
+        self._add(self.za_product, token=self.token)
+        body = self.get(CART, token=self.token).json()
+        self.assertEqual([d["store_name"] for d in body["deliveries"]], ["Huda Beauty"])
+        self.assertTrue({"Express Delivery", "Seller Delivery", "Customer Pickup"} <= {o["name"] for o in body["deliveries"][0]["options"]})
         self.assertEqual([b["title"] for b in self.get("/api/v1/banners").json()], ["Everywhere"])
         self.assertEqual(sorted(b["title"] for b in self.get("/api/v1/banners", region="PK").json()), ["Everywhere", "Pakistan only"])
 
@@ -73,18 +77,18 @@ class MarketScopeTests(ApiTestCase):
         body = self._add(self.za_product, token=self.token).json()
         self.assertEqual(body["country"], DEFAULT)
         self.assertEqual(body["summary"]["currency"], "USD")  # product currency as created by the fixture
-        self.assertEqual(body["delivery_method"]["price_cents"], 700)
+        self.assertEqual(body["summary"]["shipping_cents"], self.za_method.price_cents)
         res = self._add(self.pk_product, region="PK", token=self.token)
         self.assertEqual(res.status_code, 409)
         self.assertEqual(res.json()["detail"], "cart_region_mismatch")
-        # a delivery method from another market is refused too
-        res = self.patch(CART, {"delivery_method_id": str(self.pk_method.id)}, self.token)
-        self.assertEqual(res.status_code, 422)
+        # another store's option cannot be chosen for this cart
+        res = self.patch(f"{CART}/delivery", {"store_id": str(self.pk_store.id), "option_id": str(self.pk_method.id)}, self.token)
+        self.assertEqual(res.status_code, 404)
         # clear → switch
         body = self.delete(f"{CART}/items", self.token).json()
         self.assertEqual((body["items"], body["country"]), ([], DEFAULT))  # empty → the request's market
         body = self._add(self.pk_product, region="PK", token=self.token).json()
-        self.assertEqual((body["country"], body["delivery_method"]["price_cents"]), ("PK", 250))
+        self.assertEqual((body["country"], body["summary"]["shipping_cents"]), ("PK", self.pk_method.price_cents))
 
     def test_guest_lines_from_another_market_do_not_merge(self):
         guest = self.client.get(CART, headers={"X-Region": "PK"}).json()["cart_token"]
@@ -106,7 +110,8 @@ class MarketScopeTests(ApiTestCase):
 
     def _payload(self, method, **over):
         return {"contact": self.CONTACT, "address": {"address": "1 Main St", "city": "Cape Town", "postal_code": "6001"},
-                "delivery_method_id": str(method.id), "payment_method_type": "card", **over}
+                "deliveries": [{"store_id": str(method.store_id), "option_id": str(method.id)}],
+                "payment_method_type": "card", **over}
 
     def test_checkout_snapshots_market_and_return_window(self):
         self._add(self.za_product, token=self.token)
@@ -120,7 +125,8 @@ class MarketScopeTests(ApiTestCase):
 
     def test_checkout_refuses_other_market_delivery_and_address(self):
         self._add(self.za_product, token=self.token)
-        self.assertEqual(self.post(CHECKOUT, self._payload(self.pk_method), self.token).status_code, 422)
+        # the PK store has nothing in this cart, so its option cannot be applied
+        self.assertEqual(self.post(CHECKOUT, self._payload(self.pk_method), self.token).status_code, 404)
         res = self.post(CHECKOUT, self._payload(self.za_method, address={"address": "1 Mall Rd", "city": "Lahore", "postal_code": "54000", "country": "PK"}), self.token)
         self.assertEqual(res.status_code, 409)
         self.assertEqual(res.json()["detail"], "ships_outside_region")
