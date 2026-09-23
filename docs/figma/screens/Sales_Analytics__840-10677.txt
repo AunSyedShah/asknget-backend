@@ -1,0 +1,134 @@
+[Sales Analytics]
+  [Top Header]
+    [Bread Crums]
+      T: Analytics
+      T: Dashboard / Analytics / Sales
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+  [Content Frame]
+      T: Sales Analytics
+      T: Analyze revenue, discounts, refunds and sales trends.
+          T: Last 30 Days
+          T: Compare
+    [I:Button | State=Default]
+    [KPI - 1]
+          T: 16.4%  vs. previous period
+              T: R 284,920
+              T: Gross Sales
+    [KPI - 5]
+          T: 14.8%  vs previous period
+              T: R 248,560
+              T: Net Sales
+    [KPI - 7]
+          T: 4.2% vs previous period
+              T: R 18,240
+              T: Discounts
+    [KPI - 8]
+          T: 8.1%  vs previous period
+              T: R 6,840
+              T: Refunds
+    [Revenue Over Time]
+          T: View Details
+          T: Revenue Over Time
+        [Chart]
+                T: Apr 01
+                T: Apr 07
+                T: Apr 14
+                T: Apr 21
+                T: Apr 30
+                T: R 6,820
+                T: R 0
+                T: R 8,240
+                T: R 12,940
+                T: R 14,680
+            [Clip path group]
+              [zr3-c0]
+            [Clip path group]
+              [zr3-c0]
+                T: Gross Sales
+                T: Net Sales
+                T: Monthly
+                T: Weekly
+                T: Daily
+            [Clip path group]
+              [zr3-c0]
+            [Clip path group]
+              [zr3-c0]
+    [Revenue Breakdown]
+          T: Gross Sales
+          T: Discounts
+          T: Refunds
+          T: Adjustments
+          T: Net Sales
+        [Amount]
+          T: R300000
+          T: R250000
+          T: R200000
+          T: R150000
+          T: R100000
+          T: R50000
+          T: R0
+          T: View Details
+          T: Revenue Breakdown
+        T: R284,920
+        T: -R18,240
+        T: -R6,840
+        T: -R11,274
+        T: R248,560
+        [Bg Lines]
+    [Revenue Breakdown]
+          T: Gross Sales
+          T: Discounts
+          T: Refunds
+          T: Adjustments
+          T: Net Sales
+        [Amount]
+          T: R300000
+          T: R250000
+          T: R200000
+          T: R150000
+          T: R100000
+          T: R50000
+          T: R0
+          T: View Details
+          T: Revenue Breakdown
+        T: R284,920
+        T: -R18,240
+        T: -R6,840
+        T: -R11,274
+        T: R248,560
+        [Bg Lines]
+    [Sales by Channels]
+          [Circles]
+              T: R 284,920
+              T: Total Sales
+              T: 67.8%
+                T: Website
+              T: 27.5%
+                T: Mobile App
+              T: 4.7%
+                T: Others
+          T: View Details
+          T: Sales by Channel
+    [Sales by Category]
+          [Row 1]
+              T: Fashion
+              T: 384
+              T: R82,450
+              T: 32.2%
+          [Row 2]
+              T: Electronics
+              T: 118
+              T: R61,280
+              T: 24.7%
+          [Row 3]
+              T: Sports
+              T: 142
+              T: R31,420
+              T: 15.5%
+            T: Sales by Category
+            T: View Details

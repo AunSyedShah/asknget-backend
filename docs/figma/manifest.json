@@ -5,196 +5,16 @@
   "lastModified": "2026-09-21T11:52:53Z",
   "screens": [
     {
-      "name": "Landing Page",
-      "node_id": "186:4247",
-      "file": "Landing_Page__186-4247.txt",
-      "lines": 186
-    },
-    {
-      "name": "Categories",
-      "node_id": "192:4750",
-      "file": "Categories__192-4750.txt",
-      "lines": 179
-    },
-    {
-      "name": "Product Details - Desc",
-      "node_id": "203:6868",
-      "file": "Product_Details_Desc__203-6868.txt",
-      "lines": 77
-    },
-    {
-      "name": "Product Details - Usage",
-      "node_id": "225:3191",
-      "file": "Product_Details_Usage__225-3191.txt",
-      "lines": 77
-    },
-    {
-      "name": "Product Details - Reviews",
-      "node_id": "225:3505",
-      "file": "Product_Details_Reviews__225-3505.txt",
-      "lines": 126
-    },
-    {
-      "name": "Cart",
-      "node_id": "237:1063",
-      "file": "Cart__237-1063.txt",
-      "lines": 45
-    },
-    {
-      "name": "Track Order",
-      "node_id": "256:5097",
-      "file": "Track_Order__256-5097.txt",
-      "lines": 11
-    },
-    {
-      "name": "My Account - Personal Info",
-      "node_id": "262:5539",
-      "file": "My_Account_Personal_Info__262-5539.txt",
-      "lines": 67
-    },
-    {
-      "name": "My Account - Wishlist",
-      "node_id": "292:8769",
-      "file": "My_Account_Wishlist__292-8769.txt",
-      "lines": 42
-    },
-    {
-      "name": "My Account - Manage Addresses",
-      "node_id": "297:10207",
-      "file": "My_Account_Manage_Addresses__297-10207.txt",
-      "lines": 32
-    },
-    {
-      "name": "My Account - Payments Methods",
-      "node_id": "311:2993",
-      "file": "My_Account_Payments_Methods__311-2993.txt",
-      "lines": 26
-    },
-    {
-      "name": "My Account - Payments Methods",
-      "node_id": "312:3402",
-      "file": "My_Account_Payments_Methods__312-3402.txt",
-      "lines": 29
-    },
-    {
       "name": "About Us",
       "node_id": "312:4902",
       "file": "About_Us__312-4902.txt",
       "lines": 24
     },
     {
-      "name": "Contact Us",
-      "node_id": "312:5192",
-      "file": "Contact_Us__312-5192.txt",
-      "lines": 27
-    },
-    {
-      "name": "Signup - Create Account",
-      "node_id": "447:7950",
-      "file": "Signup_Create_Account__447-7950.txt",
-      "lines": 27
-    },
-    {
-      "name": "Login",
-      "node_id": "570:4992",
-      "file": "Login__570-4992.txt",
-      "lines": 22
-    },
-    {
-      "name": "Seller Dashboard",
-      "node_id": "573:5141",
-      "file": "Seller_Dashboard__573-5141.txt",
-      "lines": 167
-    },
-    {
-      "name": "Products",
-      "node_id": "626:5220",
-      "file": "Products__626-5220.txt",
-      "lines": 166
-    },
-    {
-      "name": "Products",
-      "node_id": "664:8452",
-      "file": "Products__664-8452.txt",
-      "lines": 218
-    },
-    {
-      "name": "Email OTP Verification",
-      "node_id": "466:8619",
-      "file": "Email_OTP_Verification__466-8619.txt",
-      "lines": 6
-    },
-    {
-      "name": "Mobile OTP Verification",
-      "node_id": "466:8885",
-      "file": "Mobile_OTP_Verification__466-8885.txt",
-      "lines": 6
-    },
-    {
-      "name": "Basic Informtaion",
-      "node_id": "467:8904",
-      "file": "Basic_Informtaion__467-8904.txt",
-      "lines": 63
-    },
-    {
-      "name": "Business  Informtaion",
-      "node_id": "474:6463",
-      "file": "Business_Informtaion__474-6463.txt",
-      "lines": 76
-    },
-    {
-      "name": "Representative",
-      "node_id": "482:6727",
-      "file": "Representative__482-6727.txt",
-      "lines": 50
-    },
-    {
-      "name": "Banking Info",
-      "node_id": "482:6910",
-      "file": "Banking_Info__482-6910.txt",
-      "lines": 50
-    },
-    {
-      "name": "Review & Submit",
-      "node_id": "482:7047",
-      "file": "Review_Submit__482-7047.txt",
-      "lines": 49
-    },
-    {
-      "name": "Application Submitted",
-      "node_id": "491:7302",
-      "file": "Application_Submitted__491-7302.txt",
-      "lines": 26
-    },
-    {
-      "name": "Application Approved",
-      "node_id": "519:7432",
-      "file": "Application_Approved__519-7432.txt",
-      "lines": 23
-    },
-    {
       "name": "Activate  Account",
       "node_id": "519:7681",
       "file": "Activate_Account__519-7681.txt",
       "lines": 13
-    },
-    {
-      "name": "Application Status",
-      "node_id": "497:6677",
-      "file": "Application_Status__497-6677.txt",
-      "lines": 34
-    },
-    {
-      "name": "More Info Required",
-      "node_id": "506:6921",
-      "file": "More_Info_Required__506-6921.txt",
-      "lines": 25
-    },
-    {
-      "name": "Update Application",
-      "node_id": "515:7161",
-      "file": "Update_Application__515-7161.txt",
-      "lines": 33
     },
     {
       "name": "Activate Seller Account",
@@ -215,28 +35,66 @@
       "lines": 22
     },
     {
-      "name": "My Account - My Orders",
-      "node_id": "267:6566",
-      "file": "My_Account_My_Orders__267-6566.txt",
-      "lines": 61
+      "name": "Analytics Overview",
+      "node_id": "779:6848",
+      "file": "Analytics_Overview__779-6848.txt",
+      "lines": 106,
+      "source": "fig-export-2026-09-23"
     },
     {
-      "name": "My Account - Ongoing Orders",
-      "node_id": "284:7470",
-      "file": "My_Account_Ongoing_Orders__284-7470.txt",
+      "name": "Application Approved",
+      "node_id": "519:7432",
+      "file": "Application_Approved__519-7432.txt",
+      "lines": 23
+    },
+    {
+      "name": "Application Status",
+      "node_id": "497:6677",
+      "file": "Application_Status__497-6677.txt",
+      "lines": 34
+    },
+    {
+      "name": "Application Submitted",
+      "node_id": "491:7302",
+      "file": "Application_Submitted__491-7302.txt",
+      "lines": 26
+    },
+    {
+      "name": "Banking Info",
+      "node_id": "482:6910",
+      "file": "Banking_Info__482-6910.txt",
+      "lines": 50
+    },
+    {
+      "name": "Basic Informtaion",
+      "node_id": "467:8904",
+      "file": "Basic_Informtaion__467-8904.txt",
+      "lines": 63
+    },
+    {
+      "name": "Business  Informtaion",
+      "node_id": "474:6463",
+      "file": "Business_Informtaion__474-6463.txt",
+      "lines": 76
+    },
+    {
+      "name": "Cart",
+      "node_id": "237:1063",
+      "file": "Cart__237-1063.txt",
       "lines": 45
     },
     {
-      "name": "My Account - Completed Orders",
-      "node_id": "284:7773",
-      "file": "My_Account_Completed_Orders__284-7773.txt",
-      "lines": 37
+      "name": "Categories",
+      "node_id": "192:4750",
+      "file": "Categories__192-4750.txt",
+      "lines": 179
     },
     {
-      "name": "My Account - Cancelled Orders",
-      "node_id": "284:8096",
-      "file": "My_Account_Cancelled_Orders__284-8096.txt",
-      "lines": 37
+      "name": "Category Request Popup",
+      "node_id": "688:5844",
+      "file": "Category_Request_Popup__688-5844.txt",
+      "lines": 11,
+      "source": "fig-export-2026-09-23"
     },
     {
       "name": "Checkout",
@@ -245,28 +103,16 @@
       "lines": 70
     },
     {
-      "name": "Order Placed",
-      "node_id": "256:5077",
-      "file": "Order_Placed__256-5077.txt",
-      "lines": 7
+      "name": "Contact Us",
+      "node_id": "312:5192",
+      "file": "Contact_Us__312-5192.txt",
+      "lines": 27
     },
     {
-      "name": "Logout Popup",
-      "node_id": "312:4875",
-      "file": "Logout_Popup__312-4875.txt",
-      "lines": 7
-    },
-    {
-      "name": "Inventory",
-      "node_id": "689:6222",
-      "file": "Inventory__689-6222.txt",
-      "lines": 144
-    },
-    {
-      "name": "Orders Overview",
-      "node_id": "697:8989",
-      "file": "Orders_Overview__697-8989.txt",
-      "lines": 124
+      "name": "Customer Detail",
+      "node_id": "768:6318",
+      "file": "Customer_Detail__768-6318.txt",
+      "lines": 79
     },
     {
       "name": "Customers Overview",
@@ -281,16 +127,119 @@
       "lines": 161
     },
     {
-      "name": "Customer Detail",
-      "node_id": "768:6318",
-      "file": "Customer_Detail__768-6318.txt",
-      "lines": 79
+      "name": "Email OTP Verification",
+      "node_id": "466:8619",
+      "file": "Email_OTP_Verification__466-8619.txt",
+      "lines": 6
     },
     {
-      "name": "Chat",
-      "node_id": "779:6848",
-      "file": "Chat__779-6848.txt",
-      "lines": 38
+      "name": "Inventory",
+      "node_id": "689:6222",
+      "file": "Inventory__689-6222.txt",
+      "lines": 144
+    },
+    {
+      "name": "Landing Page",
+      "node_id": "186:4247",
+      "file": "Landing_Page__186-4247.txt",
+      "lines": 186
+    },
+    {
+      "name": "Login",
+      "node_id": "570:4992",
+      "file": "Login__570-4992.txt",
+      "lines": 22
+    },
+    {
+      "name": "Logout Popup",
+      "node_id": "312:4875",
+      "file": "Logout_Popup__312-4875.txt",
+      "lines": 7
+    },
+    {
+      "name": "Media Popup",
+      "node_id": "664:9125",
+      "file": "Media_Popup__664-9125.txt",
+      "lines": 18,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Mobile OTP Verification",
+      "node_id": "466:8885",
+      "file": "Mobile_OTP_Verification__466-8885.txt",
+      "lines": 6
+    },
+    {
+      "name": "More Info Required",
+      "node_id": "506:6921",
+      "file": "More_Info_Required__506-6921.txt",
+      "lines": 25
+    },
+    {
+      "name": "My Account - Cancelled Orders",
+      "node_id": "284:8096",
+      "file": "My_Account_Cancelled_Orders__284-8096.txt",
+      "lines": 37
+    },
+    {
+      "name": "My Account - Completed Orders",
+      "node_id": "284:7773",
+      "file": "My_Account_Completed_Orders__284-7773.txt",
+      "lines": 37
+    },
+    {
+      "name": "My Account - Manage Addresses",
+      "node_id": "297:10207",
+      "file": "My_Account_Manage_Addresses__297-10207.txt",
+      "lines": 32
+    },
+    {
+      "name": "My Account - My Orders",
+      "node_id": "267:6566",
+      "file": "My_Account_My_Orders__267-6566.txt",
+      "lines": 61
+    },
+    {
+      "name": "My Account - Ongoing Orders",
+      "node_id": "284:7470",
+      "file": "My_Account_Ongoing_Orders__284-7470.txt",
+      "lines": 45
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "311:2993",
+      "file": "My_Account_Payments_Methods__311-2993.txt",
+      "lines": 26
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "312:3402",
+      "file": "My_Account_Payments_Methods__312-3402.txt",
+      "lines": 29
+    },
+    {
+      "name": "My Account - Personal Info",
+      "node_id": "262:5539",
+      "file": "My_Account_Personal_Info__262-5539.txt",
+      "lines": 67
+    },
+    {
+      "name": "My Account - Wishlist",
+      "node_id": "292:8769",
+      "file": "My_Account_Wishlist__292-8769.txt",
+      "lines": 42
+    },
+    {
+      "name": "Order Placed",
+      "node_id": "256:5077",
+      "file": "Order_Placed__256-5077.txt",
+      "lines": 7
+    },
+    {
+      "name": "Orders Overview",
+      "node_id": "697:8989",
+      "file": "Orders_Overview__697-8989.txt",
+      "lines": 124
     },
     {
       "name": "Orders",
@@ -299,10 +248,119 @@
       "lines": 160
     },
     {
+      "name": "Pricing Popup",
+      "node_id": "682:5667",
+      "file": "Pricing_Popup__682-5667.txt",
+      "lines": 36,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Product Analytics",
+      "node_id": "872:11940",
+      "file": "Product_Analytics__872-11940.txt",
+      "lines": 33,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Product Details - Desc",
+      "node_id": "203:6868",
+      "file": "Product_Details_Desc__203-6868.txt",
+      "lines": 77
+    },
+    {
+      "name": "Product Details - Reviews",
+      "node_id": "225:3505",
+      "file": "Product_Details_Reviews__225-3505.txt",
+      "lines": 126
+    },
+    {
+      "name": "Product Details - Usage",
+      "node_id": "225:3191",
+      "file": "Product_Details_Usage__225-3191.txt",
+      "lines": 77
+    },
+    {
+      "name": "Products",
+      "node_id": "626:5220",
+      "file": "Products__626-5220.txt",
+      "lines": 166
+    },
+    {
+      "name": "Products",
+      "node_id": "664:8452",
+      "file": "Products__664-8452.txt",
+      "lines": 218
+    },
+    {
+      "name": "Representative",
+      "node_id": "482:6727",
+      "file": "Representative__482-6727.txt",
+      "lines": 50
+    },
+    {
+      "name": "Review Publish Popup",
+      "node_id": "688:6221",
+      "file": "Review_Publish_Popup__688-6221.txt",
+      "lines": 38,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Review & Submit",
+      "node_id": "482:7047",
+      "file": "Review_Submit__482-7047.txt",
+      "lines": 49
+    },
+    {
+      "name": "Sales Analytics",
+      "node_id": "840:10677",
+      "file": "Sales_Analytics__840-10677.txt",
+      "lines": 134,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Seller Dashboard",
+      "node_id": "573:5141",
+      "file": "Seller_Dashboard__573-5141.txt",
+      "lines": 167
+    },
+    {
+      "name": "Shipping Popup",
+      "node_id": "688:6034",
+      "file": "Shipping_Popup__688-6034.txt",
+      "lines": 20,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Signup - Create Account",
+      "node_id": "447:7950",
+      "file": "Signup_Create_Account__447-7950.txt",
+      "lines": 27
+    },
+    {
+      "name": "Track Order",
+      "node_id": "256:5097",
+      "file": "Track_Order__256-5097.txt",
+      "lines": 11
+    },
+    {
+      "name": "Transactions",
+      "node_id": "825:10206",
+      "file": "Transactions__825-10206.txt",
+      "lines": 15,
+      "source": "fig-export-2026-09-23"
+    },
+    {
+      "name": "Update Application",
+      "node_id": "515:7161",
+      "file": "Update_Application__515-7161.txt",
+      "lines": 33
+    },
+    {
       "name": "View Order/ Order Detail",
       "node_id": "736:7069",
       "file": "View_Order_Order_Detail__736-7069.txt",
       "lines": 101
     }
-  ]
+  ],
+  "partial_from_fig": "Screens marked source=fig-export came from a local .fig; a .fig cannot expand component instances, so those files are thinner than the API would give. Re-run a plain snapshot once the API is available."
 }

@@ -7,6 +7,7 @@
     python docs/figma/snapshot.py --index    # just refresh the frame list (cheapest call there is)
     python docs/figma/snapshot.py --render "Analytics Overview" 779:6848   # PNG of a frame
     python docs/figma/snapshot.py --file https://figma.com/design/<key>/…   # a different file
+    uv run --with zstandard python docs/figma/snapshot.py --from-fig asknget.fig   # offline, no API
 
 Run it before planning or implementing anything that touches a screen; then
 `git diff docs/figma/` shows precisely which labels, fields, options or flows moved.
@@ -28,6 +29,11 @@ a 429 there can lock us out for days.
 - `--nodes` sweeps everything, batch by batch. Expect it to stop mid-way with a 429;
   it keeps what it fetched and never deletes a screen it has not replaced, so
   re-running it later resumes rather than starting over.
+
+`--from-fig` skips the API entirely: Figma → File → *Save local copy* gives a .fig,
+and `docs/figma/kiwi.py` decodes its scene graph straight to the same screens/*.txt.
+No token, no rate limit, no plan tier. The catch is that an export is a point-in-time
+copy — `--check` still needs the API to notice that the live file has moved on.
 
 `--render` is the last resort: `/images` is a **third** budget and has kept working
 while both of the others were locked. It gives a picture, not text — but a picture
@@ -191,6 +197,111 @@ def snapshot_via_file() -> None:
     _write_manifest(doc["version"], doc["lastModified"], screens, via="files")
 
 
+# --------------------------------------------------------------------------- #
+# Offline: .fig
+# --------------------------------------------------------------------------- #
+
+# .fig calls components SYMBOL; the REST API calls them COMPONENT. Everything else
+# lines up, so the two paths produce byte-identical screen files.
+FIG_TYPE_ALIASES = {"SYMBOL": "COMPONENT"}
+
+
+def snapshot_from_fig(path, replace: bool = False) -> int:
+    """Screens from a local .fig export.
+
+    Fidelity caveat: a .fig stores component **instances by reference** — the node
+    has no children and its content lives in the SYMBOL definition plus
+    `symbolOverrides`, while the REST API returns instances already expanded. So
+    screens built from components (product cards, nav) come out much thinner here.
+    Existing screen files are kept unless --replace is passed; this path is for
+    picking up frames the API has not given us yet.
+    """
+    import kiwi
+
+    _schema, root = kiwi.load(path)
+    changes = root.get("nodeChanges") or []
+
+    def key(guid):
+        return (guid["sessionID"], guid["localID"]) if guid else None
+
+    nodes, children = {}, {}
+    for change in changes:
+        guid = key(change.get("guid"))
+        if guid is None:
+            continue
+        nodes[guid] = change
+        parent = change.get("parentIndex") or {}
+        pkey = key(parent.get("guid"))
+        if pkey is not None:
+            # `position` is a fractional index; lexicographic order is canvas order.
+            children.setdefault(pkey, []).append((parent.get("position", ""), guid))
+
+    canvas = next((n for n in changes if n.get("type") == "CANVAS" and n.get("name") == PAGE_NAME), None)
+    if canvas is None:
+        found = [n.get("name") for n in changes if n.get("type") == "CANVAS"]
+        sys.exit(f"No page named {PAGE_NAME!r} in {path} (pages: {', '.join(map(str, found))})")
+
+    symbols = {key(n["guid"]): n.get("name", "") for n in changes if n.get("type") == "SYMBOL"}
+
+    def kids(guid):
+        return [nodes[g] for _pos, g in sorted(children.get(guid, []), key=lambda t: t[0]) if g in nodes]
+
+    def outline(node, depth, out):
+        name = node.get("name", "") or ""
+        typ = FIG_TYPE_ALIASES.get(node.get("type"), node.get("type"))
+        cname = symbols.get(key((node.get("symbolData") or {}).get("symbolID")), "") if typ == "INSTANCE" else ""
+        if SKIP_NAMES.match(name) or (cname and SKIP_NAMES.match(cname.split("|")[0].strip())):
+            return
+        pad = "  " * depth
+        if typ == "TEXT":
+            text = (node.get("textData") or {}).get("characters", "").strip().replace("\n", " / ")
+            if text:
+                out.append(f"{pad}T: {text}")
+        elif typ == "INSTANCE":
+            if ":" in name and not cname.startswith(("Input Fields", "Button")):
+                return  # an icon instance
+            out.append(f"{pad}[I:{name}" + (f" | {cname}" if cname and cname != name else "") + "]")
+        elif typ in ("FRAME", "GROUP", "COMPONENT", "SECTION") and not GENERIC_NAMES.match(name):
+            out.append(f"{pad}[{name}]")
+        for child in kids(key(node["guid"])):
+            outline(child, depth + 1, out)
+
+    frames = [f for f in kids(key(canvas["guid"])) if _wanted(f) and not GENERIC_NAMES.match(f.get("name", ""))]
+    SCREENS_DIR.mkdir(parents=True, exist_ok=True)
+    screens, skipped = [], []
+    for frame in frames:
+        lines: list[str] = []
+        outline(frame, 0, lines)
+        deduped = [l for i, l in enumerate(lines) if i == 0 or l != lines[i - 1]]
+        guid = key(frame["guid"])
+        node_id = f"{guid[0]}:{guid[1]}"
+        slug = re.sub(r"[^\w]+", "_", frame["name"]).strip("_")
+        out_path = SCREENS_DIR / f"{slug}__{node_id.replace(':', '-')}.txt"
+        if out_path.exists() and not replace:
+            skipped.append(out_path.name)   # the API version expands instances; keep it
+            continue
+        out_path.write_text(chr(10).join(deduped) + chr(10), encoding="utf-8")
+        screens.append({"name": frame["name"], "node_id": node_id, "file": out_path.name, "lines": len(deduped)})
+        print(f"  + {out_path.name} ({len(deduped)} lines)")
+
+    exported = ""
+    try:
+        import json as _json
+        import zipfile as _zipfile
+
+        with _zipfile.ZipFile(path) as z:
+            exported = _json.loads(z.read("meta.json")).get("exported_at", "")
+    except Exception:
+        pass
+
+    if skipped:
+        print(f"  kept {len(skipped)} existing screen file(s) — pass --replace to overwrite them from the .fig")
+    print(f"{len(screens)} screen file(s) written from {Path(path).name} (exported {exported or 'unknown'})")
+    print("The manifest is left alone: a .fig cannot expand instances, so it is a partial source.")
+    print("Reminder: a .fig is a point-in-time export — `--check` still compares against the live file.")
+    return 0
+
+
 def refresh_index() -> list[dict]:
     """One small call: every frame on the page, name + node id. This is how a newly
     drawn screen is discovered without reading the whole file."""
@@ -324,7 +435,11 @@ if __name__ == "__main__":
     ap.add_argument("--render", nargs="+", metavar="FRAME", help="save a PNG of these frames (separate rate limit — works when the rest is locked)")
     ap.add_argument("--scale", type=float, default=1.0, help="with --render: image scale (0.2 for an overview, 1 to read text)")
     ap.add_argument("--file", metavar="KEY_OR_URL", help="snapshot a different file (paste its Figma URL); also FIGMA_FILE_KEY")
+    ap.add_argument("--from-fig", metavar="PATH", help="add screens from a local .fig export (no token, no rate limit)")
+    ap.add_argument("--replace", action="store_true", help="with --from-fig: overwrite existing screen files too (the API versions are usually richer)")
     args = ap.parse_args()
+    if args.from_fig:
+        sys.exit(snapshot_from_fig(args.from_fig, args.replace))
     if args.file:
         FILE_KEY = file_key_from(args.file)
         print(f"file: {FILE_KEY}")

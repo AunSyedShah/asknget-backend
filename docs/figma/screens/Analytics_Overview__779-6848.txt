@@ -1,0 +1,106 @@
+[Analytics Overview]
+  [Top Header]
+    [Bread Crums]
+      T: Analytics
+      T: Dashboard / Analytics
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+  [Content Frame]
+    [I:Button | State=Default]
+      T: Store Performance
+      T: Track sales, orders, products and customer activity across your store.
+    [KPI - 1]
+          T: 14.8% vs. previous period
+              T: R 248,560
+              T: Total Sales
+    [KPI - 5]
+          T: 9.6% vs previous period
+              T: 1,284
+              T: Total Orders
+    [KPI - 7]
+          T: 4.2% vs previous period
+              T: R 193.43
+              T: Average Order Value
+    [KPI - 8]
+          T: 0.6% vs previous period
+              T: 3.84%
+              T: Conversion Rate
+    [Sales Performance]
+          T: View Details
+          T: Sales Performance
+        [Chart]
+                T: Apr 01
+                T: Apr 05
+                T: Apr 10
+                T: Apr 15
+                T: Apr 20
+                T: Apr 25
+                T: Apr 30
+                T: R 6,820
+                T: R 0
+                T: R 8,240
+                T: R 7,940
+                T: R 10,420
+                T: R 9,680
+                T: R 11,280
+                T: R 12,640
+            T: 186
+            T: 214
+            T: 237
+            T: 73
+            T: 209
+            T: 180
+          T: 305
+          T: This Week
+    [Sales by Category]
+        [Circles]
+            T: R 248,560
+            T: Total Sales
+        [Circles]
+            T: R 248,560
+            T: Total Sales
+            T: 33.2%
+              T: Fashion
+            T: 24.7%
+              T: Electronics
+            T: 15.5%
+              T: Beauty
+            T: 12.6%
+              T: Home & Lifestyle
+            T: 8.0%
+              T: Jewellery
+            T: 6.0%
+              T: Sports
+          T: View Details
+          T: Sales by Category
+    [Top Products]
+          [Row 1]
+              T: 1
+                T: Premium Oversized Hoodie
+              T: 184
+              T: R32,840
+          [Row 2]
+              T: 1
+                T: Classic Leather Bag
+              T: 118
+              T: R21,420
+          [Row 3]
+              T: 1
+                T: Wireless Earbuds Pro
+              T: 142
+              T: R27,640
+            T: Top Products
+            T: View Details
+    [Customer Snapshot]
+            T: New Customers
+            T: 328
+            T: Returning Customers
+            T: 1,240
+            T: One-Time Customers
+            T: 1,245
+        T: Customer Snapshot
+        T: View Details

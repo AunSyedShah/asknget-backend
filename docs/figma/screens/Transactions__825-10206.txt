@@ -1,0 +1,15 @@
+[Transactions]
+  [Top Header]
+    [Bread Crums]
+      T: Transections
+      T: Dashboard / Transections
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+  [Content Frame]
+    [I:Button | State=Default]
+      T: Transactions
+      T: Track payments, payouts, fees and other financial activity for your store.

@@ -1,0 +1,11 @@
+[Category Request Popup]
+  [I:Input Fields | Property 1=Icon Input]
+  [I:Input Fields | Property 1=Default]
+    [I:Input Fields | Property 1=Default]
+    T: 0/250
+    [Image Upload]
+        T: Upload File
+        T: PNG, JPG upto 1-MB
+    T: Supporting Document (Optional)
+    [I:Button | State=TErtiory Button]
+    [I:Button | State=Default]

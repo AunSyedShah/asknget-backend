@@ -1,0 +1,33 @@
+[Product Analytics]
+  [Top Header]
+    [Bread Crums]
+      T: Analytics
+      T: Dashboard / Analytics / Products
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+  [Content Frame]
+      T: Product Analytics
+      T: Understand which products drive revenue, orders and conversions.
+          T: Last 30 Days
+          T: Compare
+    [I:Button | State=Default]
+    [KPI - 1]
+          T: 16.4%  vs. previous period
+              T: 486
+              T: Total Products
+    [KPI - 5]
+          T: 14.8%  vs previous period
+              T: 24
+              T: Top Selling Products
+    [KPI - 7]
+          T: 4.2% vs previous period
+              T: 38
+              T: Low Performing Products
+    [KPI - 8]
+          T: 8.1%  vs previous period
+              T: R510
+              T: Avg. Product Revenue

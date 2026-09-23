@@ -1,0 +1,36 @@
+[Pricing Popup]
+        T: Color
+        T: Size
+        T: Price
+        T: Stock
+        T: Blue
+        T: Small
+        T: R24.99
+        T: 24
+        T: Black
+        T: Medium
+        T: R32.99
+        T: 24
+        T: Red
+        T: Large
+        T: R39.99
+        T: 24
+    [I:Button | State=TErtiory Button]
+    [I:Button | State=Default]
+      [I:Input Fields | Property 1=Default]
+      T: Pricing
+      T: Add a fair price of your product
+      [I:Input Fields | Property 1=Default]
+      T: Inventory
+  [Stepper]
+    [I:Stepper | State=Media Success]
+    [I:Stepper | State=Pricing Active]
+    [I:Stepper | State=Shipping Default]
+    [I:Stepper | State=Review Default]
+    [I:Stepper | State=Info Success]
+        T: Size
+        T: Color
+        T: Material
+      T: Add New Variant
+      T: Variants
+    [Toggle]

@@ -1,0 +1,20 @@
+[Shipping Popup]
+  [I:Input Fields | Property 1=Icon Input]
+    [I:Button | State=TErtiory Button]
+    [I:Button | State=Default]
+              T: Express Delivery
+              T: 1-3 business days
+              T: R25.00
+              T: Seller Delivery
+              T: 2-5 business days
+              T: R20.00
+              T: Customer Pickup
+              T: Pickup from store
+              T: R15.00
+      T: Delivery Options
+  [Stepper]
+    [I:Stepper | State=Media Success]
+    [I:Stepper | State=Pricing Success]
+    [I:Stepper | State=Shipping Active]
+    [I:Stepper | State=Review Default]
+    [I:Stepper | State=Info Success]

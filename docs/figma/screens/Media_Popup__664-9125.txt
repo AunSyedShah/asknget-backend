@@ -1,0 +1,18 @@
+[Media Popup]
+    [I:Button | State=TErtiory Button]
+    [I:Button | State=Default]
+    T: Product Media
+    T: Add clear, high-quality images to showcase your product.
+  [Stepper]
+    [I:Stepper | State=Media Active]
+    [I:Stepper | State=Pricing Default]
+    [I:Stepper | State=Shipping Default]
+    [I:Stepper | State=Review Default]
+    [I:Stepper | State=Info Success]
+  [Image Upload]
+    [Image Upload]
+        T: Drag & drop images here
+          T: Browse Files
+        T: PNG, JPG upto 1-MB
+        T: or
+          T: Add More
