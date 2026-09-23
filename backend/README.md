@@ -27,6 +27,9 @@ backend/
 - Design drift: `python docs/figma/snapshot.py --check` before touching a screen. If the full snapshot is
   rate-limited (Starter plan), `--index` lists the frames, `--nodes --only "<frame>"` snapshots a few, and
   `--render "<frame>"` saves a PNG — three separate budgets, so one of them is usually open.
+  If all three are cold, `uv run --with zstandard python docs/figma/snapshot.py --from-fig <file.fig>`
+  reads a local export offline (Figma → File → Save local copy). It is additive: a .fig cannot expand
+  component instances, so it fills in missing screens rather than overwriting richer API-derived ones.
 - Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers) · Live API docs: `/api/v1/docs`.
 
 ## Setup

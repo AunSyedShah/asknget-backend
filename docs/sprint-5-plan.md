@@ -104,28 +104,39 @@ rate limit, contact-detail flagging, staff flagged queue, "Message Customer" to 
 `portal/test_analytics.py` — one assertion per report against a fixture with known numbers, plus `403`
 for every route on a free store. Query budgets: pin the inbox and the analytics overview.
 
-## 5b. Design reconciliation — 2026-09-24 (partial, from renders)
+## 5b. Design reconciliation — 2026-09-24 (from a local .fig export)
 
-`/files` and `/files/{key}/nodes` were both rate-limited, but **`/images` is metered separately**, so the
-new screens were read as PNG renders instead (`snapshot.py --render`). The text snapshot in
-`docs/figma/screens/` is therefore still the 2026-09-21 one — re-run `--index` + `--nodes` once the limit
-clears (~29 Sep) and diff properly.
+The REST API was rate-limited (it is metered by the plan the *file* lives on, and the design sits in the
+designer's Starter space). A local **.fig export** — decoded offline by `docs/figma/kiwi.py`, see
+`snapshot.py --from-fig` — gave us the text without the API. Caveat: a .fig stores component **instances by
+reference**, so these screens are thinner than the API would render them; re-run a plain snapshot when the
+API is available.
 
-**Node `779:6848`, which our snapshot calls "Chat", is now "Analytics Overview".** The designer built the
-Analytics section while we were building it blind. What the frames show:
+**Node `779:6848`, which our snapshot called "Chat", is now "Analytics Overview".** The designer built the
+Analytics section while we were building it blind, and added five product-wizard popups that belong to
+sprint 3.
 
-| Frame | State | Versus what we shipped |
+### Analytics is three screens, not one
+
+| Screen | What it shows | Versus what we shipped |
 |---|---|---|
-| **Analytics / Store Performance** | complete | KPI cards Total Sales · Total Orders · Average Order Value · **Conversion Rate** — we have the first three in `/analytics/overview`; conversion lives only on the free dashboard, so **move/duplicate it into the premium overview**. Then: **Sales Performance** daily line chart with a period selector, **Sales by Category** donut with %, **Top Products** table (rank, image, orders, revenue) and a **Customer Snapshot** (New / Returning / One-Time counts). We have none of the first two; `/analytics/products` covers Top Products except the image; `/analytics/customers` has the totals but not the three-way split that `portal.customers.Customer.type()` already computes. |
-| **Analytics / Sales Analytics** | complete | KPIs **Gross Sales · Net Sales · Discounts · Refunds**. Their *net* = gross − discounts − refunds; our `net_sales_cents` = gross − cancelled/returned lines. Charts: **Revenue Over Time** (gross vs net, daily/weekly/monthly), **Revenue Breakdown** waterfall (gross → discounts → refunds → adjustments → net), **Sales by Category** table (orders, total, share), **Sales by Channel** donut (Website / Mobile App / Others). |
-| **Analytics / Product Analytics** | KPI row only, body empty | Total Products · Top Selling · **Low Performing** · Avg. Product Revenue. Our `slow_movers` is the "low performing" idea; the rest of the page is not drawn yet. |
-| **Transactions** (new sidebar entry) | title + Export button only | Payments, payouts and fees — the payments sprint. |
-| **Customer Detail** | complete | Tabs Overview / Orders / Activity / **Messages** / Notes, and per-customer KPIs. Confirms the sprint-5 chat model: **one thread per (store, customer)**, reachable from the customer record. |
+| **Analytics Overview** — "Store Performance" | KPIs Total Sales R248,560 · Total Orders 1,284 · Average Order Value R193.43 · **Conversion Rate 3.84%**, all "vs previous period". Then **Sales Performance** (daily line chart, period selector), **Sales by Category** (donut with %), **Top Products** (rank, image, orders, revenue) and **Customer Snapshot** (New 328 / Returning 1,240 / One-Time 1,245). | `/analytics/overview` has the first three KPIs. **Conversion rate** exists only on the free dashboard → add it here. Missing: the **daily sales series**, **sales by category**, and the **three-way customer split** (which `portal.customers.Customer.type()` already computes). `/analytics/products` covers Top Products except the image. |
+| **Sales Analytics** | KPIs **Gross R284,920 · Net R248,560 · Discounts R18,240 · Refunds R6,840**. **Revenue Over Time** (gross vs net, Daily/Weekly/Monthly). **Revenue Breakdown** waterfall: Gross 284,920 → −Discounts 18,240 → −Refunds 6,840 → −**Adjustments** 11,274 → Net 248,560. **Sales by Channel** donut: Website 67.8% / Mobile App 27.5% / Others 4.7%. **Sales by Category** table (category, orders, revenue, share). | Their *net* = gross − discounts − refunds − adjustments. Ours = gross − cancelled/returned lines: a different quantity with the same name. We have **no** discount attribution per store (that is Q34, now blocking), **no** refund amounts, **no** "adjustments" concept, and **no** sales channel on orders. |
+| **Product Analytics** | KPIs only so far: Total Products 486 · Top Selling 24 · **Low Performing 38** · Avg. Product Revenue R510. Body not drawn. | `/analytics/products` already returns top + `slow_movers`; "low performing" is the same idea. Wait for the rest of the page before building more. |
+| **Transactions** (new sidebar entry) | Title + Export only: "Track payments, payouts, fees and other financial activity for your store." | The payments sprint owns this. |
 
-Blocking gaps the design creates (new §10 questions Q49–Q52): per-store **discount** attribution is
-exactly Q34 and is now required, not optional; **refund amounts** do not exist until the PSP lands; we do
-not record a **sales channel** on orders at all; and the sidebar now has **Transactions** alongside
-Returns, Notifications and Team/Managers.
+Also confirmed: **Customer Detail** has tabs Overview / Orders / Activity / **Messages** / Notes — the chat
+model we shipped (one thread per store+customer, reachable from the customer record) matches the design.
+
+### The wizard popups are a sprint-3 correction
+
+| Popup | What it says | Impact |
+|---|---|---|
+| **Shipping** | "Delivery Options": Express Delivery 1–3 days **R25.00**, **Seller Delivery** 2–5 days R20.00, **Customer Pickup** "Pickup from store" R15.00 | Sprint 3 recorded the Shipping step as *empty* (Q24) and we stored weight/dimensions/handling days. The real design is **per-product delivery options with prices set by the seller**, including pickup. Today `DeliveryMethod` is platform-level per market and chosen by the buyer at checkout. This is a genuine model change — Q53. |
+| **Media** | "PNG, JPG upto 1-MB" | We enforce `PRODUCT_IMAGE_MAX_BYTES = 5 MB`. Design says **1 MB** — Q54. |
+| **Pricing** | Variant matrix: Color · Size · Price · Stock per row | Matches our options → variants model with per-variant price and stock. No change. |
+| **Category Request** | Free text (0/250) + "Supporting Document (Optional)", PNG/JPG up to 1 MB | A seller can **request a new category**. We have no such endpoint — Q55. |
+| **Review & Publish** | Product preview: category, stock, status, price, description, shipping, variants | Matches wizard step 5; it is a preview of data we already return. |
 
 ## 6. Not in this sprint
 

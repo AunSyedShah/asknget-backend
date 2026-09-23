@@ -582,9 +582,13 @@ REST-style JSON; auth via access + refresh JWT.
 47. **Chat attachments** — buyers often want to show a photo of a damaged item. Not implemented; needs the same upload limits as review media and a virus-scan decision.
 48. **Notifications** — the seller header badge is polled. E-mail/push for unread messages needs the background worker (perf step 6) and a quiet-hours policy.
 
-**Analytics screens (Figma 2026-09-23, read from renders — see `docs/sprint-5-plan.md` §5b)**
+**Analytics and wizard screens (Figma 2026-09-23, read from a .fig export — see `docs/sprint-5-plan.md` §5b)**
 
-49. **Discount attribution per store** — "Sales Analytics" shows Discounts as a headline KPI, so a store's net sales must subtract *its share* of order-level vouchers. This is Q34 and it is now blocking: allocate pro-rata across stores, or treat vouchers as marketplace-funded and show 0 to sellers?
-50. **Refunds** — also a headline KPI, and a leg of the revenue waterfall. We record `payment_status` but never an amount. Needs the PSP (amount, partial refunds, who absorbs the fee).
-51. **Sales by Channel** (Website / Mobile App / Others) — we do not record how an order was placed. Cheap to add (`Order.channel`, set by the client at checkout), but the frontend has to send it and someone must define the list.
-52. **Transactions page** — new sidebar entry, only a title and an Export button so far. Payments, payouts and fees: the payments sprint owns it; confirm it means *seller payouts*, not buyer transactions.
+49. **Discount attribution per store** — "Sales Analytics" makes Discounts a headline KPI and a leg of the revenue waterfall, so a store's net sales must subtract *its share* of order-level vouchers. This is Q34 and it is now blocking: allocate pro-rata across stores, or treat vouchers as marketplace-funded and show sellers zero?
+50. **Refunds and "Adjustments"** — both appear in the waterfall (R6,840 and R11,274). We record `payment_status` but never an amount, and "adjustments" is undefined: chargebacks? manual credits? platform fees? Needs the PSP and a definition.
+51. **Sales by Channel** (Website 67.8% / Mobile App 27.5% / Others 4.7%) — we do not record how an order was placed. Cheap to add (`Order.channel`, set by the client at checkout) but the frontend must send it and someone must own the list.
+52. **Transactions page** — new sidebar entry, title and Export button only. Confirm it means *seller payouts and fees*, not buyer transactions; the payments sprint owns it.
+53. **Per-product delivery options** — the wizard's Shipping popup lets a seller choose Express (R25), Seller Delivery (R20) and Customer Pickup (R15) **per product**. Today delivery methods are platform-level per market and the buyer picks one at checkout. Which wins? If the design does, `DeliveryMethod` becomes a per-store (or per-product) catalogue and checkout must reconcile options across a multi-store cart. Supersedes Q24.
+54. **Product image limit** — the Media popup says "PNG, JPG upto 1-MB"; we enforce 5 MB and also allow webp/gif. Tighten to match, or is 1 MB just placeholder copy?
+55. **Category request flow** — a new popup lets sellers request a category with a supporting document. New models and a staff queue (like the KYC one). In scope for which sprint?
+56. **Product Analytics page is unfinished** — only the KPI row is drawn (Total Products, Top Selling, Low Performing, Avg. Product Revenue). Confirm the rest before we build to it.
