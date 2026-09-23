@@ -9,12 +9,39 @@
     [Search Bar]
         T: Search anything...
   [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics Active]
+          T: Analytics
+      [I:Component 14 | State=Transactions]
+          T: Transections
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
   [Content Frame]
       T: Sales Analytics
       T: Analyze revenue, discounts, refunds and sales trends.
           T: Last 30 Days
           T: Compare
     [I:Button | State=Default]
+      T: Export Report
     [KPI - 1]
           T: 16.4%  vs. previous period
               T: R 284,920

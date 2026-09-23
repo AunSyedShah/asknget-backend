@@ -16,18 +16,44 @@
         T: R39.99
         T: 24
     [I:Button | State=TErtiory Button]
+      T: Cancel
     [I:Button | State=Default]
+      T: Save & Continue
       [I:Input Fields | Property 1=Default]
+        T: Selling Price
+          T: R 850
+      [I:Input Fields | Property 1=Default]
+        T: Compare-at Price
+          T: R 1,000
+      [I:Input Fields | Property 1=Default]
+        T: Cost Price
+          T: R 500
       T: Pricing
       T: Add a fair price of your product
       [I:Input Fields | Property 1=Default]
+        T: Barcode
+          T: Enter barcode
+      [I:Input Fields | Property 1=Default]
+        T: Stock Quantity
+          T: 45
+      [I:Input Fields | Property 1=Default]
+        T: Low Stock Threshold
+          T: 5
       T: Inventory
   [Stepper]
     [I:Stepper | State=Media Success]
+      T: Media
     [I:Stepper | State=Pricing Active]
+      T: Pricing & Inventory
+        T: 3
     [I:Stepper | State=Shipping Default]
+      T: Shipping
+        T: 4
     [I:Stepper | State=Review Default]
+      T: Review
+        T: 5
     [I:Stepper | State=Info Success]
+      T: Basic Info
         T: Size
         T: Color
         T: Material

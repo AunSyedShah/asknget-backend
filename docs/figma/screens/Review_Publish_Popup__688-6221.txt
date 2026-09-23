@@ -1,6 +1,8 @@
 [Review & Publish Popup]
     [I:Button | State=TErtiory Button]
+      T: Cancel
     [I:Button | State=Default]
+      T: Publish Product
         T: Category: Bags
         T: Stock: 45
         T: Status: Active
@@ -9,10 +11,16 @@
       T: Product Preview
   [Stepper]
     [I:Stepper | State=Media Success]
+      T: Media
     [I:Stepper | State=Pricing Success]
+      T: Pricing & Inventory
     [I:Stepper | State=Shipping Success]
+      T: Shipping
     [I:Stepper | State=Review Active]
+      T: Review
+        T: 5
     [I:Stepper | State=Info Success]
+      T: Basic Info
     T: Description
       T: Premium leather bag designed for everyday use...
             T: Express Delivery

@@ -153,7 +153,16 @@ def _write_screen(frame: dict, components: dict) -> dict:
 
 
 def _wanted(frame: dict) -> bool:
-    return frame.get("type") in ("FRAME", "INSTANCE") and not SKIP_NAMES.match(frame.get("name", ""))
+    """Top-level nodes that count as a screen.
+
+    GROUP belongs here: the designer draws dialogs (Media / Pricing / Shipping /
+    Review & Publish / Category Request popups) as groups, and leaving them out
+    silently lost five screens. Generic auto-names ("Group 5673") are not screens.
+    """
+    name = frame.get("name", "")
+    if SKIP_NAMES.match(name) or GENERIC_NAMES.match(name):
+        return False
+    return frame.get("type") in ("FRAME", "INSTANCE", "GROUP", "SECTION", "COMPONENT")
 
 
 def _prune(keep: set[str]) -> None:
@@ -266,7 +275,7 @@ def snapshot_from_fig(path, replace: bool = False) -> int:
         for child in kids(key(node["guid"])):
             outline(child, depth + 1, out)
 
-    frames = [f for f in kids(key(canvas["guid"])) if _wanted(f) and not GENERIC_NAMES.match(f.get("name", ""))]
+    frames = [f for f in kids(key(canvas["guid"])) if _wanted(f)]
     SCREENS_DIR.mkdir(parents=True, exist_ok=True)
     screens, skipped = [], []
     for frame in frames:

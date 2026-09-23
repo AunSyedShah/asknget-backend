@@ -2,7 +2,7 @@
   [Top Header]
     [Bread Crums]
       T: Customers
-      T: Dashboard / Customers
+      T: Dashboard / Customers / Olivia M.
           T: Sirosh Bashir
           T: Store Owner
             T: 2
@@ -29,6 +29,8 @@
           T: Chat
       [I:Component 11 | State=Analytics]
           T: Analytics
+      [I:Component 14 | State=Transactions]
+          T: Transections
       [I:Component 12 | State=Notifications]
           T: Notifications
       [I:Component 13 | State=Manager]

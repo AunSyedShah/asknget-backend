@@ -1,14 +1,25 @@
 [Media Popup]
     [I:Button | State=TErtiory Button]
+      T: Cancel
     [I:Button | State=Default]
+      T: Save & Continue
     T: Product Media
     T: Add clear, high-quality images to showcase your product.
   [Stepper]
     [I:Stepper | State=Media Active]
+      T: Media
+        T: 2
     [I:Stepper | State=Pricing Default]
+      T: Pricing & Inventory
+        T: 3
     [I:Stepper | State=Shipping Default]
+      T: Shipping
+        T: 4
     [I:Stepper | State=Review Default]
+      T: Review
+        T: 5
     [I:Stepper | State=Info Success]
+      T: Basic Info
   [Image Upload]
     [Image Upload]
         T: Drag & drop images here

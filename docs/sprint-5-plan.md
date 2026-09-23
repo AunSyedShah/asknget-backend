@@ -106,11 +106,16 @@ for every route on a free store. Query budgets: pin the inbox and the analytics 
 
 ## 5b. Design reconciliation — 2026-09-24 (from a local .fig export)
 
-The REST API was rate-limited (it is metered by the plan the *file* lives on, and the design sits in the
-designer's Starter space). A local **.fig export** — decoded offline by `docs/figma/kiwi.py`, see
-`snapshot.py --from-fig` — gave us the text without the API. Caveat: a .fig stores component **instances by
-reference**, so these screens are thinner than the API would render them; re-run a plain snapshot when the
-API is available.
+The REST API is metered by the plan the *file* lives on, and the design sits in the designer's Starter
+space — so the original stayed locked. Two routes got us current anyway: a local **.fig export** decoded
+offline (`docs/figma/kiwi.py`, `snapshot.py --from-fig`), and then a **duplicate of the file in the user's
+own Drafts**, which the API serves normally. The snapshot in git is the full-fidelity API version taken from
+that duplicate; `manifest.json` still records the *original's* version, so `--check` keeps watching the live
+design rather than the frozen copy.
+
+That sweep also exposed a bug of our own: `_wanted()` only accepted `FRAME`/`INSTANCE` top-level nodes, and
+the designer draws dialogs as **groups** — so the five wizard popups below had been silently missing from
+every snapshot we ever took.
 
 **Node `779:6848`, which our snapshot called "Chat", is now "Analytics Overview".** The designer built the
 Analytics section while we were building it blind, and added five product-wizard popups that belong to
@@ -132,7 +137,7 @@ model we shipped (one thread per store+customer, reachable from the customer rec
 
 | Popup | What it says | Impact |
 |---|---|---|
-| **Shipping** | "Delivery Options": Express Delivery 1–3 days **R25.00**, **Seller Delivery** 2–5 days R20.00, **Customer Pickup** "Pickup from store" R15.00 | Sprint 3 recorded the Shipping step as *empty* (Q24) and we stored weight/dimensions/handling days. The real design is **per-product delivery options with prices set by the seller**, including pickup. Today `DeliveryMethod` is platform-level per market and chosen by the buyer at checkout. This is a genuine model change — Q53. |
+| **Shipping** | "Delivery Options": Express Delivery 1–3 days **R25.00**, **Seller Delivery** 2–5 days R20.00, **Customer Pickup** "Pickup from store" R15.00. Plus **Processing Time** "1–2 business days" — which is our `Product.handling_days`, so part of sprint 3's guess was right. | Sprint 3 recorded the Shipping step as *empty* (Q24) and we stored weight/dimensions/handling days. The real design is **per-product delivery options with prices set by the seller**, including pickup. Today `DeliveryMethod` is platform-level per market and chosen by the buyer at checkout. This is a genuine model change — Q53. |
 | **Media** | "PNG, JPG upto 1-MB" | We enforce `PRODUCT_IMAGE_MAX_BYTES = 5 MB`. Design says **1 MB** — Q54. |
 | **Pricing** | Variant matrix: Color · Size · Price · Stock per row | Matches our options → variants model with per-variant price and stock. No change. |
 | **Category Request** | Free text (0/250) + "Supporting Document (Optional)", PNG/JPG up to 1 MB | A seller can **request a new category**. We have no such endpoint — Q55. |
