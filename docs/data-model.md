@@ -592,3 +592,4 @@ REST-style JSON; auth via access + refresh JWT.
 54. **Product image limit** — the Media popup says "PNG, JPG upto 1-MB"; we enforce 5 MB and also allow webp/gif. Tighten to match, or is 1 MB just placeholder copy?
 55. **Category request flow** — a new popup lets sellers request a category with a supporting document. New models and a staff queue (like the KYC one). In scope for which sprint?
 56. **Product Analytics page is unfinished** — only the KPI row is drawn (Total Products, Top Selling, Low Performing, Avg. Product Revenue). Confirm the rest before we build to it.
+57. **Product pricing fields the wizard asks for but we do not store** — the Pricing popup has **Cost Price** (R500, alongside Selling R850 and Compare-at R1,000) and **Barcode**. Cost price implies margin reporting (and belongs in Sales Analytics); barcode implies scanning or a feed. Confirm both, then `Product.cost_price_cents` and `Product.barcode` are a one-migration change.
