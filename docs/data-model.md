@@ -581,3 +581,10 @@ REST-style JSON; auth via access + refresh JWT.
 46. **Thread granularity** — one thread per (store, customer). Per-order threads would suit returns/disputes better; the design's "Message Customer" sits on a customer row, so we followed that.
 47. **Chat attachments** — buyers often want to show a photo of a damaged item. Not implemented; needs the same upload limits as review media and a virus-scan decision.
 48. **Notifications** — the seller header badge is polled. E-mail/push for unread messages needs the background worker (perf step 6) and a quiet-hours policy.
+
+**Analytics screens (Figma 2026-09-23, read from renders — see `docs/sprint-5-plan.md` §5b)**
+
+49. **Discount attribution per store** — "Sales Analytics" shows Discounts as a headline KPI, so a store's net sales must subtract *its share* of order-level vouchers. This is Q34 and it is now blocking: allocate pro-rata across stores, or treat vouchers as marketplace-funded and show 0 to sellers?
+50. **Refunds** — also a headline KPI, and a leg of the revenue waterfall. We record `payment_status` but never an amount. Needs the PSP (amount, partial refunds, who absorbs the fee).
+51. **Sales by Channel** (Website / Mobile App / Others) — we do not record how an order was placed. Cheap to add (`Order.channel`, set by the client at checkout), but the frontend has to send it and someone must define the list.
+52. **Transactions page** — new sidebar entry, only a title and an Export button so far. Payments, payouts and fees: the payments sprint owns it; confirm it means *seller payouts*, not buyer transactions.

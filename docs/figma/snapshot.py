@@ -2,6 +2,10 @@
 
     python docs/figma/snapshot.py            # refresh docs/figma/screens/*.txt + manifest.json
     python docs/figma/snapshot.py --check    # exit 1 if the Figma file changed since the last snapshot
+    python docs/figma/snapshot.py --nodes    # same refresh, via the per-node endpoint (see below)
+    python docs/figma/snapshot.py --nodes --only "Analytics Overview" Chat
+    python docs/figma/snapshot.py --index    # just refresh the frame list (cheapest call there is)
+    python docs/figma/snapshot.py --render "Analytics Overview" 779:6848   # PNG of a frame
 
 Run it before planning or implementing anything that touches a screen; then
 `git diff docs/figma/` shows precisely which labels, fields, options or flows moved.
@@ -10,7 +14,26 @@ Requires FIGMA_TOKEN in the environment (personal access token) — never commit
 
 Rate limits: `--check` only calls /versions (cheap). A full snapshot calls
 /files/{key}, which on a Starter plan is limited to a handful of calls per day —
-if it returns 429, read the Retry-After header rather than retrying.
+a 429 there can lock us out for days.
+
+`/files/{key}/nodes` sits on a **separate** budget, so `--nodes` often works while
+`/files/{key}` is locked — but it is cost-based, not per-call: on Starter, roughly
+10 full frames is enough to trigger a multi-day 429. So:
+
+- `--index` refreshes only the frame list (names + node ids, one tiny call). Saved
+  to page-index.json, which is how you find out what the designer added.
+- `--only <name|id> …` snapshots just those frames. This is the one to use while
+  rate-limited: pick the two or three screens that matter today.
+- `--nodes` sweeps everything, batch by batch. Expect it to stop mid-way with a 429;
+  it keeps what it fetched and never deletes a screen it has not replaced, so
+  re-running it later resumes rather than starting over.
+
+`--render` is the last resort: `/images` is a **third** budget and has kept working
+while both of the others were locked. It gives a picture, not text — but a picture
+of a screen is enough to plan against, and it is the only way in when the JSON
+endpoints are cold. Renders land in docs/figma/renders/ (git-ignored).
+
+Nothing here deletes a snapshot file until its replacement has been written.
 """
 
 import argparse
@@ -24,9 +47,13 @@ from pathlib import Path
 
 FILE_KEY = "dAGMv3hUJXkyW4QmJPw20Q"
 PAGE_NAME = "Web UI Design"
+PAGE_NODE = "0:1"          # the "Web UI Design" canvas; used by the --nodes path
+NODE_BATCH = 2             # frames per /nodes call; each full frame is ~250 KiB of JSON
 HERE = Path(__file__).parent
 SCREENS_DIR = HERE / "screens"
 MANIFEST = HERE / "manifest.json"
+PAGE_INDEX = HERE / "page-index.json"
+RENDERS_DIR = HERE / "renders"
 
 # Layers that repeat on every screen and add noise to diffs.
 SKIP_NAMES = re.compile(r"^(Navbar|Footer|Breadcrums|Header ?\d*|Top ?Bar|Nav|Icons)$", re.I)
@@ -49,16 +76,20 @@ def _token() -> str:
     return token
 
 
+class RateLimited(Exception):
+    def __init__(self, path: str, retry_after: int, tier: str):
+        self.path, self.retry_after, self.tier = path, retry_after, tier
+        super().__init__(f"429 on {path} (plan tier: {tier}); retry after ~{retry_after // 3600} h {retry_after % 3600 // 60} min")
+
+
 def _get(path: str) -> dict:
     req = urllib.request.Request(f"https://api.figma.com/v1{path}", headers={"X-Figma-Token": _token()})
     try:
-        with urllib.request.urlopen(req, timeout=120) as res:
+        with urllib.request.urlopen(req, timeout=180) as res:
             return json.loads(res.read().decode("utf-8-sig"))
     except urllib.error.HTTPError as e:
         if e.code == 429:
-            wait = int(e.headers.get("Retry-After", "0") or 0)
-            sys.exit(f"Figma rate limit hit on {path} (plan tier: {e.headers.get('x-figma-plan-tier', '?')}). "
-                     f"Retry after ~{wait // 3600} h {wait % 3600 // 60} min.")
+            raise RateLimited(path, int(e.headers.get("Retry-After", "0") or 0), e.headers.get("x-figma-plan-tier", "?")) from None
         raise
 
 
@@ -90,34 +121,38 @@ def current_version() -> dict:
     return {"version": latest["id"], "lastModified": latest["created_at"], "by": latest["user"]["handle"]}
 
 
-def snapshot() -> None:
-    doc = _get(f"/files/{FILE_KEY}")
-    page = next(p for p in doc["document"]["children"] if p["name"] == PAGE_NAME)
-    components = doc.get("components", {})
+def _write_screen(frame: dict, components: dict) -> dict:
+    lines: list[str] = []
+    _outline(frame, components, 0, lines)
+    deduped = [l for i, l in enumerate(lines) if i == 0 or l != lines[i - 1]]
+    slug = re.sub(r"[^\w]+", "_", frame["name"]).strip("_")
+    path = SCREENS_DIR / f"{slug}__{frame['id'].replace(':', '-')}.txt"
+    path.write_text("\n".join(deduped) + "\n", encoding="utf-8")
+    return {"name": frame["name"], "node_id": frame["id"], "file": path.name, "lines": len(deduped)}
 
-    SCREENS_DIR.mkdir(parents=True, exist_ok=True)
+
+def _wanted(frame: dict) -> bool:
+    return frame.get("type") in ("FRAME", "INSTANCE") and not SKIP_NAMES.match(frame.get("name", ""))
+
+
+def _prune(keep: set[str]) -> None:
+    """Drop screen files whose frame is gone. Only called after a complete sweep —
+    a partial run must never delete anything."""
     for old in SCREENS_DIR.glob("*.txt"):
-        old.unlink()
+        if old.name not in keep:
+            old.unlink()
+            print(f"  - {old.name} (frame no longer in the design)")
 
-    screens = []
-    for frame in page["children"]:
-        if frame["type"] not in ("FRAME", "INSTANCE") or SKIP_NAMES.match(frame["name"]):
-            continue
-        lines: list[str] = []
-        _outline(frame, components, 0, lines)
-        deduped = [l for i, l in enumerate(lines) if i == 0 or l != lines[i - 1]]
-        slug = re.sub(r"[^\w]+", "_", frame["name"]).strip("_")
-        path = SCREENS_DIR / f"{slug}__{frame['id'].replace(':', '-')}.txt"
-        path.write_text("\n".join(deduped) + "\n", encoding="utf-8")
-        screens.append({"name": frame["name"], "node_id": frame["id"], "file": path.name, "lines": len(deduped)})
 
+def _write_manifest(version: str, last_modified: str, screens: list[dict], *, via: str) -> None:
     MANIFEST.write_text(
         json.dumps(
             {
                 "file_key": FILE_KEY,
                 "page": PAGE_NAME,
-                "version": doc["version"],
-                "lastModified": doc["lastModified"],
+                "version": version,
+                "lastModified": last_modified,
+                "fetched_via": via,
                 "screens": screens,
             },
             indent=2,
@@ -126,8 +161,130 @@ def snapshot() -> None:
         + "\n",
         encoding="utf-8",
     )
-    print(f"Snapshot: {len(screens)} screens @ version {doc['version']} ({doc['lastModified']})")
+    print(f"Snapshot: {len(screens)} screens @ version {version} ({last_modified}) via {via}")
     print("Now run:  git diff --stat docs/figma/")
+
+
+def snapshot_via_file() -> None:
+    """One big /files/{key} call — cheapest in requests, first to be rate-limited."""
+    doc = _get(f"/files/{FILE_KEY}")
+    page = next(p for p in doc["document"]["children"] if p["name"] == PAGE_NAME)
+    components = doc.get("components", {})
+    SCREENS_DIR.mkdir(parents=True, exist_ok=True)
+    screens = [_write_screen(f, components) for f in page["children"] if _wanted(f)]
+    _prune({s["file"] for s in screens})
+    _write_manifest(doc["version"], doc["lastModified"], screens, via="files")
+
+
+def refresh_index() -> list[dict]:
+    """One small call: every frame on the page, name + node id. This is how a newly
+    drawn screen is discovered without reading the whole file."""
+    listing = _get(f"/files/{FILE_KEY}/nodes?ids={PAGE_NODE}&depth=1")
+    canvas = listing["nodes"][PAGE_NODE]["document"]
+    if canvas.get("name") != PAGE_NAME:
+        sys.exit(f"Node {PAGE_NODE} is {canvas.get('name')!r}, not the {PAGE_NAME!r} page — update PAGE_NODE.")
+    frames = [{"name": f["name"], "node_id": f["id"], "type": f["type"]} for f in canvas.get("children", []) if _wanted(f)]
+    known = {s["node_id"]: s["name"] for s in json.loads(MANIFEST.read_text(encoding="utf-8"))["screens"]} if MANIFEST.exists() else {}
+    PAGE_INDEX.write_text(json.dumps({"fetched_at": current_version(), "frames": frames}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    added = [f for f in frames if f["node_id"] not in known]
+    renamed = [(known[f["node_id"]], f["name"]) for f in frames if f["node_id"] in known and known[f["node_id"]] != f["name"]]
+    print(f"{len(frames)} frames on the page (snapshot has {len(known)}) -> {PAGE_INDEX.name}")
+    for f in added:
+        print(f"  NEW      {f['name']}  ({f['node_id']})")
+    for before, after in renamed:
+        print(f"  RENAMED  {before}  ->  {after}")
+    return frames
+
+
+def _select(frames: list[dict], only: list[str]) -> list[dict]:
+    if not only:
+        return frames
+    wanted, picked = [o.lower() for o in only], []
+    for f in frames:
+        if f["name"].lower() in wanted or f["node_id"] in only:
+            picked.append(f)
+    missing = [o for o in only if o.lower() not in {f["name"].lower() for f in picked} and o not in {f["node_id"] for f in picked}]
+    if missing:
+        sys.exit(f"Not on the page: {', '.join(missing)}. Run --index to see the frame list.")
+    return picked
+
+
+def snapshot_via_nodes(only: list[str] | None = None) -> int:
+    """Same output as the /files path, fetched frame by frame. Writes as it goes and
+    keeps everything it managed to fetch when the budget runs out."""
+    frames = _select(refresh_index(), only or [])
+    live = current_version()
+    SCREENS_DIR.mkdir(parents=True, exist_ok=True)
+
+    screens, done = [], 0
+    try:
+        for start in range(0, len(frames), NODE_BATCH):
+            batch = frames[start:start + NODE_BATCH]
+            data = _get(f"/files/{FILE_KEY}/nodes?ids={','.join(f['node_id'] for f in batch)}")
+            components = data.get("components", {})
+            for frame in batch:
+                payload = data["nodes"].get(frame["node_id"])
+                if not payload:
+                    print(f"  ! {frame['name']} ({frame['node_id']}) returned nothing — skipped")
+                    continue
+                screens.append(_write_screen(payload["document"], components))
+                print(f"  + {screens[-1]['file']} ({screens[-1]['lines']} lines)")
+            done = min(start + NODE_BATCH, len(frames))
+    except RateLimited as limited:
+        print(f"\n{limited}")
+        print(f"Kept {done}/{len(frames)} frames; existing screens untouched. Re-run later to continue,")
+        print("or use --only to spend the next budget on the screens that matter.")
+        return 1
+
+    if only:
+        print(f"\nRefreshed {len(screens)} frame(s); manifest left alone (partial snapshot).")
+        print("Now run:  git diff --stat docs/figma/")
+        return 0
+    _prune({s["file"] for s in screens})
+    _write_manifest(live["version"], live["lastModified"], screens, via="nodes")
+    return 0
+
+
+def render(targets: list[str], scale: float = 1.0) -> int:
+    """PNG of one or more frames (name from page-index.json, or a raw node id).
+
+    Uses /images, which is metered separately from /files and /files/{key}/nodes —
+    so this still works when a full snapshot is rate-limited. `0:1` renders the whole
+    page: useless for reading labels, handy for seeing what the designer added.
+    """
+    index = json.loads(PAGE_INDEX.read_text(encoding="utf-8"))["frames"] if PAGE_INDEX.exists() else []
+    by_name = {f["name"].lower(): f["node_id"] for f in index}
+    ids, labels = [], {}
+    for target in targets:
+        node_id = target if ":" in target else by_name.get(target.lower())
+        if not node_id:
+            sys.exit(f"Unknown frame {target!r}. Run --index first, or pass the node id (right-click the frame in "
+                     "Figma -> Copy link to selection; the node-id is in the URL).")
+        ids.append(node_id)
+        labels[node_id] = re.sub(r"[^\w]+", "-", target).strip("-").lower()
+
+    data = _get(f"/images/{FILE_KEY}?ids={','.join(ids)}&format=png&scale={scale}")
+    if data.get("err"):
+        sys.exit(f"Figma could not render: {data['err']}")
+    RENDERS_DIR.mkdir(parents=True, exist_ok=True)
+    for node_id, url in (data.get("images") or {}).items():
+        if not url:
+            print(f"  ! {node_id}: no image returned")
+            continue
+        dest = RENDERS_DIR / f"{labels.get(node_id, node_id.replace(':', '-'))}.png"
+        urllib.request.urlretrieve(url, dest)
+        print(f"  {node_id} -> {dest.relative_to(HERE.parent.parent)} ({dest.stat().st_size / 1024:.0f} KiB)")
+    return 0
+
+
+def snapshot() -> int:
+    """Prefer the single-call path; fall back to per-node when it is rate-limited."""
+    try:
+        snapshot_via_file()
+        return 0
+    except RateLimited as limited:
+        print(f"{limited}\n-> /files is locked; falling back to the per-node endpoint.")
+        return snapshot_via_nodes()
 
 
 def check() -> int:
@@ -146,5 +303,17 @@ def check() -> int:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="only compare versions; exit 1 if changed")
+    ap.add_argument("--nodes", action="store_true", help="snapshot via /files/{key}/nodes (works when /files is rate-limited)")
+    ap.add_argument("--index", action="store_true", help="only refresh page-index.json: which frames exist, what is new or renamed")
+    ap.add_argument("--only", nargs="+", metavar="FRAME", help="with --nodes: snapshot just these frames (name or node id)")
+    ap.add_argument("--render", nargs="+", metavar="FRAME", help="save a PNG of these frames (separate rate limit — works when the rest is locked)")
+    ap.add_argument("--scale", type=float, default=1.0, help="with --render: image scale (0.2 for an overview, 1 to read text)")
     args = ap.parse_args()
-    sys.exit(check() if args.check else snapshot())
+    if args.check:
+        sys.exit(check())
+    if args.render:
+        sys.exit(render(args.render, args.scale))
+    if args.index:
+        refresh_index()
+        sys.exit(0)
+    sys.exit(snapshot_via_nodes(args.only) if (args.nodes or args.only) else snapshot())

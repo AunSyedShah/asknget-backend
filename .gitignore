@@ -10,3 +10,6 @@ Thumbs.db
 # Python bytecode anywhere
 __pycache__/
 *.pyc
+
+# Figma frame renders (docs/figma/snapshot.py --render) — regenerate, do not commit
+docs/figma/renders/

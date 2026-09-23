@@ -24,6 +24,9 @@ backend/
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
 - Environment files and every variable: [`../docs/environment.md`](../docs/environment.md).
+- Design drift: `python docs/figma/snapshot.py --check` before touching a screen. If the full snapshot is
+  rate-limited (Starter plan), `--index` lists the frames, `--nodes --only "<frame>"` snapshots a few, and
+  `--render "<frame>"` saves a PNG — three separate budgets, so one of them is usually open.
 - Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers) · Live API docs: `/api/v1/docs`.
 
 ## Setup

@@ -104,6 +104,29 @@ rate limit, contact-detail flagging, staff flagged queue, "Message Customer" to 
 `portal/test_analytics.py` — one assertion per report against a fixture with known numbers, plus `403`
 for every route on a free store. Query budgets: pin the inbox and the analytics overview.
 
+## 5b. Design reconciliation — 2026-09-24 (partial, from renders)
+
+`/files` and `/files/{key}/nodes` were both rate-limited, but **`/images` is metered separately**, so the
+new screens were read as PNG renders instead (`snapshot.py --render`). The text snapshot in
+`docs/figma/screens/` is therefore still the 2026-09-21 one — re-run `--index` + `--nodes` once the limit
+clears (~29 Sep) and diff properly.
+
+**Node `779:6848`, which our snapshot calls "Chat", is now "Analytics Overview".** The designer built the
+Analytics section while we were building it blind. What the frames show:
+
+| Frame | State | Versus what we shipped |
+|---|---|---|
+| **Analytics / Store Performance** | complete | KPI cards Total Sales · Total Orders · Average Order Value · **Conversion Rate** — we have the first three in `/analytics/overview`; conversion lives only on the free dashboard, so **move/duplicate it into the premium overview**. Then: **Sales Performance** daily line chart with a period selector, **Sales by Category** donut with %, **Top Products** table (rank, image, orders, revenue) and a **Customer Snapshot** (New / Returning / One-Time counts). We have none of the first two; `/analytics/products` covers Top Products except the image; `/analytics/customers` has the totals but not the three-way split that `portal.customers.Customer.type()` already computes. |
+| **Analytics / Sales Analytics** | complete | KPIs **Gross Sales · Net Sales · Discounts · Refunds**. Their *net* = gross − discounts − refunds; our `net_sales_cents` = gross − cancelled/returned lines. Charts: **Revenue Over Time** (gross vs net, daily/weekly/monthly), **Revenue Breakdown** waterfall (gross → discounts → refunds → adjustments → net), **Sales by Category** table (orders, total, share), **Sales by Channel** donut (Website / Mobile App / Others). |
+| **Analytics / Product Analytics** | KPI row only, body empty | Total Products · Top Selling · **Low Performing** · Avg. Product Revenue. Our `slow_movers` is the "low performing" idea; the rest of the page is not drawn yet. |
+| **Transactions** (new sidebar entry) | title + Export button only | Payments, payouts and fees — the payments sprint. |
+| **Customer Detail** | complete | Tabs Overview / Orders / Activity / **Messages** / Notes, and per-customer KPIs. Confirms the sprint-5 chat model: **one thread per (store, customer)**, reachable from the customer record. |
+
+Blocking gaps the design creates (new §10 questions Q49–Q52): per-store **discount** attribution is
+exactly Q34 and is now required, not optional; **refund amounts** do not exist until the PSP lands; we do
+not record a **sales channel** on orders at all; and the sidebar now has **Transactions** alongside
+Returns, Notifications and Team/Managers.
+
 ## 6. Not in this sprint
 
 Subscriptions/billing and self-serve upgrade (payments sprint), websockets/push, chat attachments,
