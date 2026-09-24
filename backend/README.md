@@ -13,7 +13,7 @@ backend/
 │   ├── accounts/         # User (email login), OTP, refresh tokens, terms audit, addresses, payment methods
 │   ├── catalog/          # categories, brands, products, variants/options, reviews, wishlist
 │   ├── sellers/          # seller KYC application, documents, info requests, stores
-│   ├── orders/           # cart, vouchers, delivery methods, orders, status timeline, payments
+│   ├── orders/           # cart, vouchers, per-store delivery, orders, status timeline, payments
 │   └── marketing/        # banners, newsletter, contact messages
 ├── .env.example
 └── pyproject.toml        # managed with uv
@@ -31,7 +31,7 @@ backend/
   If all three are cold, `uv run --with zstandard python docs/figma/snapshot.py --from-fig <file.fig>`
   reads a local export offline (Figma → File → Save local copy). It is additive: a .fig cannot expand
   component instances, so it fills in missing screens rather than overwriting richer API-derived ones.
-- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers) · Live API docs: `/api/v1/docs`.
+- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers), [`../docs/sprint-6-plan.md`](../docs/sprint-6-plan.md) (analytics + seller-defined shipping) · Live API docs: `/api/v1/docs`.
 
 ## Setup
 
@@ -156,14 +156,13 @@ to exactly one. Buyers only see their market's stores. Details and the reasons b
 - **Endpoints**: `GET /regions` (switcher), `GET /regions/current` (resolved market + localised return policy),
   `GET /me` → stored `language` + resolved `locale`, `PATCH /me {language}`.
 - **Rules**: one market per cart (`409 cart_region_mismatch`; `DELETE /cart/items` to clear and switch),
-  delivery methods / vouchers / banners per market, checkout refuses another country's address
+  vouchers / banners per market (shipping is the seller's, see below), checkout refuses another country's address
   (`409 ships_outside_region`), `Order.country` + `return_window_days` are snapshots.
 - **KYC per country**: `sellers/policy.py` overlays the country's `KycPolicy` (documents, labels such as
   CNIC / SA ID, ID-number regex, instructions) on the defaults in `sellers/rules.py`; the wizard reads it
   from `ApplicationOut.policy` or `GET /lookups/seller?country=`.
-- **Seeds**: `seed_lookups` creates ZA and PK (+ delivery methods per market); `seed_demo` adds a PK demo
-  store so `X-Region: PK` shows a different catalogue. Add a country in admin, then re-run `seed_lookups`
-  for its delivery methods (or add them in admin).
+- **Seeds**: `seed_lookups` creates ZA and PK; `seed_demo` adds a PK demo store so `X-Region: PK` shows a
+  different catalogue. A new country needs nothing for shipping — each store brings its own options.
 
 ## Seller portal (`portal` app)
 
@@ -182,6 +181,26 @@ Revenue, customer types, fulfilment states, what the design left undefined) is `
 - **Customers** are computed from orders (key = user id or guest email) and cached per store for 60 s; the
   cache key changes whenever the store's order lines change.
 
+## Shipping is the seller's (`sellers.StoreDeliveryOption`)
+
+The platform's `orders.DeliveryMethod` is **deprecated**: rows stay, nothing writes them. Sellers define their
+own options and the buyer picks one **per store**. `docs/sprint-6-plan.md` §3 has the contract.
+
+- **Options** — `StoreDeliveryOption` (name, free-text `eta_label`, `price_cents`, `kind` delivery/pickup)
+  with `GET/POST/PATCH/DELETE /seller/delivery-options`. Every store starts with the design's three
+  (`sellers.services.ensure_default_delivery_options`); deleting the last active one is a `409`, and one already
+  used by an order is deactivated rather than deleted so history still resolves.
+- **Per product** — `Product.delivery_options` (M2M, `PUT /seller/products/{id}/delivery-options`).
+  **Empty means all of the store's active options**, so nothing had to be backfilled.
+- **Cart** — `GET /cart` returns one `deliveries[]` group per store: the options *every* line in that group
+  supports (intersection), which is selected, and its price. Selections live on `Cart.delivery_selections`
+  (`{store_id: option_id}`) and default to the cheapest **delivery** option — never pickup, which is usually
+  free and would silently ask the buyer to collect. `PATCH /cart/delivery {store_id, option_id}` changes one.
+  A store whose lines share no option blocks checkout (`can_checkout: false`, then `409`).
+- **Order** — `POST /checkout` takes optional `deliveries: [{store_id, option_id}]` and snapshots one
+  `OrderDelivery` per store. `Order.shipping_cents` is still the total, so totals, invoices and exports are
+  unchanged.
+
 ## Seller plans and chat (premium — `portal.entitlements`, `chat` app)
 
 A store is **standard** or **premium** (`Store.is_premium`, staff toggle in Django admin or
@@ -193,8 +212,14 @@ A store is **standard** or **premium** (`Store.is_premium`, staff toggle in Djan
   `chat_inbox`) carry their own label and description, so `GET /seller/plan` (also embedded in
   `GET /seller/dashboard`) renders the sidebar locks and the upgrade card without hard-coded copy.
   When real subscriptions arrive, only `plan_of()` changes.
-- **Advanced Analytics** — `/seller/analytics/{overview,funnel,products,search,customers,fulfilment}`
-  (+ `export.csv`), all `?period=`. They answer *why*, not *how much*: funnel drop-off, slow movers,
+- **Advanced Analytics** — `/seller/analytics/{overview,sales,funnel,products,search,customers,fulfilment}`
+  (+ `export.csv`), all `?period=`. `overview` and `sales` are the design's two analytics screens (daily
+  series, sales by category, top products, customer mix; then gross → discounts → refunds → net with
+  `?bucket=daily|weekly|monthly` and Sales by Channel from `Order.channel`). **Two "net"s coexist on purpose**:
+  `overview.net_sales_cents` is gross minus cancelled/returned, `sales.net_sales_cents` is the designer's
+  gross minus discounts, refunds and adjustments — the last two are 0 until the PSP lands.
+  An order-level voucher is split across its stores pro-rata by subtotal share
+  (`orders.services.store_discount_cents`, largest-remainder rounded). They answer *why*, not *how much*: funnel drop-off, slow movers,
   the queries shoppers typed before finding you, repeat rate, hours from payment to shipped and from shipped to delivered. Everything is
   derived from `ProductEvent` / `OrderItem` / `OrderStatusEvent` — no new tracking. The search report is
   the only non-aggregate: it scans a capped window of events (`ANALYTICS_EVENT_SCAN_LIMIT`) and caches 5 min.

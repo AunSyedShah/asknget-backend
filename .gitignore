@@ -16,3 +16,6 @@ docs/figma/renders/
 
 # Local Figma exports (.fig) — large binaries, regenerate from Figma
 *.fig
+
+# Local SQLite databases (dev + scratch runs)
+*.sqlite3

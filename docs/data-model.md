@@ -167,6 +167,8 @@ Values seen: Fashion, Beauty, Electronics, Groceries/Food, Jewellery, Sports, Ho
 | description | text (rich) | |
 | price_cents | int | base price; variants may override |
 | compare_at_price_cents | int, nullable | struck-through "$40.99" |
+| cost_price_cents | int, nullable | wizard Pricing popup "Cost Price"; **seller-only**, never in a buyer schema (sprint 6) |
+| barcode | varchar, blank | wizard Pricing popup "Barcode" (sprint 6) |
 | currency | char(3) | |
 | stock_status | enum(in_stock, out_of_stock, preorder) | derived from variant stock; "In Stock" badge, availability filter |
 | rating_avg | numeric(2,1) cached | "4.9" |
@@ -239,8 +241,11 @@ Option types seen: **Size** (15 ml, 30 ml, 50 ml, 75 ml), **Shade** (Ivory, Natu
 
 `voucher_redemptions`: `voucher_id`, `user_id`, `order_id`.
 
-### `delivery_methods`
-`id`, `name`, `eta_min_days`, `eta_max_days`, `price_cents`, `is_active`. Seen: Standard (5–7 days), Express (2–3 days). ❓ flat fee vs per-seller/per-zone; multi-vendor orders may need per-store shipments.
+### `delivery_methods` — **deprecated (sprint 6)**
+`id`, `country_id`, `name`, `eta_min_days`, `eta_max_days`, `price_cents`, `is_active`. Was the platform's
+per-market catalogue the buyer chose from at checkout — Standard (5–7 days), Express (2–3 days). Shipping is
+now the seller's (§7d): the table and its rows are kept (no destructive migration, old orders still resolve
+their snapshot) but nothing writes `Cart.delivery_method` / `Order.delivery_method` any more.
 
 ### `orders`
 | field | type | notes |
@@ -252,8 +257,9 @@ Option types seen: **Size** (15 ml, 30 ml, 50 ml, 75 ml), **Shade** (Ivory, Natu
 | contact_first_name / contact_last_name / contact_email / contact_phone | varchar | "Contact Info" block |
 | shipping_address | jsonb snapshot | street, city, postal_code, country… |
 | billing_address | jsonb snapshot, nullable | "Ship to a different address" toggle ⇒ billing may differ |
-| delivery_method_id | FK, nullable | |
-| delivery_method_snapshot | jsonb | name + ETA at time of order |
+| delivery_method_id | FK, nullable | deprecated, unwritten since sprint 6 — see `orders_orderdelivery` |
+| delivery_method_snapshot | jsonb | name + ETA at time of order; superseded by `orders_orderdelivery` |
+| channel | enum(web, mobile_app, other) | how the order was placed, sent by the client at checkout; default `web` (sprint 6, Q51) |
 | special_note | text, nullable | "Special Note (Optional)" + cart order note |
 | subtotal_cents | int | |
 | shipping_cents | int | "$10.99" |
@@ -458,6 +464,55 @@ replying is premium, except `GET /seller/chat/summary` (counts only) which every
 
 ---
 
+## 7d. Seller-defined shipping and analytics (sprint 6 — Figma 2026-09-23)
+
+The design's product wizard prices delivery per product, which the platform-wide `delivery_methods` could not
+express. Shipping now belongs to the seller (Q53); `docs/sprint-6-plan.md` §3 has the reasoning.
+
+### `sellers_storedeliveryoption`
+| field | type | notes |
+|---|---|---|
+| store_id | FK stores | `related_name="delivery_options"` |
+| name | varchar(60) | the seller's own label, "Express Delivery"; unique per store |
+| eta_label | varchar(60), blank | free text, "1-3 business days" — not two day-count columns, because sellers word this themselves |
+| price_cents | int | in the store's market currency; 0 allowed (free delivery) |
+| kind | enum(delivery, pickup) | pickup is never auto-selected for a buyer |
+| is_active | boolean | an option used by an order is deactivated, never deleted |
+| sort_order | smallint | |
+
+Every store is created with the three the design shows (Express / Seller Delivery / Customer Pickup) via
+`sellers.services.ensure_default_delivery_options()`, and a data migration gave existing stores the same,
+priced from their market's `delivery_methods` rows where those existed. A store cannot end up with zero
+active options — deleting the last one is a 409.
+
+### `catalog_product_delivery_options` (M2M)
+`product_id`, `storedeliveryoption_id`. **Empty means all of the store's active options**, so no product
+needed a backfill and a seller adding an option does not have to revisit every listing.
+
+### `orders_orderdelivery`
+| field | type | notes |
+|---|---|---|
+| order_id | FK orders | `related_name="deliveries"` |
+| store_id | FK stores | unique together with `order` — one shipping line per seller |
+| option_id | FK storedeliveryoption, nullable | SET_NULL; the snapshot below is what matters |
+| name / eta_label / kind / price_cents | snapshot | so later edits or deactivation never rewrite history |
+
+`Order.shipping_cents` stays the **total** across stores, so existing totals, invoices and exports are
+untouched. `carts.delivery_selections` is a JSON `{store_id: option_id}` map, defaulting per store to the
+cheapest **delivery** option — not simply the cheapest, since pickup is usually free and silently making a
+buyer collect in person would be wrong. A cart whose lines for one store share no common option cannot check
+out (409), and says so.
+
+### Analytics
+No new tables: `GET /seller/analytics/sales` is derived from `order_items`, `orders` and
+`order_status_events`. Two definitions of "net" coexist deliberately — `/overview.net_sales_cents` is gross
+minus cancelled/returned, while `/sales.net_sales_cents` is the designer's gross minus discounts, refunds and
+adjustments. Refunds and adjustments are **0 until the PSP exists** (Q50) and the schema says so.
+`orders.services.store_discount_cents()` allocates an order's voucher across its stores pro-rata on subtotal
+share, largest-remainder rounded so the parts sum to the whole (Q49); analytics uses it now, payouts later.
+
+---
+
 ## 8. Marketing & support
 
 ### `banners`
@@ -526,7 +581,7 @@ REST-style JSON; auth via access + refresh JWT.
 
 1. **Market / currency / tax** — the design mixes Pakistan (+92, Lahore, Meezan Bank) and South Africa (Johannesburg, Gauteng, VAT). Which countries at launch? Single currency?
 2. **Guest checkout** — Track Order takes order # + email, implying guests can order. Confirm.
-3. **Multi-vendor fulfilment** — one order can contain items from several stores. Does each store ship separately (per-store shipments and fees) or does the platform fulfil centrally? This is the biggest schema fork.
+3. **Multi-vendor fulfilment** — one order can contain items from several stores. Does each store ship separately (per-store shipments and fees) or does the platform fulfil centrally? This is the biggest schema fork.**Resolved (sprint 6).** Each store ships separately: shipping is chosen per store and snapshotted in `orders_orderdelivery` (§7d). Fees are still summed into one `Order.shipping_cents` and one payment; per-store payouts wait for the PSP.
 4. **Cancellation window** — buyers can cancel "Ongoing" orders; until which status (before shipped?). Refund flow?
 5. **Reviews** — guests allowed (form asks name/email)? Moderation before publishing? One review per order item?
 6. **Product flags** — Featured / Best Sellers / New Arrived: manual curation or computed?
@@ -551,6 +606,7 @@ REST-style JSON; auth via access + refresh JWT.
 22. **Products "Status" column** mixes lifecycle (Active) with stock (Out of Stock / Low Stock). Backend returns `status` and `stock_status` separately; UI merges.
 23. **Product description ≤ 250 chars** in the wizard vs the PDP's long description + Key Benefits + How to Use. Wizard field maps to `short_description`; the rich sections stay optional — is a second "Content" step wanted?
 24. **Shipping step is empty in the design.** Backend stores weight, dimensions, ships-from and handling days. Confirm, and whether per-product shipping price/free-shipping flags are expected.
+    **Resolved (sprint 6).** Superseded by Q53 — a product now selects from its store's delivery options.
 25. **Product moderation** — the Pending/Rejected tabs imply staff approve listings before they go live. Confirm (alternative: publish immediately, moderate after).
 26. **Returned orders** — a "Returned" tab and a Returns menu exist but no return-request flow. Interim: seller marks a delivered store order returned (stock restored). Refund handling waits for the PSP.
 27. **Unpaid orders hidden from sellers** — orders still `pending_payment` (bank transfer not yet confirmed, PSP pending) are not shown in the seller portal. Confirm, especially for COD/bank-transfer flows.
@@ -561,6 +617,7 @@ REST-style JSON; auth via access + refresh JWT.
 32. **Traffic Channel widget** (visitors, socialising, active/inactive users) needs web analytics we do not collect. Omitted; wire to GA/Plausible later if wanted.
 33. **Social login** (Apple/Google) on the seller Login screen — no provider configured; needs OAuth client ids and a decision on account linking.
 34. **Order-level discount allocation** — vouchers apply to the whole buyer order; a store's "sales" currently use undiscounted line totals. Allocate pro-rata per store, or treat vouchers as marketplace-funded?
+    **Resolved (sprint 6).** Pro-rata, see Q49.
 
 **Multi-country markets (sprint 4, see `docs/sprint-4-plan.md`)**
 
@@ -585,11 +642,32 @@ REST-style JSON; auth via access + refresh JWT.
 **Analytics and wizard screens (Figma 2026-09-23, read from a .fig export — see `docs/sprint-5-plan.md` §5b)**
 
 49. **Discount attribution per store** — "Sales Analytics" makes Discounts a headline KPI and a leg of the revenue waterfall, so a store's net sales must subtract *its share* of order-level vouchers. This is Q34 and it is now blocking: allocate pro-rata across stores, or treat vouchers as marketplace-funded and show sellers zero?
+    **Resolved (sprint 6).** Pro-rata on subtotal share (`orders.services.store_discount_cents`), largest-remainder rounded so the per-store parts sum to the order's discount exactly. Who *funds* the voucher is a separate, still-open commercial question that only matters once payouts exist.
 50. **Refunds and "Adjustments"** — both appear in the waterfall (R6,840 and R11,274). We record `payment_status` but never an amount, and "adjustments" is undefined: chargebacks? manual credits? platform fees? Needs the PSP and a definition.
 51. **Sales by Channel** (Website 67.8% / Mobile App 27.5% / Others 4.7%) — we do not record how an order was placed. Cheap to add (`Order.channel`, set by the client at checkout) but the frontend must send it and someone must own the list.
+    **Resolved (sprint 6).** `Order.channel` exists with `web` (default) / `mobile_app` / `other`. **Still needed from the team:** the clients must actually send it — until they do, every order reads *Website* and the chart is honest but flat.
 52. **Transactions page** — new sidebar entry, title and Export button only. Confirm it means *seller payouts and fees*, not buyer transactions; the payments sprint owns it.
 53. **Per-product delivery options** — the wizard's Shipping popup lets a seller choose Express (R25), Seller Delivery (R20) and Customer Pickup (R15) **per product**. Today delivery methods are platform-level per market and the buyer picks one at checkout. Which wins? If the design does, `DeliveryMethod` becomes a per-store (or per-product) catalogue and checkout must reconcile options across a multi-store cart. Supersedes Q24.
+    **Resolved (sprint 6).** The design wins, fully seller-defined (your call over the middle ground I proposed). Prices live on the *store's* option, and a product selects which of them it supports rather than pricing its own — see Q58.
 54. **Product image limit** — the Media popup says "PNG, JPG upto 1-MB"; we enforce 5 MB and also allow webp/gif. Tighten to match, or is 1 MB just placeholder copy?
+    **Resolved (sprint 6).** Tightened: 1 MB, PNG/JPEG only. Reverting is a one-line settings change if 1 MB proves too tight for product photography.
 55. **Category request flow** — a new popup lets sellers request a category with a supporting document. New models and a staff queue (like the KYC one). In scope for which sprint?
 56. **Product Analytics page is unfinished** — only the KPI row is drawn (Total Products, Top Selling, Low Performing, Avg. Product Revenue). Confirm the rest before we build to it.
 57. **Product pricing fields the wizard asks for but we do not store** — the Pricing popup has **Cost Price** (R500, alongside Selling R850 and Compare-at R1,000) and **Barcode**. Cost price implies margin reporting (and belongs in Sales Analytics); barcode implies scanning or a feed. Confirm both, then `Product.cost_price_cents` and `Product.barcode` are a one-migration change.
+    **Resolved (sprint 6).** Both added. `cost_price_cents` is seller-only and no margin report reads it yet; `barcode` is not unique and nothing scans it — both are stored so the wizard stops losing what sellers type.
+
+**Seller-defined shipping (sprint 6, see `docs/sprint-6-plan.md`)**
+
+58. **Delivery prices are per store, not per product.** The Shipping popup shows a price beside each option on
+    a *product*, which reads as "this product ships Express for R25". We priced the option on the store and let
+    a product pick which options it supports, because the alternative multiplies a price per (product x option)
+    and a seller with 200 listings could never keep it consistent. Confirm — if per-product prices are really
+    wanted, the M2M grows a `price_cents` override column.
+59. **Customer Pickup has no address.** A buyer choosing it is told nothing about where to collect, and the
+    store has no pickup address or opening hours field. Needs a design decision before pickup is usable;
+    today it simply costs 0.
+60. **One shipping fee per order, several sellers.** The buyer pays the sum in one payment, and nothing yet
+    splits it back to each seller. That split (and whether the platform takes a cut of shipping) belongs with
+    payouts and the PSP, alongside Q50 and Q52.
+61. **Delivery zones.** Every option has one price whatever the destination. Cross-city or cross-province
+    pricing, and refusing to ship to some regions, are the obvious next asks — is either needed at launch?

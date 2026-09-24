@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.7"
+VERSION = "0.8"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -210,7 +210,7 @@ story += [
         ["Seller application (5 steps, autosave), documents, submit/resubmit, status timeline, store activation", "Implemented", "/api/v1/seller/*, /api/v1/lookups/*"],
         ["Admin KYC review: queue, request-info, approve/reject, document review", "Implemented", "/api/v1/admin/seller-applications/* (staff JWT)"],
         ["Catalogue: categories, products + filters, PDP, related, reviews, wishlist", "Implemented", "/api/v1/categories, /products/*, /me/wishlist"],
-        ["Cart (members + guests), vouchers, delivery methods, checkout", "Implemented", "/api/v1/cart/*, /checkout - order is created pending_payment"],
+        ["Cart (members + guests), vouchers, per-seller delivery, checkout", "Implemented", "/api/v1/cart/*, /checkout - order is created pending_payment"],
         ["My Orders, cancel, re-order, public tracking, admin order status", "Implemented", "/api/v1/me/orders/*, /orders/track, /admin/orders/*"],
         ["Banners, newsletter, contact form, site info", "Implemented", "/api/v1/banners, /newsletter/subscribe, /contact, /site-info"],
         ["AI search: hybrid keyword + semantic ranking, typo tolerance, suggestions, query log", "Implemented", "/api/v1/products?q=, /search/suggest - pgvector; offline embedder by default, Voyage/OpenAI by env"],
@@ -222,6 +222,9 @@ story += [
         ["Vendor sub-roles / permissions, premium tier, vendor-customer chat", "Not designed", "'Team/Managers' and 'Chat' now appear in the seller sidebar; still no screens"],
         ["Multi-country markets: per-country currency/timezone/languages, KYC policy and return policy in admin; region, language and timezone resolved per request", "Implemented", "/api/v1/regions, X-Region / X-Language / X-Timezone headers; ZA + PK seeded (sprint 4, team-lead re-scope)"],
         ["Premium sellers: plan entitlements, Advanced Analytics, customer chat", "Implemented", "Store.is_premium (staff toggle); /seller/plan, /seller/analytics/*, /seller/chat, /me/conversations (sprint 5)"],
+        ["Seller-defined shipping (per-store delivery options, per-store cart groups)", "Implemented", "sellers.StoreDeliveryOption; /seller/delivery-options, PATCH /cart/delivery (sprint 6). Platform DeliveryMethod is deprecated"],
+        ["Refunds and 'Adjustments' in Sales Analytics; Transactions page", "Planned", "Both need the payment provider - reported as 0 rather than guessed (Q50, Q52)"],
+        ["Delivery zones, pickup addresses, splitting one shipping fee between sellers", "Planned", "See data-model.md section 10 Q59-Q61"],
         ["Subscriptions / self-serve upgrade to premium", "Planned", "Premium is a staff-flipped flag until the payments sprint - see data-model.md section 10 Q42"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
@@ -266,7 +269,7 @@ asknget/                     git root  (github.com/AunSyedShah/asknget)
         +-- accounts/        User, OTP, refresh tokens, terms audit, addresses, payment methods
         +-- catalog/         categories, brands, products, variants/options, reviews, wishlist
         +-- sellers/         seller application (KYC), documents, info requests, stores
-        +-- orders/          cart, vouchers, delivery methods, orders, status timeline, payments
+        +-- orders/          cart, vouchers, per-store delivery, orders, status timeline, payments
         +-- marketing/       banners, newsletter, contact messages
 """),
     P("The three-file pattern inside every app", "h2"),
@@ -317,7 +320,7 @@ cp .env.example .env                     # then edit .env (see below)
 
 cd asknget                               # the Django project root (contains manage.py)
 uv run python manage.py migrate          # create the database schema
-uv run python manage.py seed_lookups     # categories, brands, banks, delivery methods
+uv run python manage.py seed_lookups     # countries, categories, brands, banks
 uv run python manage.py seed_demo        # demo accounts, store, 13 products, vouchers (dev only)
 uv run python manage.py createsuperuser  # optional: your own admin login
 uv run python manage.py runserver        # http://127.0.0.1:8000
@@ -532,13 +535,14 @@ story += [
          "<font face='Courier'>X-Cart-Token</font> header on every cart/checkout call. When the user signs in, send both the Bearer token and the header once - "
          "the guest cart merges into their account cart and the token is retired."),
     flow([
-        ["Cart page opens", "GET /cart", "items (with variant_summary, image, stock), order_note, voucher, delivery_method, summary {subtotal, shipping, discount, total}, can_checkout, problems[]"],
+        ["Cart page opens", "GET /cart", "items (with variant_summary, image, stock), order_note, voucher, deliveries[] (one per seller), summary {subtotal, shipping, discount, total}, can_checkout, problems[]"],
         ["'Add to Cart' / 'Buy Now'", "POST /cart/items {variant_id, qty}", "Merges quantity if already present; clamps to stock; 409 when sold out"],
         ["Quantity stepper / remove", "PATCH /cart/items/{id} {qty}, DELETE /cart/items/{id}", "409 if qty exceeds stock"],
-        ["'Order Notes', 'Delivery Type'", "PATCH /cart {order_note?, delivery_method_id?}", "Shipping cost in the summary follows the chosen method (default: Standard)"],
+        ["'Order Notes'", "PATCH /cart {order_note?}", "Cart-level note only; shipping moved to /cart/delivery"],
+        ["'Delivery Type', per seller", "PATCH /cart/delivery {store_id, option_id}", "Each seller sets their own options: deliveries[] gives each store's list, selection and price. Default = that store's cheapest delivery option (never pickup); summary.shipping_cents is the sum"],
         ["'Discount Voucher -> Apply'", "POST /cart/voucher {code}, DELETE /cart/voucher", "404 unknown; 422 with the reason (expired, minimum not met, already used)"],
-        ["Checkout page: delivery options", "GET /delivery-methods", "'Standard Delivery 5 - 7 working days $10.99', 'Express ...'"],
-        ["'Place Order'", "POST /checkout {contact, address | address_id, ship_to_different_address?, shipping_address?, delivery_method_id, payment_method_type, payment_method_id?, special_note?}",
+        ["Checkout page: delivery options", "use cart.deliveries[]", "Render one shipping block per seller. A store whose items share no common option sets can_checkout=false and says so in problems[]"],
+        ["'Place Order'", "POST /checkout {contact, address | address_id, ship_to_different_address?, shipping_address?, deliveries?: [{store_id, option_id}], channel?, payment_method_type, payment_method_id?, special_note?}",
          "201 {order, detail}. Re-checks stock under a lock, snapshots everything, reserves stock, redeems the voucher, clears the cart, emails confirmation. Order is pending_payment / unpaid."],
         ["Card entry / 'Save card for future checkout'", "<i>next sprint</i>", "The PSP SDK will tokenise the card client-side; the API will never see PAN/CVV"],
         ["'Order Placed!' screen", "use the checkout response", "detail carries the 'Thank You, John Ali...' copy; order.order_number for the confirmation"],
@@ -586,10 +590,11 @@ story += [
         ["Header 'Search anything...'", "GET /seller/search?q=", "Own products, order numbers/customers, customers"],
         ["Products table + tabs + KPI cards", "GET /seller/products?status=&q=&brand=&category=&stock=&sort=, GET /seller/products/kpis", "Tabs all/active/pending/draft/rejected/archived; sold_qty and earned_cents per row"],
         ["'+ Add New Product' step 1 Basic Info", "POST /seller/products {name, category_id, brand_id?, tags[], short_description}", "Creates a draft with one default variant; category_id is the leaf (subcategory)"],
-        ["Steps 2-4 (Media, Pricing & Inventory, Shipping)", "POST .../images (multipart), PUT .../images/order, PATCH /seller/products/{id} (price, compare-at, threshold, shipping), PUT .../options {options}, PATCH .../variants/{vid} {sku, price_cents, stock_qty}", "Options regenerate variants for every combination, keeping matching SKUs/stock; stock changes are logged movements"],
+        ["Steps 2-4 (Media, Pricing & Inventory, Shipping)", "POST .../images (multipart, PNG/JPG <= 1 MB), PUT .../images/order, PATCH /seller/products/{id} (price, compare-at, cost_price_cents, barcode, threshold, shipping), PUT .../options {options}, PATCH .../variants/{vid} {sku, price_cents, stock_qty}, PUT .../delivery-options {option_ids}", "Options regenerate variants for every combination, keeping matching SKUs/stock; stock changes are logged movements. delivery-options narrows which of the store's options this product supports - empty = all of them"],
         ["Step 5 Review -> submit", "POST /seller/products/{id}/status {action: submit}", "422 lists what is missing (image, price, variant, stock); product becomes pending until staff approve"],
         ["Staff review (no screen yet)", "GET /admin/products?status=pending, POST /admin/products/{id}/approve | reject {reason}", "Approve publishes; reject stores the reason the seller sees under the Rejected tab"],
         ["Row actions", "unpublish/archive/unarchive via .../status, POST .../duplicate, DELETE (draft/rejected/archived only), GET .../analytics", "Analytics: views, sold, earned, conversion, 30-day series"],
+        ["Shipping setup (wizard Shipping popup)", "GET|POST /seller/delivery-options, PATCH|DELETE /seller/delivery-options/{id}", "The seller's own options (name, ETA text, price, delivery|pickup). Every store starts with three; deleting the last active one is a 409, and one already used by an order is deactivated instead"],
         ["Inventory", "GET /seller/inventory?tab=all|low|out|recent, GET /seller/inventory/kpis, POST /seller/inventory/{variant_id}/adjust {set | delta, note}, GET .../movements, GET /seller/inventory/export.csv", "on_hand = sum of variant stock; reserved = paid but unshipped units; every adjustment is a StockMovement"],
         ["Orders Overview", "GET /seller/orders/overview?period=", "KPIs, monthly delivered/pending/refunded, status share, latest 5"],
         ["Orders table", "GET /seller/orders?tab=pending|processing|shipped|delivered|cancelled|returned&q=&date_from=&date_to=", "Unpaid orders are not shown to sellers (Q27)"],
@@ -614,7 +619,7 @@ story += [
         ["App boot / footer policy line", "GET /regions/current", "Resolved country, language, timezone, currency, postal-code regex, localised return policy (window + summary)"],
         ["Language preference", "PATCH /me {language}; GET /me -> language + locale", "Send the saved value back as X-Language on every call"],
         ["Add to cart from another market", "POST /cart/items -> 409 cart_region_mismatch", "Offer 'clear cart and switch' = DELETE /cart/items, then add again"],
-        ["Checkout", "POST /checkout", "Blank address country = the market; another country -> 409 ships_outside_region; delivery methods are per market"],
+        ["Checkout", "POST /checkout", "Blank address country = the market; another country -> 409 ships_outside_region; shipping options come from each seller"],
         ["Order detail", "GET /me/orders/{id}", "country, return_window_days (snapshot) and return_eligible_until"],
         ["Seller wizard (per-country KYC)", "GET /seller/application -> policy; GET /lookups/seller?country=PK&account_type=", "Required documents, local labels (CNIC / SA ID...), ID-number format, instructions - in the request language"],
         ["Staff review queue", "GET /admin/seller-applications?country=PK", "Row shows the applicant's market"],
@@ -634,13 +639,14 @@ story += [
     flow([
         ["Sidebar locks / upgrade card", "GET /seller/plan", "plan, plan_label, features[], locked_features[], catalogue[] with label + description"],
         ["Staff grants premium", "POST /admin/stores/{id}/plan {is_premium}", "Same as the Django admin toggle; admin LogEntry records who and when"],
-        ["Analytics: headline", "GET /seller/analytics/overview?period=", "Gross vs net sales (after cancels/returns), units, orders, AOV, repeat/cancellation/return rates"],
+        ["Analytics: Store Performance", "GET /seller/analytics/overview?period=", "Gross vs net sales (after cancels/returns), units, orders, AOV, conversion, repeat/cancellation/return rates, daily series, sales_by_category, top_products (with image_url), customer_snapshot {new, returning, one_time}"],
+        ["Analytics: Sales Analytics", "GET /seller/analytics/sales?period=&bucket=daily|weekly|monthly", "gross/discounts/refunds/net KPIs, revenue_over_time, the revenue_breakdown waterfall, sales_by_channel (Order.channel), sales_by_category. NOTE: two 'net's - here it is gross minus discounts/refunds/adjustments; refunds and adjustments are 0 until the PSP lands"],
         ["Analytics: where shoppers drop out", "GET /seller/analytics/funnel?period=", "views -> wishlists -> add_to_cart -> purchases, per-step drop-off, biggest_drop_off"],
-        ["Analytics: what earns its shelf space", "GET /seller/analytics/products?sort=revenue|units|views|conversion", "top[] plus slow_movers[] (live, in stock, nothing sold this period)"],
+        ["Analytics: Product Analytics", "GET /seller/analytics/products?sort=revenue|units|views|conversion", "products_total, top_selling_count, avg_product_revenue_cents, top[] (with image_url) plus slow_movers[] (live, in stock, nothing sold this period)"],
         ["Analytics: what people typed", "GET /seller/analytics/search?period=", "store_queries[] (searched, then viewed your product within 30 min) and market_zero_result_queries[] - searches in your market that found nothing"],
         ["Analytics: do they come back", "GET /seller/analytics/customers?period=", "repeat_rate, orders/spend per customer, new vs returning per month, top customers"],
         ["Analytics: how fast do you ship", "GET /seller/analytics/fulfilment?period=", "median/average hours payment->shipped and shipped->delivered, status mix, rates"],
-        ["Analytics: download", "GET /seller/analytics/export.csv?report=&period=", "Any of the six reports as CSV"],
+        ["Analytics: download", "GET /seller/analytics/export.csv?report=&period=", "Any of the seven reports as CSV"],
         ["Buyer: message a seller", "POST /me/conversations {store_id|store_slug, order_id?, body}", "Opens or reuses the single thread with that store; 201 with the messages"],
         ["Buyer: inbox and polling", "GET /me/conversations, GET /me/conversations/{id}/messages?after=, POST .../messages, POST .../read, GET /me/chat/summary", "seller_can_reply tells the buyer whether an answer is possible"],
         ["Seller: inbox", "GET /seller/chat?tab=all|unread|open|closed&q=", "Premium; 403 premium_required otherwise"],
@@ -737,7 +743,7 @@ story += [
         ["GET /regions", "-", "-", "200 [CountryOut]", ""],
         ["GET /seller/plan", "store", "-", "200 PlanOut", "403"],
         ["POST /admin/stores/{id}/plan", "staff", "PlanSetIn", "200 PlanOut", "404"],
-        ["GET /seller/analytics/overview|funnel|products|search|customers|fulfilment", "store", "?period= (+sort/limit)", "200 Analytics*Out", "403 premium_required"],
+        ["GET /seller/analytics/overview|sales|funnel|products|search|customers|fulfilment", "store", "?period= (+bucket/sort/limit)", "200 Analytics*Out", "403 premium_required"],
         ["GET /seller/analytics/export.csv", "store", "?report=&period=", "200 text/csv", "403"],
         ["GET|POST /me/conversations", "member", "ConversationOpenIn", "200 page[CustomerConversationOut] / 201 CustomerThreadOut", "404, 422, 429"],
         ["GET /me/conversations/{id}[/messages]", "member", "?after=&limit=", "200 CustomerThreadOut / [MessageOut]", "404, 422"],
@@ -765,6 +771,9 @@ story += [
         ["POST /seller/products/{id}/status", "store", "StatusChangeIn", "200 SellerProductOut", "409, 422"],
         ["POST /seller/products/{id}/duplicate", "store", "-", "201 SellerProductOut", "404"],
         ["GET /seller/products/{id}/analytics", "store", "?period=", "200 ProductAnalyticsOut", "404"],
+        ["PUT /seller/products/{id}/delivery-options", "store", "ProductDeliveryIn", "200 ProductEditOut", "404, 422"],
+        ["GET|POST /seller/delivery-options", "store", "DeliveryOptionIn", "200 | 201 DeliveryOptionOut", "409"],
+        ["PATCH|DELETE /seller/delivery-options/{id}", "store", "DeliveryOptionPatchIn", "200 DeliveryOptionOut | 204", "404, 409"],
         ["GET /admin/products", "staff", "?status=&page", "200 page[AdminProductRowOut]", ""],
         ["POST /admin/products/{id}/approve|reject", "staff", "RejectIn (reject)", "200 MessageOut", "404, 409"],
         ["GET /seller/inventory", "store", "InventoryQuery + page", "200 page[InventoryRowOut]", ""],
@@ -799,7 +808,8 @@ story += [
         ["PATCH|DELETE /cart/items/{id}", "optional", "CartItemPatchIn", "200 CartOut", "404, 409"],
         ["PATCH /cart", "optional", "CartPatchIn", "200 CartOut", "422"],
         ["POST|DELETE /cart/voucher", "optional", "VoucherApplyIn", "200 CartOut", "404, 422"],
-        ["GET /delivery-methods", "-", "-", "200 [DeliveryMethodOut]", ""],
+        ["PATCH /cart/delivery", "optional", "DeliveryChoiceIn", "200 CartOut", "404, 422"],
+        ["GET /delivery-methods", "-", "-", "200 [DeliveryMethodOut]", "deprecated - shipping is per seller"],
         ["POST /checkout", "optional", "CheckoutIn", "201 OrderPlacedOut", "404, 409, 422"],
         ["POST /orders/track", "-", "TrackIn", "200 TrackOut", "404"],
         ["GET /banners?placement=", "-", "-", "200 [BannerOut]", "422"],
@@ -844,7 +854,9 @@ ProductDetailOut = ProductCardOut + { short_description, description_title, desc
                  ratings {average, count, distribution {5..1}} }
 CartOut { id, cart_token?, items[{id, variant_id, product_slug, product_name, variant_summary, image_url,
           unit_price_cents, compare_at_price_cents, qty, line_total_cents, available_qty, in_stock}],
-          order_note, voucher {code, type, value, label}?, delivery_method {id, name, eta_label, price_cents}?,
+          order_note, voucher {code, type, value, label}?,
+          deliveries[{store_id, store_name, options[{id, name, eta_label, kind, price_cents}],
+                      selected_option_id?, price_cents}],
           summary {subtotal_cents, shipping_cents, discount_cents, total_cents, currency, item_count},
           can_checkout, problems[] }
 OrderSummaryOut { id, order_number, status, status_label, group: ongoing|completed|cancelled, placed_at,
@@ -906,9 +918,9 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
     table([
         ["Order", "Scope", "Depends on"],
         ["1", "Payment provider: client-side tokenisation, POST /checkout/{id}/pay, webhooks -> payment_status/paid, saved cards, refunds on cancel", "Provider decision (see data-model.md section 10)"],
-        ["2", "Seller portal remainder: Returns flow, Chat, Analytics page, Notifications, Team/Managers (sub-roles), invoice PDF, social login", "Design for those screens + answers to Q20-Q34"],
+        ["2", "Seller portal remainder: Returns flow, Notifications, Team/Managers (sub-roles), Transactions, category requests, invoice PDF, social login", "Design for those screens + answers to Q20-Q34, Q52, Q55"],
         ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
-        ["4", "Vendor sub-roles/permissions, premium tier, vendor-customer messaging", "Product decisions + design"],
+        ["4", "Vendor sub-roles/permissions, self-serve premium subscriptions, delivery zones", "Product decisions + design"],
         ["5", "Email/SMS providers; more worker jobs (category counts, rating refresh, cart expiry)", "Worker service exists; add commands"],
         ["6", "LLM query understanding ('gift under $50 for dry skin' -> filters) and a streaming shopping assistant", "Claude API key; ASGI (uvicorn) for streaming - only those endpoints go async"],
     ], (14 * mm, 112 * mm, 46 * mm)),

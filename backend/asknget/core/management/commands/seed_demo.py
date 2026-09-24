@@ -24,7 +24,8 @@ from catalog.models import Brand, Category, Product, ProductContentSection, Prod
 from catalog.services import refresh_category_counts, refresh_product_rating, refresh_stock_status
 from core.models import SiteSetting
 from orders import services as order_services
-from orders.models import Order, OrderItem, Voucher
+from orders.models import Order, OrderDelivery, OrderItem, Voucher
+from sellers import services as seller_services
 from sellers.models import SellerApplication, Store
 
 PASSWORD = "DemoPass123!"
@@ -83,6 +84,7 @@ class Command(BaseCommand):
             application=app, defaults=dict(owner=seller, country=country, display_name="Huda Beauty", slug="huda-beauty", status="active",
                                            description="Premium beauty and lifestyle products.", activated_at=timezone.now()),
         )
+        seller_services.ensure_default_delivery_options(store)   # approve() does this for a real store
 
         Address.objects.get_or_create(
             user=customer, street_address="123 Main Street",
@@ -206,6 +208,7 @@ class Command(BaseCommand):
             application=app, defaults=dict(owner=owner, country=country, display_name="Karachi Cosmetics", slug="karachi-cosmetics", status="active",
                                            description="Everyday beauty and lawn essentials.", activated_at=timezone.now()),
         )
+        seller_services.ensure_default_delivery_options(store)
         for name, cat_slug, brand, price, compare, options, blurb in self.PK_PRODUCTS:
             category = Category.objects.filter(slug=cat_slug).first() or Category.objects.filter(parent__isnull=True).first()
             product, was_created = Product.objects.get_or_create(
@@ -259,6 +262,10 @@ class Command(BaseCommand):
         }
         products = {p.name: p for p in Product.objects.filter(store=store).prefetch_related("variants")}
         now = timezone.now()
+        options = list(store.delivery_options.filter(is_active=True))
+        # Synthetic, and only so the Sales by Channel donut is not a single slice:
+        # nothing in the app sets `channel` until the clients start sending it (Q51).
+        channels = ["web", "web", "mobile_app", "web", "other"]   # Order.channel uses plain literals (orders/schemas.py)
         for n, (days_ago, who, lines, final, method) in enumerate(self.DEMO_ORDERS, start=1):
             first, last, email = self.DEMO_CUSTOMERS[who]
             user = member if who == 0 else None  # Olivia is the signed-in demo customer
@@ -267,14 +274,21 @@ class Command(BaseCommand):
                 continue
             subtotal = sum(p.price_cents * q for p, q in items)
             placed_at = now - timedelta(days=days_ago, hours=n % 7)
+            # The seller's own option, rotated so orders differ (sprint 6).
+            option = options[n % len(options)] if options else None
+            shipping = option.price_cents if option else 0
             order = Order.objects.create(
                 user=user, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK-DEMO{n:03d}",
                 country=store.country, return_window_days=store.country.return_window_days,
                 contact_first_name=first, contact_last_name=last, contact_email=member.email if user else email, contact_phone="+27 82 123 4567",
                 shipping_address={"full_name": f"{first} {last}", "street_address": "123 Main Street", "city": "Cape Town", "postal_code": "6001", "country": store.country_id},
-                subtotal_cents=subtotal, shipping_cents=700, total_cents=subtotal + 700, currency=items[0][0].currency,
+                subtotal_cents=subtotal, shipping_cents=shipping, total_cents=subtotal + shipping, currency=items[0][0].currency,
                 payment_method_type=method, payment_status=Order.OrderPaymentStatus.PAID,
+                channel=channels[n % len(channels)],
             )
+            if option is not None:
+                OrderDelivery.objects.create(order=order, store=store, option=option, name=option.name,
+                                             eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents)
             Order.objects.filter(pk=order.pk).update(placed_at=placed_at, created_at=placed_at)
             for p, q in items:
                 v = p.variants.first()
