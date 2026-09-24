@@ -152,7 +152,25 @@ Environment variables already set in your shell **win** over `backend/.env`: `py
 with its default `override=False`. Handy for one-offs (`DATABASE_URL=… uv run …`), surprising if you
 exported something months ago and forgot.
 
-## 4. Production checklist
+## 4. Troubleshooting
+
+**`ImproperlyConfigured: FIELD_ENCRYPTION_KEY is not set`** — usually on
+`PATCH /api/v1/seller/application/steps/basic-info`, the first request that writes an encrypted column
+(`id_passport_number`). `backend/.env` is missing or the key line is empty. Fill it and restart; a
+*new* key makes any rows written with the old one unreadable (`unable to decrypt value (key
+mismatch?)`), so restore the original key if one exists rather than generating another.
+`manage.py check` (and so `runserver` and `uv run poe check`) warns about a missing or malformed key
+at startup — `core.W001` / `core.W002` — so this should not reach a request again.
+
+**`env file ...\backend\.env not found`** from `docker compose` — same missing file; compose loads it
+via `env_file` and refuses to start without it. Note the db container only applies
+`POSTGRES_PASSWORD` when it *creates* `pgdata`: after recreating `.env` with a new password, either
+put the old password back or `docker compose down -v` (which erases the database).
+
+**`no such table` / empty data locally** — the poe tasks point at `backend/asknget/db.sqlite3`; a bare
+`manage.py` run uses `DATABASE_URL` from `.env`, which is the Docker host `db`. See the table above.
+
+## 5. Production checklist
 
 - `DEBUG=0`, a fresh `SECRET_KEY`, real `ALLOWED_HOSTS` (plus every country subdomain) and
   `CSRF_TRUSTED_ORIGINS`.
