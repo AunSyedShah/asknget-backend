@@ -1,0 +1,167 @@
+[All Transactions]
+  [Top Header]
+    [Bread Crums]
+      T: Transections
+      T: Dashboard / Transections
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 14 | State=Transactions Active]
+          T: Transections
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager]
+          T: Team/Managers
+  [Content Frame]
+    [I:Button | State=Default]
+      T: Export Transactions
+      T: All Transactions
+      T: View and manage all financial activity associated with your store.
+    [Tabs]
+        T: Sales (1,102)
+        T: Payouts (24)
+        T: Fees (32)
+        T: Refunds (42)
+        T: Adjustments (30)
+          T: All  (1,284)
+    [All Transactions]
+        T: All Transactions
+        [Filters]
+            [Search Bar]
+                T: Search transaction ID, order ID or customer...
+            [Brand]
+                T: Amount
+            [Brand]
+                T: Transaction Type
+            [Brand]
+                T: Date
+            [Brand]
+                T: Transaction Status
+        [Row 1]
+              T: Olivia Martin
+            T: #ORD-28491
+            T: TXN-10482
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R1,240
+            T: Completed
+        [Row 2]
+              T: James Khan
+            T: #ORD-28487
+            T: TXN-10481
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R860
+            T: Completed
+        [Row 3]
+              T: Emma Roberts
+            T: #ORD-28472
+            T: TXN-10480
+            T: Fee
+            T: Sep 14, 12:40 pm
+            T: -R45
+            T: Completed
+        [Row 4]
+              T: Daniel Smith
+            T: #ORD-28461
+            T: TXN-10480
+            T: Refund
+            T: Sep 14, 12:40 pm
+            T: -R620
+            T: Refunded
+        [Row 5]
+              T: Sophia Lee
+            T: #ORD-28489
+            T: TXN-10478
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R1,260
+            T: Completed
+        [Row 6]
+              T: -
+            T: -
+            T: TXN-10478
+            T: Payout
+            T: Sep 14, 12:40 pm
+            T: -R620
+            T: Processing
+        [Row 7]
+              T: Liam Smith
+            T: #ORD-28420
+            T: TXN-10482
+            T: Refund
+            T: Sep 14, 12:40 pm
+            T: -R620
+            T: Refunded
+        [Row 8]
+              T: John Rose
+            T: #ORD-28418
+            T: TXN-10482
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R1,265
+            T: Completed
+        [Row 9]
+              T: John William
+            T: #ORD-28414
+            T: TXN-10482
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R1,280
+            T: Completed
+        [Row 10]
+              T: Sophia Martin
+            T: #ORD-28413
+            T: TXN-10482
+            T: Sale
+            T: Sep 14, 12:40 pm
+            T: +R1,275
+            T: Completed
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 10 of 1,284 transactions
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next

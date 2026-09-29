@@ -58,3 +58,106 @@
           T: 8.1%  vs previous period
               T: R510
               T: Avg. Product Revenue
+    [Top Products]
+          [Row 1]
+              T: 01
+                T: Classic Leather Bag
+              T: 384
+              T: 225
+              T: R32,840
+              T: Active
+          [Row 2]
+              T: 02
+                T: Smart Watch Series 5
+              T: 92
+              T: 98
+              T: R27,640
+              T: Active
+          [Row 3]
+              T: 03
+                T: Wireless Earbuds Pro
+              T: 142
+              T: 158
+              T: R21,420
+              T: Active
+            T: Top Products
+            T: View All Products
+    [Product Performance]
+            T: Product Performance
+            T: View All Products
+        [Tabs]
+          [Orders]
+            T: Orders
+          [Units Sold]
+            T: Units Sold
+          [Revenue]
+            T: Revenue
+          [Views]
+            T: Views
+        [Lines]
+          [Horizontal Lines]
+          [Verticle Lines]
+        [Days]
+              T: Apr 01
+              T: Apr 07
+              T: Apr 14
+              T: Apr 21
+              T: Apr 30
+        [Orders]
+            T: 800
+            T: R 0
+            T: 1,000
+            T: 1,200
+            T: 1,400
+          T: Orders
+        [line-14]
+          [Clip path group]
+            [zr3-c0]
+    [Product Conversion]
+          [Row 1]
+              T: 01
+              T: Wireless Earbuds
+              T: 384
+              T: 6,820
+              T: 982
+              T: 2.18%
+          [Row 2]
+              T: 02
+              T: Smart Watch
+              T: 92
+              T: 4,240
+              T: 602
+              T: 2.25%
+          [Row 3]
+              T: 03
+              T: Leather Bag
+              T: 142
+              T: 5,240
+              T: 742
+              T: 2.17%
+            T: Product Conversion
+            T: View Conversion Details
+    [Low Performing Products]
+          [Row 1]
+              T: 01
+              T: Wireless Earbuds
+              T: 384
+              T: 6,820
+              T: 982
+              T: 2.18%
+          [Row 2]
+              T: 02
+              T: Smart Watch
+              T: 92
+              T: 4,240
+              T: 602
+              T: 2.25%
+          [Row 3]
+              T: 03
+              T: Leather Bag
+              T: 142
+              T: 5,240
+              T: 742
+              T: 2.17%
+            T: Low Performing Products
+            T: View Low Performers

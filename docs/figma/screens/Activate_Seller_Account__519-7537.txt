@@ -15,3 +15,4 @@
     T: Store Setup
       T: I agree to the asknget Seller Agreement and marketplace policies.
       T: I confirm that my business information remains accurate and up to date.
+  T: Seller Signup & Onboarding Flow (Seller Complete Journey)

@@ -165,6 +165,23 @@ def _wanted(frame: dict) -> bool:
     return frame.get("type") in ("FRAME", "INSTANCE", "GROUP", "SECTION", "COMPONENT")
 
 
+def _screens(nodes: list[dict], children=lambda n: n.get("children", [])) -> list[dict]:
+    """The screens among a page's top-level nodes, looking inside SECTIONs.
+
+    A SECTION is how the designer files screens ("Seller Portal" holds every seller
+    screen since 2026-09-29), not a screen itself. Treating it as one wrote the
+    whole portal into a single file and pruned all 35 real screens as "gone".
+    `children` lets the .fig path pass its own child lookup.
+    """
+    out = []
+    for node in nodes:
+        if node.get("type") == "SECTION":
+            out.extend(_screens(children(node), children))
+        elif _wanted(node):
+            out.append(node)
+    return out
+
+
 def _prune(keep: set[str]) -> None:
     """Drop screen files whose frame is gone. Only called after a complete sweep —
     a partial run must never delete anything."""
@@ -201,7 +218,7 @@ def snapshot_via_file() -> None:
     page = next(p for p in doc["document"]["children"] if p["name"] == PAGE_NAME)
     components = doc.get("components", {})
     SCREENS_DIR.mkdir(parents=True, exist_ok=True)
-    screens = [_write_screen(f, components) for f in page["children"] if _wanted(f)]
+    screens = [_write_screen(f, components) for f in _screens(page["children"])]
     _prune({s["file"] for s in screens})
     _write_manifest(doc["version"], doc["lastModified"], screens, via="files")
 
@@ -275,7 +292,7 @@ def snapshot_from_fig(path, replace: bool = False) -> int:
         for child in kids(key(node["guid"])):
             outline(child, depth + 1, out)
 
-    frames = [f for f in kids(key(canvas["guid"])) if _wanted(f)]
+    frames = _screens(kids(key(canvas["guid"])), lambda n: kids(key(n["guid"])))
     SCREENS_DIR.mkdir(parents=True, exist_ok=True)
     screens, skipped = [], []
     for frame in frames:
@@ -314,11 +331,11 @@ def snapshot_from_fig(path, replace: bool = False) -> int:
 def refresh_index() -> list[dict]:
     """One small call: every frame on the page, name + node id. This is how a newly
     drawn screen is discovered without reading the whole file."""
-    listing = _get(f"/files/{FILE_KEY}/nodes?ids={PAGE_NODE}&depth=1")
+    listing = _get(f"/files/{FILE_KEY}/nodes?ids={PAGE_NODE}&depth=2")   # 2: screens inside SECTIONs
     canvas = listing["nodes"][PAGE_NODE]["document"]
     if canvas.get("name") != PAGE_NAME:
         sys.exit(f"Node {PAGE_NODE} is {canvas.get('name')!r}, not the {PAGE_NAME!r} page — update PAGE_NODE.")
-    frames = [{"name": f["name"], "node_id": f["id"], "type": f["type"]} for f in canvas.get("children", []) if _wanted(f)]
+    frames = [{"name": f["name"], "node_id": f["id"], "type": f["type"]} for f in _screens(canvas.get("children", []))]
     known = {s["node_id"]: s["name"] for s in json.loads(MANIFEST.read_text(encoding="utf-8"))["screens"]} if MANIFEST.exists() else {}
     PAGE_INDEX.write_text(json.dumps({"fetched_at": current_version(), "frames": frames}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     added = [f for f in frames if f["node_id"] not in known]

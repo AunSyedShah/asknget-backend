@@ -1,0 +1,93 @@
+[Member Details]
+  [Top Header]
+    [Bread Crums]
+      T: Team & Managers
+      T: Dashboard / Teams & Managers / Member Details
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 14 | State=Transactions]
+          T: Transections
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager Active]
+          T: Team/Managers
+  [Content Frame]
+    [I:Button | State=Default]
+      T: Edit Member
+      T: Team Members
+      T: Back to Team & Managers
+      T: Manager
+        T: Sarah Lewis
+        [Status]
+          T: Active
+    [Member Info]
+          T: Member Information
+            T: Full Name
+            T: Sarah Lewis
+            T: Email Address
+            T: lewis.sarah@gmail.com
+            T: Role
+            T: Manager
+            T: Phone Number
+            T: +27 71 456 8921
+            T: Status
+            T: Active
+            T: Joined
+            T: Sep 12, 2026
+            T: Last Active
+            T: 12 September 2026, 12:48 pm
+    [Access & Permissin]
+          T: Access & Permissions
+          T: Edit Permissions
+              T: Dashboard
+              T: View
+              T: Orders
+              T: View + Manage
+              T: Products
+              T: View + Manage
+              T: Inventory
+              T: View + Manage
+              T: Customers
+              T: View + Manage
+              T: Marketing
+              T: View + Manage
+              T: Analytics
+              T: View
+              T: Transactions
+              T: View
+    [Recent Activity]
+          T: Recent Activity
+          T: Edit Permissions
+              T: Updated inventory for Wireless Earbuds Pro
+              T: Update Inventory
+              T: 10:18 AM
+              T: Download orders reportvfor september 2026
+              T: Exported orders CSV
+              T: 04:42 PM
+              T: Updated price for Wireless Earbuds Pro
+              T: Update product price
+              T: 02:15 PM

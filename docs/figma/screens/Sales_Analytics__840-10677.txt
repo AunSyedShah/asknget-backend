@@ -62,22 +62,24 @@
           T: View Details
           T: Revenue Over Time
         [Chart]
+          [Days]
                 T: Apr 01
                 T: Apr 07
                 T: Apr 14
                 T: Apr 21
                 T: Apr 30
+          [Amount]
                 T: R 6,820
                 T: R 0
                 T: R 8,240
                 T: R 12,940
                 T: R 14,680
-            [Clip path group]
-              [zr3-c0]
-            [Clip path group]
-              [zr3-c0]
+          [Lines]
+            [Horixontal Lines]
+            [Vertical Lines]
                 T: Gross Sales
                 T: Net Sales
+            [Tabs]
                 T: Monthly
                 T: Weekly
                 T: Daily

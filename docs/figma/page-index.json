@@ -1,0 +1,129 @@
+{
+  "fetched_at": {
+    "version": "2404643621949386033",
+    "lastModified": "2026-09-29T13:19:18Z",
+    "by": "Asma Choudhary"
+  },
+  "frames": [
+    {
+      "name": "Landing Page",
+      "node_id": "186:4247",
+      "type": "FRAME"
+    },
+    {
+      "name": "Categories",
+      "node_id": "192:4750",
+      "type": "FRAME"
+    },
+    {
+      "name": "Product Details - Desc",
+      "node_id": "203:6868",
+      "type": "FRAME"
+    },
+    {
+      "name": "Product Details - Usage",
+      "node_id": "225:3191",
+      "type": "FRAME"
+    },
+    {
+      "name": "Product Details - Reviews",
+      "node_id": "225:3505",
+      "type": "FRAME"
+    },
+    {
+      "name": "Cart",
+      "node_id": "237:1063",
+      "type": "FRAME"
+    },
+    {
+      "name": "Track Order",
+      "node_id": "256:5097",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Personal Info",
+      "node_id": "262:5539",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Wishlist",
+      "node_id": "292:8769",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Manage Addresses",
+      "node_id": "297:10207",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "311:2993",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Payments Methods",
+      "node_id": "312:3402",
+      "type": "FRAME"
+    },
+    {
+      "name": "About Us",
+      "node_id": "312:4902",
+      "type": "FRAME"
+    },
+    {
+      "name": "Contact Us",
+      "node_id": "312:5192",
+      "type": "FRAME"
+    },
+    {
+      "name": "Add New Address Popup",
+      "node_id": "302:11047",
+      "type": "INSTANCE"
+    },
+    {
+      "name": "Add New Card Popup",
+      "node_id": "312:4671",
+      "type": "INSTANCE"
+    },
+    {
+      "name": "My Account - My Orders",
+      "node_id": "267:6566",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Ongoing Orders",
+      "node_id": "284:7470",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Completed Orders",
+      "node_id": "284:7773",
+      "type": "FRAME"
+    },
+    {
+      "name": "My Account - Cancelled Orders",
+      "node_id": "284:8096",
+      "type": "FRAME"
+    },
+    {
+      "name": "Checkout",
+      "node_id": "244:3220",
+      "type": "FRAME"
+    },
+    {
+      "name": "Order Placed",
+      "node_id": "256:5077",
+      "type": "INSTANCE"
+    },
+    {
+      "name": "Logout Popup",
+      "node_id": "312:4875",
+      "type": "INSTANCE"
+    },
+    {
+      "name": "Seller Portal",
+      "node_id": "990:9031",
+      "type": "SECTION"
+    }
+  ]
+}

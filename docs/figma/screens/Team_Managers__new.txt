@@ -1,0 +1,143 @@
+[Team / Managers]
+  [Top Header]
+    [Bread Crums]
+      T: Team & Managers
+      T: Dashboard / Teams & Managers
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Sidebar]
+    [I:Component 14 | State=Logout]
+        T: Logout
+        T: Sirosh Bashir
+        T: Store Owner
+      [I:Component 4 | State=Dashboard]
+          T: Dashboard
+      [I:Component 5 | State=Products]
+          T: Products
+      [I:Component 6 | State=Inventory]
+          T: Inventory
+      [I:Component 7 | State=Orders]
+          T: Orders
+      [I:Component 8 | State=Returns]
+          T: Returns
+      [I:Component 9 | State=Customers]
+          T: Customers
+      [I:Component 10 | State=Chats]
+          T: Chat
+      [I:Component 11 | State=Analytics]
+          T: Analytics
+      [I:Component 14 | State=Transactions]
+          T: Transections
+      [I:Component 12 | State=Notifications]
+          T: Notifications
+      [I:Component 13 | State=Manager Active]
+          T: Team/Managers
+  [Content Frame]
+    [I:Button | State=Default]
+      T: + Invite Member
+      T: Team Members
+      T: Manage your store team, invite members, assign roles and control access.
+    [KPI - 1]
+          T: Total members
+              T: 12
+              T: Team Members
+    [KPI - 5]
+          T: Currently active
+              T: 8
+              T: Active Members
+    [KPI - 7]
+          T: Awaiting response
+              T: 2
+              T: Pending Invites
+    [KPI - 8]
+          T: Members with manager access
+              T: 2
+              T: Managers
+    [Team Members]
+        T: Team Members
+        [Filters]
+            [Search Bar]
+                T: Search team members...
+            [Brand]
+                T: Status:      All Statuses
+            [Brand]
+                T: Role :             All Roles
+            [Brand]
+                T: Last Active:            Yesterday
+          [Rows]
+            [Row 1]
+                  T: Olivia Martin
+                T: Owner
+                T: olivia.martin@gmail.com
+                T: Just Now
+                T: Active
+            [Row 2]
+                  T: Sarah Lewis
+                T: Manager
+                T: lewis.sarah@gmail.com
+                T: 12 min ago
+                T: Active
+            [Row 3]
+                  T: James Peters
+                T: Inventory Manager
+                T: peter.james@gmail.com
+                T: 1 hr ago
+                T: Active
+            [Row 4]
+                  T: Emma Roberts
+                T: Order Manager
+                T: emma.roberts@gmail.com
+                T: 2 hr ago
+                T: Active
+            [Row 5]
+                  T: Daniel Smith
+                T: Marketing Manager
+                T: danial.smith@gmail.com
+                T: Yesterday
+                T: Active
+            [Row 6]
+                  T: Sophia Lee
+                T: Finance Manager
+                T: sophia.lee@gmail.com
+                T: Yesterday
+                T: Active
+            [Row 7]
+                  T: Olivia Brown
+                T: Support Agent
+                T: oliviabrown@gmail.com
+                T: Yesterday
+                T: Active
+            [Row 8]
+                  T: Mia Taylor
+                T: Manager
+                T: taylormia@gmail.com
+                T: -
+                T: Pending
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 8 of 12 members
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next

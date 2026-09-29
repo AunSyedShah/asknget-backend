@@ -671,3 +671,51 @@ REST-style JSON; auth via access + refresh JWT.
     payouts and the PSP, alongside Q50 and Q52.
 61. **Delivery zones.** Every option has one price whatever the destination. Cross-city or cross-province
     pricing, and refusing to ship to some regions, are the obvious next asks — is either needed at launch?
+
+**Figma 2026-09-29 — seller screens moved into a "Seller Portal" section; 7 new screens, Product Analytics finished**
+
+62. **Transactions implies a seller ledger and payouts.** Overview KPIs are Total Sales, Pending Payout
+    ("+R6,240 Processing"), Total Fees and **Available Balance — "Available to withdraw"**; the list has types
+    Sale / Payout / Fee / Refund / Adjustment and statuses Completed / Processing / Refunded. That is a
+    double-entry ledger per store, a payout schedule and a withdraw action — none of which exists, and all of
+    which depend on the PSP (Q9, Q50). Confirm this sprint builds the ledger shape only, with amounts from
+    orders, and payouts stay manual until the PSP lands. Answers Q52: the page is seller payouts and fees.
+63. **The seller pays delivery fees?** The Transaction Summary deducts "Delivery Fees −R8,640" from the
+    seller's payout, and the Detail shows "Delivery Fee −R40". Under the sprint 6 decision the *seller*
+    sets and receives delivery prices (Q53), so the buyer's shipping should arrive as income, not leave as a
+    fee. Either the platform delivers and charges the seller (a logistics model we have not got), or this
+    line is the buyer's shipping passed through. Which? This decides Q60.
+64. **Transaction Detail arithmetic does not add up.** Order R1,240 − Delivery R40 − Tax/Adjustments R18 =
+    R1,182, but Net Amount shows R1,120. The R62 gap is exactly 5% of the order, which looks like a missing
+    **Platform Fee** line. Confirm the commission rate (per market? per category? per plan — cf. Q43) and
+    that it belongs in the breakdown.
+65. **"Update Status" on a transaction.** The detail page gives the seller a button to change a financial
+    transaction's status. A seller must not be able to mark their own payout or refund complete; we will
+    treat this as staff-only (or a copy-paste from View Order) unless told otherwise. The same stray button
+    sits on the Notifications page.
+66. **Adjustments sign.** The Transaction Summary shows Adjustments as **+R2,240** (added to payout), while
+    Sales Analytics' waterfall subtracts them. Adjustments can go both ways, so we will store a signed
+    amount — confirm what creates one (manual staff credit/debit, chargeback, promo subsidy).
+67. **Team / Managers — roles vs permissions.** Roles shown: Owner, Manager, Inventory Manager, Order Manager,
+    Marketing Manager, Finance Manager, Support Agent. Member Details lists 8 modules with a level each
+    (View / View + Manage), but the Edit Permissions popup has **6 on/off toggles** (no Marketing, no
+    Transactions, no View-vs-Manage). Proposal: a role is a named preset of per-module levels
+    (none / view / manage), the popup edits the level per module, Owner is fixed and cannot be removed.
+    Confirm, and whether members can belong to several stores. Supersedes Q17/Q20's deferred sub-roles.
+68. **Invites.** "+ Invite Member" and a Pending status exist but no invite popup or accept screen. We would
+    e-mail a signed, expiring link; the invitee sets a password or signs in. Confirm expiry (7 days?) and
+    whether a phone OTP is required as for sellers.
+69. **"Marketing" module** appears in permissions, but sellers have no marketing features (vouchers are
+    platform-wide). Is seller-created vouchers/promotions coming, or is the row placeholder?
+70. **Recent Activity** on Member Details needs an audit log of seller-portal actions (price change, stock
+    update, CSV export). Cheap to add as one append-only table if we log at the service layer; confirm
+    retention and whether the owner sees *every* member's activity.
+71. **Notifications** — tabs Orders / Payments / Inventory / Customers / System, with New Order, Low Stock,
+    Payment Received, Payout Processed, New Customer, Order Cancelled. Confirm this is in-app only for now
+    (e-mail/push waits on the worker, Q48), that it is per store rather than per member, and what "System"
+    covers. Low-stock uses each variant's threshold, fired once per crossing, not on every sale.
+72. **Product Analytics** is now drawn (was Q56): Top Products, a Product Performance chart (Orders / Units
+    Sold / Revenue / Views per day), Product Conversion and Low Performing Products. The tables have no
+    header row, and Low Performing reuses Product Conversion's placeholder rows. We read "low performing"
+    as lowest conversion among products with views, not only zero-sales products. Confirm the columns.
+73. **Returns** is still a sidebar entry with no screen (Q26, Q40).
