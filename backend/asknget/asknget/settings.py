@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -33,7 +34,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-only-change-me')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h]
+# Automatically includes .vercel.app for Vercel preview/production URLs
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,.vercel.app'
+    ).split(',')
+    if h.strip()
+]
 
 # Fernet key for core.fields.EncryptedTextField (ID numbers, bank accounts).
 # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -153,14 +162,24 @@ WSGI_APPLICATION = 'asknget.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-# Postgres in every real environment (DATABASE_URL=postgres://user:pass@host:5432/asknget);
-# falls back to SQLite so a fresh checkout runs without any setup.
+# Default location for local sqlite
+sqlite_file_path = BASE_DIR / 'db.sqlite3'
+
+# If deployed to Vercel and no external Postgres DATABASE_URL is set,
+# copy SQLite DB to /tmp (the only writable directory in Vercel lambda functions)
+if os.environ.get('VERCEL') and not os.environ.get('DATABASE_URL'):
+    tmp_db = Path('/tmp/db.sqlite3')
+    if sqlite_file_path.exists() and not tmp_db.exists():
+        shutil.copyfile(sqlite_file_path, tmp_db)
+    sqlite_file_path = tmp_db
+
 DATABASES = {
     'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        default=f"sqlite:///{sqlite_file_path}",
         conn_max_age=600,
     )
 }
+
 if DATABASES['default'].get('ENGINE', '').endswith('postgresql') and os.environ.get('DB_POOL', '1') == '1':
     # psycopg connection pool per process (needs psycopg[pool]); pooling and
     # persistent connections are mutually exclusive in Django.
@@ -194,8 +213,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en'
 
-# Every language any country may offer; a Country picks a subset. Add here first,
-# then in admin.
 LANGUAGES = [
     ('en', 'English'),
     ('af', 'Afrikaans'),
@@ -204,7 +221,7 @@ LANGUAGES = [
 ]
 LOCALE_PATHS = [BASE_DIR / 'locale']
 
-TIME_ZONE = 'UTC'  # storage; the request timezone is activated per country by markets.middleware
+TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
@@ -224,51 +241,43 @@ STORAGES = {
 # User uploads (avatars, product images, seller KYC documents)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
-# Let Django serve uploads itself. On by default in DEBUG; set SERVE_MEDIA=1 in the
-# container until uploads move to object storage / a reverse proxy.
 SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
 
-# Behind a reverse proxy (Docker/nginx) trust its scheme header and origins.
-CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o]
-if os.environ.get('BEHIND_PROXY') == '1':
+# CSRF Trusted Origins (includes Vercel domains by default for API / Admin forms)
+CSRF_TRUSTED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'https://*.vercel.app,http://localhost:3000,http://127.0.0.1:3000'
+    ).split(',')
+    if o.strip()
+]
+
+# Behind a reverse proxy (Docker/nginx/Vercel) trust scheme header and origins.
+if os.environ.get('BEHIND_PROXY') == '1' or os.environ.get('VERCEL'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     USE_X_FORWARDED_HOST = True
 
 
 # CORS (django-cors-headers)
 # -----------------------------------------------------------------------------
-# Only needed when the storefront is served from a different origin than the API.
-# When the frontend for a market lives on the same host (za.asknget.com serving
-# both the app and /api/) nothing here applies — leave the lists empty and the
-# middleware adds no headers at all.
-#
-# Origins are exact (scheme + host + port). For country subdomains use a regex:
-#   CORS_ALLOWED_ORIGIN_REGEXES=^https://[a-z]{2}\.asknget\.com$
 CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [r.strip() for r in os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',') if r.strip()]
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', '0') == '1'  # staging only; never with credentials
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', '0') == '1'
 
-# The API authenticates with a Bearer header, not cookies, so the browser has no
-# ambient credentials to send. Keeping this False means a malicious page can only
-# ever make *unauthenticated* calls. Turn it on only if cookie auth is added, and
-# never together with CORS_ALLOW_ALL_ORIGINS (the spec forbids that combination).
 CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', '0') == '1'
 
-# Local frontends (Next 3000 / Vite 5173) while DEBUG, so a frontend dev never
-# has to debug CORS on a fresh clone. Production always sets DEBUG=0.
 if DEBUG and not (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES or CORS_ALLOW_ALL_ORIGINS):
     CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://(localhost|127\.0\.0\.1)(:\d+)?$']
 
-CORS_URLS_REGEX = r'^/api/.*$'  # never add CORS headers to /admin or /static
+CORS_URLS_REGEX = r'^/api/.*$'
 
-# Our custom request headers must be allowed through preflight...
 CORS_ALLOW_HEADERS = (
     'accept', 'accept-language', 'authorization', 'content-type', 'origin', 'user-agent',
     'x-requested-with', 'x-csrftoken',
-    'x-cart-token',   # guest carts (orders.services.CART_TOKEN_HEADER)
-    'x-region', 'x-language', 'x-timezone',  # markets.middleware
+    'x-cart-token',
+    'x-region', 'x-language', 'x-timezone',
 )
-# ...and these response headers must be exposed, or JS cannot read them cross-origin.
 CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
 
 
