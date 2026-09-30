@@ -166,7 +166,7 @@ sqlite_file_path = BASE_DIR / 'db.sqlite3'
 # If running on Vercel without an external Postgres DATABASE_URL, copy to writable /tmp
 if os.environ.get('VERCEL') and not os.environ.get('DATABASE_URL'):
     tmp_db = Path('/tmp/db.sqlite3')
-    # Copy repo db.sqlite3 to /tmp if it exists and hasn't been copied yet
+    # Copy repo db.sqlite3 to /tmp if present and not yet copied
     if sqlite_file_path.exists() and not tmp_db.exists():
         shutil.copyfile(sqlite_file_path, tmp_db)
     sqlite_file_path = tmp_db
@@ -177,24 +177,6 @@ DATABASES = {
         conn_max_age=600,
     )
 }
-
-# Auto-migrate SQLite on cold start if running on Vercel and the DB has no tables
-if os.environ.get('VERCEL') and not os.environ.get('DATABASE_URL'):
-    try:
-        import sqlite3
-        conn = sqlite3.connect(sqlite_file_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='markets_country';")
-        has_table = cursor.fetchone()
-        conn.close()
-
-        if not has_table:
-            import django
-            from django.core.management import call_command
-            django.setup()
-            call_command('migrate', interactive=False)
-    except Exception:
-        pass
 
 if DATABASES['default'].get('ENGINE', '').endswith('postgresql') and os.environ.get('DB_POOL', '1') == '1':
     # psycopg connection pool per process (needs psycopg[pool]); pooling and
