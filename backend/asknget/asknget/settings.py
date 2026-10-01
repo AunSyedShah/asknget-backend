@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load backend/.env (one level above the Django project dir) if present.
 load_dotenv(BASE_DIR.parent / '.env')
+APPEND_SLASH = False
 
 
 # Quick-start development settings - unsuitable for production
