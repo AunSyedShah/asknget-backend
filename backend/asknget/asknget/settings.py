@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load backend/.env (one level above the Django project dir) if present.
 load_dotenv(BASE_DIR.parent / '.env')
-APPEND_SLASH = False[cite: 1]
+APPEND_SLASH = False
 
 
 # Quick-start development settings - unsuitable for production
@@ -39,7 +39,7 @@ ALLOWED_HOSTS = [
     h.strip()
     for h in os.environ.get(
         'ALLOWED_HOSTS',
-        'localhost,127.0.0.1,.vercel.app'
+        'localhost,127.0.0.1,asknget-backend.vercel.app,.vercel.app'
     ).split(',')
     if h.strip()
 ]
@@ -127,8 +127,8 @@ AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     *(['zeal.middleware.zeal_middleware'] if ZEAL_ENABLED else []),
+    'corsheaders.middleware.CorsMiddleware',  # Placed above SecurityMiddleware & CommonMiddleware for proper preflights
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # must come before anything that can return a response
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves /static (admin, Swagger UI) from the app image
     'django.contrib.sessions.middleware.SessionMiddleware',
     'markets.middleware.RegionMiddleware',  # country → language + timezone for /api/ requests
@@ -244,10 +244,10 @@ SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
 
 # CSRF Trusted Origins (includes Vercel domains by default for API / Admin forms)
 CSRF_TRUSTED_ORIGINS = [
-    o.strip()
+    o.strip().rstrip('/')
     for o in os.environ.get(
         'CSRF_TRUSTED_ORIGINS',
-        'https://*.vercel.app,http://localhost:3000,http://127.0.0.1:3000'
+        'https://*.vercel.app,https://asknget-frontend-one.vercel.app,http://localhost:3000,http://127.0.0.1:3000'
     ).split(',')
     if o.strip()
 ]
@@ -260,22 +260,47 @@ if os.environ.get('BEHIND_PROXY') == '1' or os.environ.get('VERCEL'):
 
 # CORS (django-cors-headers)
 # -----------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
-CORS_ALLOWED_ORIGIN_REGEXES = [r.strip() for r in os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',') if r.strip()]
+default_cors_origins = [
+    'https://asknget-frontend-one.vercel.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+
+raw_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS') or os.environ.get('FRONTEND_URL', '')
+env_cors_origins = [o.strip().rstrip('/') for o in raw_cors_origins.split(',') if o.strip()]
+
+CORS_ALLOWED_ORIGINS = list(set(default_cors_origins + env_cors_origins))
+
+# Allow any preview branch deployment ending in .vercel.app
+default_cors_regexes = [
+    r"^https:\/\/.*\.vercel\.app$",
+]
+raw_cors_regexes = os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '')
+env_cors_regexes = [r.strip() for r in raw_cors_regexes.split(',') if r.strip()]
+CORS_ALLOWED_ORIGIN_REGEXES = list(set(default_cors_regexes + env_cors_regexes))
+
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', '0') == '1'
 
-CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', '0') == '1'
-
-if DEBUG and not (CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGIN_REGEXES or CORS_ALLOW_ALL_ORIGINS):
-    CORS_ALLOWED_ORIGIN_REGEXES = [r'^http://(localhost|127\.0\.0\.1)(:\d+)?$']
+# Credentials enabled so cookies and Authorization headers work across domains
+CORS_ALLOW_CREDENTIALS = os.environ.get('CORS_ALLOW_CREDENTIALS', '1') == '1'
 
 CORS_URLS_REGEX = r'^/api/.*$'
 
 CORS_ALLOW_HEADERS = (
-    'accept', 'accept-language', 'authorization', 'content-type', 'origin', 'user-agent',
-    'x-requested-with', 'x-csrftoken',
+    'accept',
+    'accept-language',
+    'authorization',
+    'content-type',
+    'origin',
+    'user-agent',
+    'x-requested-with',
+    'x-csrftoken',
     'x-cart-token',
-    'x-region', 'x-language', 'x-timezone',
+    'x-region',
+    'x-language',
+    'x-timezone',
 )
 CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
 
