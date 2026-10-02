@@ -6,20 +6,34 @@ Values are opaque in the DB, so they cannot be filtered or ordered on — keep a
 separate plain column (e.g. `last4`) for anything the UI needs to show.
 """
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
 
-def _fernet() -> Fernet:
+def configured_keys() -> list[str]:
+    """Current key first, then any `FIELD_ENCRYPTION_KEY_PREVIOUS` keys.
+
+    New values are always written with the first; old rows stay readable while
+    their key is listed, and `manage.py check_encryption --rewrite` moves them to
+    the first so the old one can be dropped."""
     key = getattr(settings, "FIELD_ENCRYPTION_KEY", None)
     if not key:
         raise ImproperlyConfigured(
-            "FIELD_ENCRYPTION_KEY is not set. Generate one with "
+            "FIELD_ENCRYPTION_KEY is not set. Copy backend/.env.example to backend/.env (it carries the shared "
+            "development key), or generate one with "
             "`python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"`"
         )
-    return Fernet(key.encode() if isinstance(key, str) else key)
+    return [key, *getattr(settings, "FIELD_ENCRYPTION_KEY_PREVIOUS", [])]
+
+
+def fernet_for(keys: list[str]) -> MultiFernet:
+    return MultiFernet([Fernet(k.encode() if isinstance(k, str) else k) for k in keys])
+
+
+def _fernet() -> MultiFernet:
+    return fernet_for(configured_keys())
 
 
 class EncryptedTextField(models.TextField):
@@ -39,7 +53,11 @@ class EncryptedTextField(models.TextField):
             return _fernet().decrypt(value.encode()).decode()
         except InvalidToken:
             # Wrong key or legacy plaintext row — surface rather than silently corrupt.
-            raise ValueError("EncryptedTextField: unable to decrypt value (key mismatch?)")
+            raise ValueError(
+                f"Cannot decrypt {self.model._meta.label}.{self.name}: the row was encrypted with a different "
+                "FIELD_ENCRYPTION_KEY. Run `manage.py check_encryption` to see which rows, and list the old key in "
+                "FIELD_ENCRYPTION_KEY_PREVIOUS if you still have it."
+            )
 
     def to_python(self, value):
         return value

@@ -37,7 +37,7 @@ backend/
 
 ```bash
 uv sync
-cp .env.example .env            # then set FIELD_ENCRYPTION_KEY (see comment in the file)
+cp .env.example .env            # includes the shared dev FIELD_ENCRYPTION_KEY; keep it
 uv run poe seed                 # migrate + seed_lookups + seed_demo (password DemoPass123!)
 uv run poe dev                  # http://127.0.0.1:8000
 ```
@@ -92,7 +92,7 @@ Your code stays where it is — the image *copies* it at build time, and in dev 
 working tree is *bind-mounted* into the container so edits reload live.
 
 ```bash
-cp backend/.env.example backend/.env    # fill SECRET_KEY, FIELD_ENCRYPTION_KEY, POSTGRES_PASSWORD (+ same password in DATABASE_URL)
+cp backend/.env.example backend/.env    # fill SECRET_KEY, POSTGRES_PASSWORD (+ same password in DATABASE_URL); keep the shared dev FIELD_ENCRYPTION_KEY
 docker compose up -d --build            # dev: Postgres + runserver with live reload on :8000 (nginx on :80 as well)
 docker compose exec web python manage.py seed_demo   # optional demo data
 ```

@@ -38,6 +38,9 @@ ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1
 # Fernet key for core.fields.EncryptedTextField (ID numbers, bank accounts).
 # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = os.environ.get('FIELD_ENCRYPTION_KEY', '')
+# Older keys, comma-separated. Rows written under them stay readable; the current key
+# encrypts everything new. See `manage.py check_encryption --rewrite`.
+FIELD_ENCRYPTION_KEY_PREVIOUS = [k.strip() for k in os.environ.get('FIELD_ENCRYPTION_KEY_PREVIOUS', '').split(',') if k.strip()]
 
 # Test runs: throwaway encryption key and a fast password hasher (PBKDF2 makes
 # every user-creating test take ~1 s).

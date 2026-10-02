@@ -18,14 +18,14 @@ else in `backend/.env`.
 cp .env.example .env
 cp backend/.env.example backend/.env
 python -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(50))"
-python -c "from cryptography.fernet import Fernet; print('FIELD_ENCRYPTION_KEY=' + Fernet.generate_key().decode())"
-# paste both into backend/.env, set POSTGRES_PASSWORD, then:
+# paste it into backend/.env and set POSTGRES_PASSWORD. Leave FIELD_ENCRYPTION_KEY exactly as the
+# example has it: it is a shared development key, so every developer reads the same encrypted rows.
 docker compose up -d --build
 ```
 
 Then `http://localhost:${HTTP_PORT}/api/v1/docs`.
 
-> **Never commit either `.env`.** `SECRET_KEY`, `FIELD_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` are real
+> **Never commit either `.env`.** In production `SECRET_KEY`, `FIELD_ENCRYPTION_KEY` and `POSTGRES_PASSWORD` are real
 > secrets — and losing `FIELD_ENCRYPTION_KEY` makes every encrypted ID/passport and bank account number
 > permanently unreadable. Back it up somewhere safe before going anywhere near production.
 
@@ -47,7 +47,8 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | Variable | Example | Notes |
 |---|---|---|
 | `SECRET_KEY` | *(50 random chars)* | Django signing key; also signs JWTs. Changing it logs everyone out. |
-| `FIELD_ENCRYPTION_KEY` | *(Fernet key)* | Encrypts ID/passport and bank account numbers at rest (`core.fields.EncryptedTextField`). **Lose it and that data is unrecoverable.** Tests generate a throwaway key. |
+| `FIELD_ENCRYPTION_KEY` | *(Fernet key)* | Encrypts ID/passport and bank account numbers at rest (`core.fields.EncryptedTextField`). **Lose it and that data is unrecoverable.** `.env.example` ships a **shared development key** so every developer's database is interchangeable; production must generate its own (`manage.py check` warns, `core.W003`, if it sees the shared one with `DEBUG=0`). Tests generate a throwaway key. |
+| `FIELD_ENCRYPTION_KEY_PREVIOUS` | *(comma-separated Fernet keys)* | Optional. Keys this database used before. Rows written under them stay readable; everything new uses `FIELD_ENCRYPTION_KEY`. See *Key mismatch* under Troubleshooting. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `asknget` / *(secret)* / `asknget` | Consumed by the **`db` image** on first start to create the role and database. Changing them later does nothing unless you also wipe the volume (`docker compose down -v`). |
 | `DATABASE_URL` | `postgres://asknget:…@db:5432/asknget` | Host is **`db`** inside Docker, **`localhost`** from your PC (the dev override publishes 5432). Unset → SQLite at `backend/asknget/db.sqlite3`. |
 
@@ -170,11 +171,32 @@ put the old password back or `docker compose down -v` (which erases the database
 **`no such table` / empty data locally** — the poe tasks point at `backend/asknget/db.sqlite3`; a bare
 `manage.py` run uses `DATABASE_URL` from `.env`, which is the Docker host `db`. See the table above.
 
+**`Cannot decrypt sellers.SellerApplication.id_passport_number ...`** — a row was written under a
+different `FIELD_ENCRYPTION_KEY` than the one you are running. It happens when two developers each
+generate their own key and then share a database, a dump or a committed `db.sqlite3`.
+
+1. See how bad it is. The command reads raw rows, so it works even when the ORM would raise:
+   `uv run poe manage check_encryption` (Docker: `poe dmanage check_encryption`). It prints a fingerprint
+   of each key (the first 8 hex digits of its sha256, which cannot be reversed into the key) and, per field,
+   how many rows are readable. Fingerprints are the way to compare two people's keys.
+2. If the other key still exists, keep yours as `FIELD_ENCRYPTION_KEY` and add theirs to
+   `FIELD_ENCRYPTION_KEY_PREVIOUS`. Everything is readable again at once. Get it from them through your
+   password manager or another secure channel, not chat or e-mail.
+3. `check_encryption --rewrite` then re-encrypts those rows under your key, after which the old key can
+   be removed from the file.
+4. If nobody has the key any more, those rows cannot be recovered. `check_encryption` exits 1 and leaves
+   them untouched. For a development database, delete it and run `uv run poe seed` again.
+
+To avoid it altogether: use the shared development key from `backend/.env.example` for every
+non-production database, and never move a database between machines that used different keys.
+
 ## 5. Production checklist
 
 - `DEBUG=0`, a fresh `SECRET_KEY`, real `ALLOWED_HOSTS` (plus every country subdomain) and
   `CSRF_TRUSTED_ORIGINS`.
-- `FIELD_ENCRYPTION_KEY` backed up in a secrets manager, not only in the file.
+- A production-only `FIELD_ENCRYPTION_KEY` (never the shared development one), backed up in a secrets
+  manager, not only in the file. To rotate: move the old value to `FIELD_ENCRYPTION_KEY_PREVIOUS`, set the
+  new one, run `manage.py check_encryption --rewrite`, then drop the old key.
 - `POSTGRES_PASSWORD` not the example value; consider `docker compose -f compose.yaml up` (no dev
   override → gunicorn, no bind mounts, no published Postgres).
 - `BEHIND_PROXY=1` and TLS terminated at nginx.

@@ -13,10 +13,13 @@ Warnings, not errors: the Docker image builds static files with no key at all
 from django.conf import settings
 from django.core.checks import Warning, register
 
+# The shared development key published in backend/.env.example (a test keeps them in sync).
+DEV_ENCRYPTION_KEY = "QbUpnoY5McN7IJI0yvg4j1J7RDDQE2_meQywUQzSU_4="
+
 
 @register()
 def check_field_encryption_key(app_configs, **kwargs):
-    """FIELD_ENCRYPTION_KEY must be present and a valid Fernet key."""
+    """FIELD_ENCRYPTION_KEY must be present, valid, and not the public dev key outside DEBUG."""
     if getattr(settings, "TESTING", False):
         return []   # tests generate a throwaway key
 
@@ -25,20 +28,32 @@ def check_field_encryption_key(app_configs, **kwargs):
         return [Warning(
             "FIELD_ENCRYPTION_KEY is not set: saving seller ID/passport or bank account "
             "numbers will fail with ImproperlyConfigured.",
-            hint="Add it to backend/.env (see .env.example). Generate one with: python -c "
+            hint="Copy backend/.env.example to backend/.env (it carries the shared development key). "
+                 "For anything else generate one: python -c "
                  "\"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"",
             id="core.W001",
         )]
 
     from cryptography.fernet import Fernet
 
-    try:
-        Fernet(key.encode() if isinstance(key, str) else key)
-    except Exception:
+    for name, value in [("FIELD_ENCRYPTION_KEY", key),
+                        *(("FIELD_ENCRYPTION_KEY_PREVIOUS", k) for k in getattr(settings, "FIELD_ENCRYPTION_KEY_PREVIOUS", []))]:
+        try:
+            Fernet(value.encode() if isinstance(value, str) else value)
+        except Exception:
+            return [Warning(
+                f"{name} holds a value that is not a valid Fernet key, so encrypted fields will fail.",
+                hint="It must be 32 url-safe base64-encoded bytes; regenerate it with Fernet.generate_key(). "
+                     "Replacing the key makes existing encrypted rows unreadable.",
+                id="core.W002",
+            )]
+
+    if key == DEV_ENCRYPTION_KEY and not settings.DEBUG:
         return [Warning(
-            "FIELD_ENCRYPTION_KEY is not a valid Fernet key, so encrypted fields will fail on write.",
-            hint="It must be 32 url-safe base64-encoded bytes; regenerate it with Fernet.generate_key(). "
-                 "Replacing the key makes existing encrypted rows unreadable.",
-            id="core.W002",
+            "FIELD_ENCRYPTION_KEY is the shared development key from .env.example. Anyone with the repo "
+            "can decrypt data stored under it.",
+            hint="Generate a key for this environment, move this one to FIELD_ENCRYPTION_KEY_PREVIOUS if any "
+                 "rows were written under it, then run `manage.py check_encryption --rewrite`.",
+            id="core.W003",
         )]
     return []
