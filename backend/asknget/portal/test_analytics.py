@@ -48,6 +48,23 @@ class AnalyticsTestCase(ApiTestCase):
         for _ in range(3):
             ProductEvent.objects.create(kind=ProductEvent.Kind.ADD_TO_CART, product=cls.bb, user=cls.olivia)
 
+    @staticmethod
+    def _ago(days: float):
+        """`days` before now -- but never before the start of the current calendar month.
+
+        "month" is a calendar period (portal.periods), so history seeded "6 days ago"
+        falls outside it during the first week of every month and the whole suite
+        fails on, say, the 2nd. The clock cannot be frozen instead: JWTs are minted
+        with timezone.now() and validated by PyJWT against the real clock. So when
+        less than a week of the month has elapsed, the same spread is scaled to fit
+        in what has -- order preserved, shape unchanged."""
+        now = timezone.now()
+        elapsed = now - timezone.localtime(now).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        spread = timedelta(days=7)
+        if elapsed >= spread:
+            return now - timedelta(days=days)
+        return now - timedelta(days=days) * (elapsed / spread)
+
     @classmethod
     def _order(cls, user, lines, status, *, days_ago=1):
         total = sum(p.price_cents * q for p, q in lines)
@@ -62,7 +79,7 @@ class AnalyticsTestCase(ApiTestCase):
             OrderItem.objects.create(order=order, store=cls.store, product=product, variant=product.variants.first(),
                                      product_name=product.name, qty=qty, unit_price_cents=product.price_cents,
                                      line_total_cents=product.price_cents * qty, status=status)
-        placed = timezone.now() - timedelta(days=days_ago)
+        placed = cls._ago(days_ago)
         Order.objects.filter(pk=order.pk).update(placed_at=placed)
         order.refresh_from_db()
         return order
