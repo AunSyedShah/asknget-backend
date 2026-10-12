@@ -1,9 +1,9 @@
 {
   "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
   "page": "Web UI Design",
-  "version": "2404643621949386033",
-  "lastModified": "2026-09-29T13:19:18Z",
-  "fetched_via": "files (section split locally; new screens have no node id until the next API sweep)",
+  "version": "2408376029043747207",
+  "lastModified": "2026-10-09T15:13:07Z",
+  "fetched_via": "files",
   "screens": [
     {
       "name": "Landing Page",
@@ -144,291 +144,328 @@
       "lines": 7
     },
     {
-      "name": "Activate  Account",
-      "node_id": "519:7681",
-      "file": "Activate_Account__519-7681.txt",
-      "lines": 13,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Activate Seller Account",
-      "node_id": "519:7537",
-      "file": "Activate_Seller_Account__519-7537.txt",
-      "lines": 18,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "All Transactions",
-      "node_id": null,
-      "file": "All_Transactions__new.txt",
-      "lines": 167,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Analytics Overview",
-      "node_id": "779:6848",
-      "file": "Analytics_Overview__779-6848.txt",
-      "lines": 133,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Application Approved",
-      "node_id": "519:7432",
-      "file": "Application_Approved__519-7432.txt",
-      "lines": 23,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Application Status",
-      "node_id": "497:6677",
-      "file": "Application_Status__497-6677.txt",
-      "lines": 34,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Application Submitted",
-      "node_id": "491:7302",
-      "file": "Application_Submitted__491-7302.txt",
-      "lines": 26,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Banking Info",
-      "node_id": "482:6910",
-      "file": "Banking_Info__482-6910.txt",
-      "lines": 50,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Basic Informtaion",
-      "node_id": "467:8904",
-      "file": "Basic_Informtaion__467-8904.txt",
-      "lines": 63,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Business  Informtaion",
-      "node_id": "474:6463",
-      "file": "Business_Informtaion__474-6463.txt",
-      "lines": 76,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Category Request Popup",
-      "node_id": "688:5844",
-      "file": "Category_Request_Popup__688-5844.txt",
-      "lines": 19,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Customer Detail",
-      "node_id": "768:6318",
-      "file": "Customer_Detail__768-6318.txt",
-      "lines": 81,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Customers",
-      "node_id": "755:7590",
-      "file": "Customers__755-7590.txt",
-      "lines": 163,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Customers Overview",
-      "node_id": "743:6101",
-      "file": "Customers_Overview__743-6101.txt",
-      "lines": 116,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Edit Permissions",
-      "node_id": null,
-      "file": "Edit_Permissions__new.txt",
-      "lines": 132,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Email OTP Verification",
-      "node_id": "466:8619",
-      "file": "Email_OTP_Verification__466-8619.txt",
-      "lines": 6,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Inventory",
-      "node_id": "689:6222",
-      "file": "Inventory__689-6222.txt",
-      "lines": 146,
-      "section": "Seller Portal"
+      "name": "Signup - Create Account",
+      "node_id": "447:7950",
+      "file": "Signup_Create_Account__447-7950.txt",
+      "lines": 27
     },
     {
       "name": "Login",
       "node_id": "570:4992",
       "file": "Login__570-4992.txt",
-      "lines": 22,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Media Popup",
-      "node_id": "664:9125",
-      "file": "Media_Popup__664-9125.txt",
-      "lines": 29,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Member Details",
-      "node_id": null,
-      "file": "Member_Details__new.txt",
-      "lines": 93,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Mobile OTP Verification",
-      "node_id": "466:8885",
-      "file": "Mobile_OTP_Verification__466-8885.txt",
-      "lines": 6,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "More Info Required",
-      "node_id": "506:6921",
-      "file": "More_Info_Required__506-6921.txt",
-      "lines": 25,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Notifications",
-      "node_id": null,
-      "file": "Notifications__new.txt",
-      "lines": 88,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Orders",
-      "node_id": "704:9564",
-      "file": "Orders__704-9564.txt",
-      "lines": 162,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Orders Overview",
-      "node_id": "697:8989",
-      "file": "Orders_Overview__697-8989.txt",
-      "lines": 126,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Pricing Popup",
-      "node_id": "682:5667",
-      "file": "Pricing_Popup__682-5667.txt",
-      "lines": 62,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Product Analytics",
-      "node_id": "872:11940",
-      "file": "Product_Analytics__872-11940.txt",
-      "lines": 163,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Products",
-      "node_id": "626:5220",
-      "file": "Products__626-5220.txt",
-      "lines": 168,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Products",
-      "node_id": "664:8452",
-      "file": "Products__664-8452.txt",
-      "lines": 220,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Representative",
-      "node_id": "482:6727",
-      "file": "Representative__482-6727.txt",
-      "lines": 50,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Review & Publish Popup",
-      "node_id": "688:6221",
-      "file": "Review_Publish_Popup__688-6221.txt",
-      "lines": 46,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Review & Submit",
-      "node_id": "482:7047",
-      "file": "Review_Submit__482-7047.txt",
-      "lines": 49,
-      "section": "Seller Portal"
-    },
-    {
-      "name": "Sales Analytics",
-      "node_id": "840:10677",
-      "file": "Sales_Analytics__840-10677.txt",
-      "lines": 163,
-      "section": "Seller Portal"
+      "lines": 22
     },
     {
       "name": "Seller Dashboard",
       "node_id": "573:5141",
       "file": "Seller_Dashboard__573-5141.txt",
-      "lines": 169,
-      "section": "Seller Portal"
+      "lines": 169
     },
     {
-      "name": "Shipping Popup",
-      "node_id": "688:6034",
-      "file": "Shipping_Popup__688-6034.txt",
-      "lines": 31,
-      "section": "Seller Portal"
+      "name": "Products",
+      "node_id": "626:5220",
+      "file": "Products__626-5220.txt",
+      "lines": 168
     },
     {
-      "name": "Signup - Create Account",
-      "node_id": "447:7950",
-      "file": "Signup_Create_Account__447-7950.txt",
-      "lines": 27,
-      "section": "Seller Portal"
+      "name": "Products",
+      "node_id": "664:8452",
+      "file": "Products__664-8452.txt",
+      "lines": 220
     },
     {
-      "name": "Team / Managers",
-      "node_id": null,
-      "file": "Team_Managers__new.txt",
-      "lines": 143,
-      "section": "Seller Portal"
+      "name": "Media Popup",
+      "node_id": "664:9125",
+      "file": "Media_Popup__664-9125.txt",
+      "lines": 29
     },
     {
-      "name": "Transaction Details",
-      "node_id": null,
-      "file": "Transaction_Details__new.txt",
-      "lines": 78,
-      "section": "Seller Portal"
+      "name": "Email OTP Verification",
+      "node_id": "466:8619",
+      "file": "Email_OTP_Verification__466-8619.txt",
+      "lines": 6
     },
     {
-      "name": "Transactions Overview",
-      "node_id": null,
-      "file": "Transactions_Overview__new.txt",
-      "lines": 114,
-      "section": "Seller Portal"
+      "name": "Mobile OTP Verification",
+      "node_id": "466:8885",
+      "file": "Mobile_OTP_Verification__466-8885.txt",
+      "lines": 6
+    },
+    {
+      "name": "Basic Informtaion",
+      "node_id": "467:8904",
+      "file": "Basic_Informtaion__467-8904.txt",
+      "lines": 63
+    },
+    {
+      "name": "Business  Informtaion",
+      "node_id": "474:6463",
+      "file": "Business_Informtaion__474-6463.txt",
+      "lines": 76
+    },
+    {
+      "name": "Representative",
+      "node_id": "482:6727",
+      "file": "Representative__482-6727.txt",
+      "lines": 50
+    },
+    {
+      "name": "Banking Info",
+      "node_id": "482:6910",
+      "file": "Banking_Info__482-6910.txt",
+      "lines": 50
+    },
+    {
+      "name": "Review & Submit",
+      "node_id": "482:7047",
+      "file": "Review_Submit__482-7047.txt",
+      "lines": 49
+    },
+    {
+      "name": "Application Submitted",
+      "node_id": "491:7302",
+      "file": "Application_Submitted__491-7302.txt",
+      "lines": 26
+    },
+    {
+      "name": "Application Approved",
+      "node_id": "519:7432",
+      "file": "Application_Approved__519-7432.txt",
+      "lines": 23
+    },
+    {
+      "name": "Activate  Account",
+      "node_id": "519:7681",
+      "file": "Activate_Account__519-7681.txt",
+      "lines": 13
+    },
+    {
+      "name": "Application Status",
+      "node_id": "497:6677",
+      "file": "Application_Status__497-6677.txt",
+      "lines": 34
+    },
+    {
+      "name": "More Info Required",
+      "node_id": "506:6921",
+      "file": "More_Info_Required__506-6921.txt",
+      "lines": 25
     },
     {
       "name": "Update Application",
       "node_id": "515:7161",
       "file": "Update_Application__515-7161.txt",
-      "lines": 33,
-      "section": "Seller Portal"
+      "lines": 33
+    },
+    {
+      "name": "Activate Seller Account",
+      "node_id": "519:7537",
+      "file": "Activate_Seller_Account__519-7537.txt",
+      "lines": 17
+    },
+    {
+      "name": "Pricing Popup",
+      "node_id": "682:5667",
+      "file": "Pricing_Popup__682-5667.txt",
+      "lines": 62
+    },
+    {
+      "name": "Shipping Popup",
+      "node_id": "688:6034",
+      "file": "Shipping_Popup__688-6034.txt",
+      "lines": 31
+    },
+    {
+      "name": "Review & Publish Popup",
+      "node_id": "688:6221",
+      "file": "Review_Publish_Popup__688-6221.txt",
+      "lines": 46
+    },
+    {
+      "name": "Category Request Popup",
+      "node_id": "688:5844",
+      "file": "Category_Request_Popup__688-5844.txt",
+      "lines": 19
+    },
+    {
+      "name": "Inventory",
+      "node_id": "689:6222",
+      "file": "Inventory__689-6222.txt",
+      "lines": 146
+    },
+    {
+      "name": "Orders Overview",
+      "node_id": "697:8989",
+      "file": "Orders_Overview__697-8989.txt",
+      "lines": 126
+    },
+    {
+      "name": "Customers Overview",
+      "node_id": "743:6101",
+      "file": "Customers_Overview__743-6101.txt",
+      "lines": 116
+    },
+    {
+      "name": "Customers",
+      "node_id": "755:7590",
+      "file": "Customers__755-7590.txt",
+      "lines": 163
+    },
+    {
+      "name": "Customer Detail",
+      "node_id": "768:6318",
+      "file": "Customer_Detail__768-6318.txt",
+      "lines": 81
+    },
+    {
+      "name": "Analytics Overview",
+      "node_id": "779:6848",
+      "file": "Analytics_Overview__779-6848.txt",
+      "lines": 133
+    },
+    {
+      "name": "Sales Analytics",
+      "node_id": "840:10677",
+      "file": "Sales_Analytics__840-10677.txt",
+      "lines": 163
+    },
+    {
+      "name": "Product Analytics",
+      "node_id": "872:11940",
+      "file": "Product_Analytics__872-11940.txt",
+      "lines": 163
+    },
+    {
+      "name": "Transactions Overview",
+      "node_id": "825:10206",
+      "file": "Transactions_Overview__825-10206.txt",
+      "lines": 114
+    },
+    {
+      "name": "All Transactions",
+      "node_id": "930:7240",
+      "file": "All_Transactions__930-7240.txt",
+      "lines": 167
+    },
+    {
+      "name": "Transaction Details",
+      "node_id": "930:8751",
+      "file": "Transaction_Details__930-8751.txt",
+      "lines": 78
+    },
+    {
+      "name": "Notifications",
+      "node_id": "930:9225",
+      "file": "Notifications__930-9225.txt",
+      "lines": 88
+    },
+    {
+      "name": "Team / Managers",
+      "node_id": "943:9696",
+      "file": "Team_Managers__943-9696.txt",
+      "lines": 143
+    },
+    {
+      "name": "Member Details",
+      "node_id": "957:7822",
+      "file": "Member_Details__957-7822.txt",
+      "lines": 93
+    },
+    {
+      "name": "Edit Permissions",
+      "node_id": "987:8392",
+      "file": "Edit_Permissions__987-8392.txt",
+      "lines": 132
+    },
+    {
+      "name": "Orders",
+      "node_id": "704:9564",
+      "file": "Orders__704-9564.txt",
+      "lines": 162
     },
     {
       "name": "View Order/ Order Detail",
       "node_id": "736:7069",
       "file": "View_Order_Order_Detail__736-7069.txt",
-      "lines": 103,
-      "section": "Seller Portal"
+      "lines": 103
+    },
+    {
+      "name": "Admin Dashboard",
+      "node_id": "1037:7927",
+      "file": "Admin_Dashboard__1037-7927.txt",
+      "lines": 230
+    },
+    {
+      "name": "Orders",
+      "node_id": "1046:10563",
+      "file": "Orders__1046-10563.txt",
+      "lines": 196
+    },
+    {
+      "name": "Products",
+      "node_id": "1101:11344",
+      "file": "Products__1101-11344.txt",
+      "lines": 179
+    },
+    {
+      "name": "Category Management",
+      "node_id": "1129:9100",
+      "file": "Category_Management__1129-9100.txt",
+      "lines": 153
+    },
+    {
+      "name": "Category Details",
+      "node_id": "1155:12419",
+      "file": "Category_Details__1155-12419.txt",
+      "lines": 145
+    },
+    {
+      "name": "Sellers",
+      "node_id": "1160:13235",
+      "file": "Sellers__1160-13235.txt",
+      "lines": 157
+    },
+    {
+      "name": "Seller Details",
+      "node_id": "1166:14620",
+      "file": "Seller_Details__1166-14620.txt",
+      "lines": 136
+    },
+    {
+      "name": "Add Category",
+      "node_id": "1141:9034",
+      "file": "Add_Category__1141-9034.txt",
+      "lines": 179
+    },
+    {
+      "name": "Subcategories",
+      "node_id": "1151:9221",
+      "file": "Subcategories__1151-9221.txt",
+      "lines": 211
+    },
+    {
+      "name": "Order Details",
+      "node_id": "1099:8313",
+      "file": "Order_Details__1099-8313.txt",
+      "lines": 140
+    },
+    {
+      "name": "Product Detail",
+      "node_id": "1117:8655",
+      "file": "Product_Detail__1117-8655.txt",
+      "lines": 86
+    },
+    {
+      "name": "Cancel Order",
+      "node_id": "1099:8906",
+      "file": "Cancel_Order__1099-8906.txt",
+      "lines": 150
+    },
+    {
+      "name": "Update Order Status Popup",
+      "node_id": "1099:9462",
+      "file": "Update_Order_Status_Popup__1099-9462.txt",
+      "lines": 20
     }
   ]
 }

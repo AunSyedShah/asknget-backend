@@ -1,0 +1,230 @@
+[Admin Dashboard]
+  [Top Header]
+    [Bread Crums]
+      T: Dashboard
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Good morning, Admin!
+      T: Here’s an overview of what’s happening across asknget today.
+    [KPI - 1]
+        T: vs previous 30 days
+          T: Last month gmv
+          T: R 1,886,550
+              T: R 2,486,540
+                T: 12.8%
+              T: Total GMV
+                T: Today
+    [KPI - 2]
+        T: vs previous 30 days
+          T: Last month orders
+          T: 10,550
+              T: 12,684
+                T: 9.6%
+              T: Total Orders
+                T: Today
+    [KPI - 3]
+        T: new this month
+          T: Last month sellers
+          T: 350
+              T: 486
+                T: 18
+              T: Active Sellers
+                T: Today
+    [KPI - 4]
+        T: vs previous 30 days
+          T: Last month customers
+          T: 25,660
+              T: 28,460
+                T: 7.4%
+              T: Total Customers
+                T: Today
+    [Marketplace Performance]
+            T: View Details
+            T: Marketplace Performance
+          [Tabs]
+            [Orders]
+              T: Weekly
+            [Units Sold]
+              T: 1 Month
+            [Revenue]
+              T: 6 Months
+            [Views]
+              T: 1 Year
+              T: GMV
+              T: Orders
+      [Bar-chart]
+        T: 0
+        T: R 81,420
+        T: R 89,640
+        T: R 94,820
+        T: R112,680
+        T: Sep 1
+        T: Sep5
+        T: Sep 10
+        T: Sep 15
+        T: Sep 20
+        T: Sep 25
+        T: Sep 30
+        T: 382
+        T: 416
+        T: 398
+        T: 452
+        T: 486
+        T: 524
+        T: 582
+    [Order STatus]
+      T: Order Status
+          T: 87.76%
+          [Circles]
+            T: Total Visitors
+            T: Total Purchase
+            T: Socializing
+              T: Active Users
+              T: 816,712K
+                  T: 88%
+              T: Inactive Users
+              T: 816,712K
+                  T: 32%
+        T: Monthly
+      [Donut Chart]
+        [pie-01]
+          T: Delivered
+          T: Shipped
+          T: Processing
+          T: Pending
+          T: Cancelled
+              T: Delivered
+              T: Shipped
+              T: Processing
+              T: Pending
+              T: Cancelled
+    [Recent Orders]
+        T: Recent Orders
+          T: Order
+          T: Customer
+          T: Seller
+          T: Amount
+          T: Status
+          T: #ORD-28502
+          T: Olivia Martin
+          T: Urban Finds
+          T: R 1,240
+          T: Processing
+          T: #ORD-28501
+          T: James Wilson
+          T: TechHub Store
+          T: R 2,840
+          T: Shipped
+          T: #ORD-28500
+          T: Emma Roberts
+          T: Beauty Lane
+          T: R 1,420
+          T: Delivered
+          T: #ORD-28499
+          T: Daniel Smith
+          T: Home Living Co.
+          T: R 1,420
+          T: Pending
+        T: View All Orders
+    [Seller Activity]
+        T: Seller Activity
+          T: Seller
+          T: Orders
+          T: Sales
+          T: Last Active
+          T: Status
+          T: Urban Finds
+          T: 248
+          T: R 84,520
+          T: 5 min ago
+          T: Active
+          T: TechHub Store
+          T: 186
+          T: R 72,840
+          T: 12 min ago
+          T: Active
+          T: Fashion Avenue
+          T: 98
+          T: R 36,240
+          T: 32 min ago
+          T: Active
+        T: View All
+    [Seller Applications]
+        T: Seller Applications
+          T: Application ID
+          T: Seller
+          T: Business Type
+          T: Submitted
+          T: Status
+          T: ASK-SLR-2026-004821
+          T: Urban Finds
+          T: Registered Company
+          T: Sep 29,2026
+          T: Under Review
+          T: ASK-SLR-2026-004820
+          T: TechHub Store
+          T: Registered Company
+          T: Sep 29,2026
+          T: Under Review
+          T: ASK-SLR-2026-004819
+          T: Beauty Lane
+          T: Sole Proprietor
+          T: Sep 28,2026
+          T: More Info Required
+        T: View All Applications
+    [Requires Attention]
+                [Icon]
+                  T: 126 products low on stock
+                  T: Low Stock Products
+                    T: 38 below critical stock level
+              T: View Products
+                [Icon]
+                  T: 24 applications pending
+                  T: Seller Applications
+                    T: 8 waiting more than 48 hours
+              T: Review Applications
+                [Icon]
+                  T: 18 payouts currently processing
+                  T: Pending Payouts
+                    T: R 64,820 pending
+              T: View Payouts
+            T: Requires Attention
+              T: 5
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard Active]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

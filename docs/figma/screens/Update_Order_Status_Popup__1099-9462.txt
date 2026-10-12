@@ -1,0 +1,20 @@
+[Update Order Status Popup]
+  [Customer]
+    [Icon]
+      T: Olivia Martin
+      T: 30 Sep 2026, 10:42AM
+  [Order]
+    [Icon]
+    T: Order: #ORD-28502
+  [Current Status]
+    [Status]
+      T: Processing
+    T: Current Status
+  [New Status]
+    T: New Status
+        T: Shipped
+  [CTA]
+    [I:Button | State=TErtiory Button]
+      T: Cancel
+    [I:Button | State=Default]
+      T: Update Status

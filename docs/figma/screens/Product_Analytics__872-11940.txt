@@ -8,7 +8,7 @@
             T: 2
     [Search Bar]
         T: Search anything...
-  [I:Sidebar]
+  [I:Seller Sidebar]
     [I:Component 14 | State=Logout]
         T: Logout
         T: Sirosh Bashir

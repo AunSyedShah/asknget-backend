@@ -1,0 +1,157 @@
+[Sellers]
+  [Top Header]
+    [Bread Crums]
+      T: Sellers
+      T: Dashboard  / Sellers
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Sellers
+      T: Manage seller accounts, business verification and marketplace activity.
+    [KPI - 1]
+          T: Across marketplace
+              T: 486
+              T: Total Sellers
+    [KPI - 5]
+          T: 93% of all sellers
+              T: 452
+              T: Active Sellers
+    [KPI - 7]
+          T: Awaiting approval
+              T: 18
+              T: Pending Review
+    [KPI - 8]
+          T: Requires attention
+              T: 10
+              T: Suspended
+    [Tabs]
+        T: Active (452)
+        T: Pending Review (18)
+        T: Suspended (10)
+        T: Inactive (6)
+          T: All Sellers (486)
+    [I:Button | State=Default]
+      T: + Add New Seller
+    [All Sellers]
+        [Filters]
+            [Search Bar]
+                T: Search by seller name, seller ID, email...
+              [Brand]
+                  T: Seller
+              [Brand]
+                  T: Business Type
+              [Brand]
+                  T: Category
+              [Brand]
+                  T: Status
+              [Brand]
+                  T: Filters
+          T: All Sellers
+            [Row 1]
+                T: Registered Company
+                T: 248
+                T: 1,842
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                    T: Urban Finds
+                    T: SLR-2026-001284
+            [Row 2]
+                T: Registered Company
+                T: 186
+                T: 1,284
+                T: Sep 14, 2026
+                T: R 3,842,680
+                T: Approved
+                    T: TechHub Store
+                    T: SLR-2026-001285
+            [Row 3]
+                T: Sole Proprietor
+                T: 142
+                T: 986
+                T: Sep 14, 2026
+                T: R 2,184,620
+                T: Approved
+                    T: Beauty Lane
+                    T: SLR-2026-001286
+            [Row 4]
+                T: Registered Company
+                T: 98
+                T: 642
+                T: Sep 14, 2026
+                T: R 1,684,240
+                T: Approved
+                    T: Home Living Co.
+                    T: SLR-2026-001287
+            [Row 5]
+                T: Sole Proprietor
+                T: 76
+                T: -
+                T: Sep 14, 2026
+                T: -
+                T: Pending
+                    T: Fashion Avenue
+                    T: SLR-2026-001288
+            [Row 6]
+                T: Registered Company
+                T: 64
+                T: 318
+                T: Sep 14, 2026
+                T: R 724,860
+                T: Suspended
+                    T: Sports Hub
+                    T: SLR-2026-001289
+    [Pagination]
+      T: Showing 6 of 486 sellers
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers Active]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

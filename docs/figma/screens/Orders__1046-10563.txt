@@ -1,0 +1,196 @@
+[Orders]
+  [Top Header]
+    [Bread Crums]
+      T: Orders
+      T: Dashboard / Orders
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Orders
+      T: Manage and monitor all marketplace orders in one place.
+    [I:Button | State=Default]
+      T: Export Orders
+    [Tabs]
+        T: Pending (761)
+        T: Processing (1,268)
+        T: Shipped (2,283)
+        T: Delivered (7,864)
+        T: Cancelled (508)
+        T: Returned (12)
+          T: All Orders (12,684)
+    [Orders List]
+      [Filters]
+          [Search Bar]
+              T: Search by order ID, customer, seller...
+            [Brand]
+                T: Order Status
+            [Brand]
+                T: Date Range
+            [Brand]
+                T: Seller
+            [Brand]
+                T: Filters
+        T: Orders List
+      [Table Rows]
+        [Row 1]
+            T: #ORD-28502
+            T: Olivia Martin
+            T: Urban Finds
+            T: 3 Items
+            T: R 1,240
+            T: Paid
+            T: Sep 14, 2026  12:40 pm
+            T: Processing
+            [Actions]
+        [Row 2]
+            T: #ORD-28501
+            T: James Wilson
+            T: TechHub Store
+            T: 2 Items
+            T: R 2,840
+            T: Paid
+            T: Sep 14, 2026  12:40 pm
+            T: Shipped
+            [Actions]
+        [Row 3]
+            T: #ORD-28500
+            T: Emma Roberts
+            T: Beauty Lane
+            T: 4 Items
+            T: R 860
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Delivered
+            [Actions]
+        [Row 4]
+            T: #ORD-28499
+            T: Daniel Smith
+            T: Asknget Fashion
+            T: 2 Items
+            T: R 1,420
+            T: Pending
+            T: Sep 14, 12:40 pm
+            T: Pending
+            [Actions]
+        [Row 5]
+            T: #ORD-28498
+            T: Sophia Lee
+            T: Home Living Co.
+            T: 5 Items
+            T: R 2,160
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Delivered
+            [Actions]
+        [Row 6]
+            T: #ORD-28497
+            T: Ava Thompson
+            T: Urban Finds
+            T: 1 Items
+            T: R 680
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Shipped
+            [Actions]
+        [Row 7]
+            T: #ORD-28496
+            T: Noah Williams
+            T: Fashion Evenue
+            T: 2 Items
+            T: R 3,240
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Processing
+            [Actions]
+        [Row 8]
+            T: #ORD-28495
+            T: Mia Davis
+            T: Beauty Lane
+            T: 3 Items
+            T: R 1,180
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Delivered
+            [Actions]
+        [Row 9]
+            T: #ORD-28494
+            T: David Brown
+            T: Urban Finds
+            T: 2 Items
+            T: R 1,240
+            T: Paid
+            T: Sep 14, 12:40 pm
+            T: Processing
+            [Actions]
+        [Row 10]
+            T: #ORD-28493
+            T: Oliver Clark
+            T: Urban Finds
+            T: 1 Items
+            T: R 3,550
+            T: Refunded
+            T: Sep 14, 12:40 pm
+            T: Cancelled
+            [Actions]
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 10 of 12,684 orders
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders Active]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

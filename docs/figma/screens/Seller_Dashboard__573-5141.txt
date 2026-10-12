@@ -140,7 +140,7 @@
               T: 879 Products
               T: Out of Stock
               T: 398 Products
-  [I:Sidebar]
+  [I:Seller Sidebar]
     [I:Component 14 | State=Logout]
         T: Logout
         T: Sirosh Bashir

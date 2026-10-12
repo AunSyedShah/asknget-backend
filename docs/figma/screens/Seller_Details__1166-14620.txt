@@ -1,0 +1,136 @@
+[Seller Details]
+  [Top Header]
+    [Bread Crums]
+      T: Sellers
+      T: Dashboard  / Sellers / TechHub Store
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: TechHub Store
+      T: Seller ID: SLR-2026-001285
+        T: Registered Company
+        T: Joined 12 Jan 2026
+      [Status]
+        T: Approved
+    [I:Button | State=Default]
+      T: + Add New Seller
+    [KPI - 1]
+          T: 12 new this month
+            T: Active 172
+            T: 14 Low Stock
+              T: 186
+              T: Total Products
+    [KPI - 5]
+          T: 15% vs last month
+            T: 1,238 Delivered
+            T: 46 Pending
+              T: 1,284
+              T: Total Orders
+    [KPI - 7]
+          T: 12.5% vs last month
+            T: Last30 days
+            T: 14 Low Stock
+              T: R 3,842,680
+              T: Total Sales
+    [KPI - 8]
+          T: Trusted Seller
+            T: 126 reviews
+            T: 14 Low Stock
+              T: 4.8 / 5
+              T: Seller Rating
+    [KPI - 9]
+          T: Documents approved
+            T: Active 172
+            T: 14 Low Stock
+              T: Verified
+              T: Verification
+    [Tabs]
+        T: Business Information
+        T: Products
+        T: Orders
+        T: Performance
+        T: Payouts
+        T: Activity
+          T: Overview
+    [Contact Information]
+                T: Contact Person
+              T: Ahmed Khan
+                T: Email
+              T: support@techhubstore.com
+                T: Phone
+              T: +92 300 4567890
+                T: Business Location
+              T: Lahore, Pakistan
+        T: Contact Information
+    [Account Information]
+                T: Seller ID
+              T: SLR-2026-001285
+                T: Account Status
+              T: Approved
+                T: Verification
+              T: Verified
+                T: Seller Since
+              T: 12 Jan 2026
+                T: Last Active
+              T: 30 Sep 2026, 11:42 AM
+        T: Account Information
+    [Seller Performance]
+                T: Total Products
+              T: 186
+                T: Approved Products
+              T: 172
+                T: Pending Products
+              T: 8
+                T: Rejected Products
+              T: 4
+                T: Suspended Products
+              T: 2
+        T: Seller Performance
+    [Recent Activity]
+          T: Product information updated
+          T: 30 Sep 2026 · 11:42 AM
+        [Icon]
+          T: New product submitted for review
+          T: 30 Sep 2026 · 10:18 AM
+        [Icon]
+          T: Order #ORD-28496 fulfilled
+          T: 29 Sep 2026 · 04:28 PM
+        [Icon]
+      T: Recent Activity
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers Active]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

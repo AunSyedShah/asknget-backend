@@ -1,0 +1,150 @@
+[Cancel Order]
+  [Top Header]
+    [Bread Crums]
+      T: Orders
+      T: Dashboard / Orders / ASK48291
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders Active]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout
+  [Content Frame]
+    [Status]
+      T: Update Status
+    [I:Button | State=Default]
+      T: Cancel Order
+      T: Placed:  30 Sep 2026, 10:42 AM
+        T: #ORD-28502
+        [Status]
+          T: Processing
+    T: Back to orders
+    [Customer Info]
+          T: Customer Information
+            T: martin.olivia@gmail.com
+            T: +27 82 123 4567
+            T: Olivia Martin
+    [Seller Info]
+          T: Seller Information
+            T: urbanfinds@gmail.com
+            T: +27 82 123 4567
+            T: Urban Finds
+    [Shipping Address]
+        T: Shipping Address
+            T: House 24, Street 8 Model Town Lahore, Pakistan
+            T: Olivia M.
+    [Payment Info]
+        T: Payment Information
+            T: Visa  •••• 4821
+              T: Paid
+              T: R49.99
+            T: Payment Method
+          T: TXN-20260930-28501
+            T: Paid on
+            T: 30 Sep 2026, 10:43 AM
+          T: Transaction ID
+    [Order Items]
+          [Items]
+            [Row 1]
+              T: TechHub Store
+              T: R 49.99
+              T: 1
+              T: R 49.99
+                  T: Classis Leather Bag
+                  T: Color: Blue
+            [Row 2]
+              T: TechHub Store
+              T: 2
+              T: R 22.99
+              T: R 44.99
+                  T: Teddy Bear Brown
+                  T: Color: Brown  | Size: Medium
+            [Row 3]
+              T: TechHub Store
+              T: 2
+              T: R 22.99
+              T: R 44.99
+                  T: Wireless Headphones
+                  T: Color: Brown  | Size: Medium
+            [Row 4]
+              T: TechHub Store
+              T: 2
+              T: R 180
+              T: R 360
+                  T: Screen Protector
+                  T: Color: Brown  | Size: Medium
+        T: Order Items (4)
+    [Order Summary]
+                T: Subtotal
+                T: R 2,600
+                T: Discount
+                T: -R 200
+                T: Shipping
+                T: R 440
+                T: Total
+                T: R 2,840
+        T: Order summary
+    [Order Timeline]
+        T: Order Timeline
+        [Order Status]
+          [Delivered]
+              T: Waiting
+              T: Delivered
+          [Order Placed]
+                T: 30 Sep  |  10:42 AM
+                T: Order Placed
+          [Payment Cofirmed]
+                T: 30 Sep  |  10:43 AM
+                T: Payment Confirmed
+          [Processing]
+                T: 29 Sep  |  11:18 AM
+                T: Order Processing
+          [Packed]
+                T: Waiting
+                T: Packed
+          [Shipped]
+                T: Waiting
+                T: Shipped
+  [Cancel Order Popup]
+      [I:Button | State=TErtiory Button]
+        T: Keep Order
+      [I:Button | State=Default]
+        T: Cancel Order
+      T: Order #ORD-28502
+      T: Are you sure you want to cancel this order?
+    [Input Fields]
+      T: Cancellation Reason
+        T: Select reason

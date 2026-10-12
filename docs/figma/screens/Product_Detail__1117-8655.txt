@@ -1,0 +1,86 @@
+[Product Detail]
+  [Top Header]
+    [Bread Crums]
+      T: Products
+      T: Dashboard / Products / Wireless Headphone
+          T: Sirosh Bashir
+          T: Store Owner
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products Active]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout
+  [Content Frame]
+    [Status]
+      T: Edit Product
+    [I:Button | State=Default]
+      T: Suspend
+      T: SKU: WH-2048
+        T: Wireless Headphones
+        [Status]
+          T: Approved
+    T: Back to products
+    [Product Information]
+                T: Name
+                T: Wireless Headphones
+                T: SKU
+                T: WH-2048
+                T: Brand
+                T: SoundCore
+                T: Description
+                T: Premium wireless headphones designed for everyday listening with active noise cancellation, clear audio and extended battery life.
+                  T: Category
+                  T: Accessories
+        T: Product Information
+    [Product Specification]
+                T: Battery Life
+                T: Up to 40 Hours
+                T: Wireless Range
+                T: Up to 15m
+                T: Charging Port
+                T: USB-C
+                T: Warranty
+                T: 12 Months
+                  T: Connectivity
+                  T: Bluetooth 5.3
+        T: Product Specification
+    [Tabs]
+        T: Seller
+        T: Variants
+        T: Inventory
+        T: HIstory
+        T: Reviews
+        T: Returned (12)
+          T: Product Information

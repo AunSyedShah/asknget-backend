@@ -1,0 +1,179 @@
+[Products]
+  [Top Header]
+    [Bread Crums]
+      T: Products
+      T: Dashboard / Products
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Products
+      T: Manage products listed across the asknget marketplace.
+    [I:Button | State=Default]
+      T: Export Products
+    [Tabs]
+        T: Approved (21,420)
+        T: Pending ( 1,284)
+        T: Rejected (642)
+        T: Suspended (386)
+        T: Archived ( 1,128)
+        T: Returned (12)
+          T: All Products (24,860)
+    [Product List]
+      [Table ]
+        [Filters]
+            [Search Bar]
+                T: Search by product name, SKU, seller...
+              [Brand]
+                  T: Stock
+              [Brand]
+                  T: Seller
+              [Brand]
+                  T: Category
+              [Brand]
+                  T: Status
+              [Brand]
+                  T: Filters
+          T: Product List
+          [Rows]
+            [Row 1]
+                T: Wireless Headphones
+                T: WH-2048
+                T: TechHub Store
+                T: Accessories
+                T: Sep 14, 2026  12:40 pm
+                T: R 2,000
+                T: Approved
+            [Row 2]
+                T: Leather Crossbody Bag
+                T: LCB-1024
+                T: Urban Finds
+                T: Fashion
+                T: Sep 13, 2026  12:40 pm
+                T: R 3,480
+                T: Approved
+            [Row 3]
+                T: Vitamin C Serum
+                T: VCS-5812
+                T: Beauty Lane
+                T: Beauty
+                T: Sep 12, 2026  12:40 pm
+                T: R 1,250
+                T: Approved
+            [Row 4]
+                T: Minimal Desk Lamp
+                T: MDL-4092
+                T: Home Living Co.
+                T: Home & Lifestyle
+                T: Sep 12, 2026  12:40 pm
+                T: R 2,180
+                T: Pending Review
+            [Row 5]
+                T: Running Shoes
+                T: RS-7721
+                T: Sports Hub
+                T: Sports
+                T: Sep 10, 2026  12:40 pm
+                T: R 4,200
+                T: Rejected
+            [Row 6]
+                T: Selfie Stick
+                T: SS-2421
+                T: Luminarc
+                T: Accessories
+                T: Sep 09, 2026  12:40 pm
+                T: R 2,400
+                T: Approved
+            [Row 7]
+                T: Nars bb Cream
+                T: NBC-1242
+                T: Nars
+                T: Makup
+                T: Sep 08, 2026  12:40 pm
+                T: R 2,400
+                T: Suspended
+            [Row 8]
+                T: Chocolate Balls
+                T: CB-1982
+                T: Ferrero Rocher
+                T: Food
+                T: Sep 07, 2026  12:40 pm
+                T: R 3,800
+                T: Approved
+            [Row 9]
+                T: Golden Teapot
+                T: GTP-2826
+                T: Kitchen Elite
+                T: Crockery
+                T: Sep06, 2026  12:40 pm
+                T: R 5,800
+                T: Archived
+            [Row 10]
+                T: LED Console
+                T: LC-2826
+                T: Home Living Co.
+                T: Electronics
+                T: Sep 05, 2026  12:40 pm
+                T: R 6,200
+                T: Approved
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 10 of 12,684 orders
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products Active]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

@@ -12,7 +12,7 @@
 Run it before planning or implementing anything that touches a screen; then
 `git diff docs/figma/` shows precisely which labels, fields, options or flows moved.
 
-Requires FIGMA_TOKEN in the environment (personal access token) — never commit it.
+Requires FIGMA_TOKEN (personal access token) in the repo-root .env, or in the environment — never commit it.
 
 Rate limits: `--check` only calls /versions (cheap). A full snapshot calls
 /files/{key}, which on a Starter plan is limited to a handful of calls per day —
@@ -78,8 +78,25 @@ def file_key_from(value: str) -> str:
     return match.group(1) if match else value.strip()
 
 
+def _token_from_dotenv() -> str | None:
+    """FIGMA_TOKEN from the repo-root .env (git-ignored), without needing python-dotenv.
+
+    It wins over the process environment on purpose: an app started before the token
+    was rotated keeps handing out the old value, and Figma answers 401 forever."""
+    env_file = Path(__file__).resolve().parents[2] / ".env"
+    try:
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        line = line.strip().removeprefix("export ").strip()
+        if line.startswith("FIGMA_TOKEN="):
+            return line.split("=", 1)[1].strip().strip("\"'") or None
+    return None
+
+
 def _token() -> str:
-    token = os.environ.get("FIGMA_TOKEN")
+    token = _token_from_dotenv() or os.environ.get("FIGMA_TOKEN")
     if not token and sys.platform == "win32":
         # Fall back to the user-level env var when the shell predates `setx`.
         import winreg

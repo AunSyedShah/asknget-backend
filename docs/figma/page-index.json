@@ -1,7 +1,7 @@
 {
   "fetched_at": {
-    "version": "2404643621949386033",
-    "lastModified": "2026-09-29T13:19:18Z",
+    "version": "2408376029043747207",
+    "lastModified": "2026-10-09T15:13:07Z",
     "by": "Asma Choudhary"
   },
   "frames": [
@@ -121,9 +121,274 @@
       "type": "INSTANCE"
     },
     {
-      "name": "Seller Portal",
-      "node_id": "990:9031",
-      "type": "SECTION"
+      "name": "Signup - Create Account",
+      "node_id": "447:7950",
+      "type": "FRAME"
+    },
+    {
+      "name": "Login",
+      "node_id": "570:4992",
+      "type": "FRAME"
+    },
+    {
+      "name": "Seller Dashboard",
+      "node_id": "573:5141",
+      "type": "FRAME"
+    },
+    {
+      "name": "Products",
+      "node_id": "626:5220",
+      "type": "FRAME"
+    },
+    {
+      "name": "Products",
+      "node_id": "664:8452",
+      "type": "FRAME"
+    },
+    {
+      "name": "Media Popup",
+      "node_id": "664:9125",
+      "type": "GROUP"
+    },
+    {
+      "name": "Email OTP Verification",
+      "node_id": "466:8619",
+      "type": "FRAME"
+    },
+    {
+      "name": "Mobile OTP Verification",
+      "node_id": "466:8885",
+      "type": "FRAME"
+    },
+    {
+      "name": "Basic Informtaion",
+      "node_id": "467:8904",
+      "type": "FRAME"
+    },
+    {
+      "name": "Business  Informtaion",
+      "node_id": "474:6463",
+      "type": "FRAME"
+    },
+    {
+      "name": "Representative",
+      "node_id": "482:6727",
+      "type": "FRAME"
+    },
+    {
+      "name": "Banking Info",
+      "node_id": "482:6910",
+      "type": "FRAME"
+    },
+    {
+      "name": "Review & Submit",
+      "node_id": "482:7047",
+      "type": "FRAME"
+    },
+    {
+      "name": "Application Submitted",
+      "node_id": "491:7302",
+      "type": "FRAME"
+    },
+    {
+      "name": "Application Approved",
+      "node_id": "519:7432",
+      "type": "FRAME"
+    },
+    {
+      "name": "Activate  Account",
+      "node_id": "519:7681",
+      "type": "FRAME"
+    },
+    {
+      "name": "Application Status",
+      "node_id": "497:6677",
+      "type": "FRAME"
+    },
+    {
+      "name": "More Info Required",
+      "node_id": "506:6921",
+      "type": "FRAME"
+    },
+    {
+      "name": "Update Application",
+      "node_id": "515:7161",
+      "type": "FRAME"
+    },
+    {
+      "name": "Activate Seller Account",
+      "node_id": "519:7537",
+      "type": "FRAME"
+    },
+    {
+      "name": "Pricing Popup",
+      "node_id": "682:5667",
+      "type": "GROUP"
+    },
+    {
+      "name": "Shipping Popup",
+      "node_id": "688:6034",
+      "type": "GROUP"
+    },
+    {
+      "name": "Review & Publish Popup",
+      "node_id": "688:6221",
+      "type": "GROUP"
+    },
+    {
+      "name": "Category Request Popup",
+      "node_id": "688:5844",
+      "type": "GROUP"
+    },
+    {
+      "name": "Inventory",
+      "node_id": "689:6222",
+      "type": "FRAME"
+    },
+    {
+      "name": "Orders Overview",
+      "node_id": "697:8989",
+      "type": "FRAME"
+    },
+    {
+      "name": "Customers Overview",
+      "node_id": "743:6101",
+      "type": "FRAME"
+    },
+    {
+      "name": "Customers",
+      "node_id": "755:7590",
+      "type": "FRAME"
+    },
+    {
+      "name": "Customer Detail",
+      "node_id": "768:6318",
+      "type": "FRAME"
+    },
+    {
+      "name": "Analytics Overview",
+      "node_id": "779:6848",
+      "type": "FRAME"
+    },
+    {
+      "name": "Sales Analytics",
+      "node_id": "840:10677",
+      "type": "FRAME"
+    },
+    {
+      "name": "Product Analytics",
+      "node_id": "872:11940",
+      "type": "FRAME"
+    },
+    {
+      "name": "Transactions Overview",
+      "node_id": "825:10206",
+      "type": "FRAME"
+    },
+    {
+      "name": "All Transactions",
+      "node_id": "930:7240",
+      "type": "FRAME"
+    },
+    {
+      "name": "Transaction Details",
+      "node_id": "930:8751",
+      "type": "FRAME"
+    },
+    {
+      "name": "Notifications",
+      "node_id": "930:9225",
+      "type": "FRAME"
+    },
+    {
+      "name": "Team / Managers",
+      "node_id": "943:9696",
+      "type": "FRAME"
+    },
+    {
+      "name": "Member Details",
+      "node_id": "957:7822",
+      "type": "FRAME"
+    },
+    {
+      "name": "Edit Permissions",
+      "node_id": "987:8392",
+      "type": "FRAME"
+    },
+    {
+      "name": "Orders",
+      "node_id": "704:9564",
+      "type": "FRAME"
+    },
+    {
+      "name": "View Order/ Order Detail",
+      "node_id": "736:7069",
+      "type": "FRAME"
+    },
+    {
+      "name": "Admin Dashboard",
+      "node_id": "1037:7927",
+      "type": "FRAME"
+    },
+    {
+      "name": "Orders",
+      "node_id": "1046:10563",
+      "type": "FRAME"
+    },
+    {
+      "name": "Products",
+      "node_id": "1101:11344",
+      "type": "FRAME"
+    },
+    {
+      "name": "Category Management",
+      "node_id": "1129:9100",
+      "type": "FRAME"
+    },
+    {
+      "name": "Category Details",
+      "node_id": "1155:12419",
+      "type": "FRAME"
+    },
+    {
+      "name": "Sellers",
+      "node_id": "1160:13235",
+      "type": "FRAME"
+    },
+    {
+      "name": "Seller Details",
+      "node_id": "1166:14620",
+      "type": "FRAME"
+    },
+    {
+      "name": "Add Category",
+      "node_id": "1141:9034",
+      "type": "FRAME"
+    },
+    {
+      "name": "Subcategories",
+      "node_id": "1151:9221",
+      "type": "FRAME"
+    },
+    {
+      "name": "Order Details",
+      "node_id": "1099:8313",
+      "type": "FRAME"
+    },
+    {
+      "name": "Product Detail",
+      "node_id": "1117:8655",
+      "type": "FRAME"
+    },
+    {
+      "name": "Cancel Order",
+      "node_id": "1099:8906",
+      "type": "FRAME"
+    },
+    {
+      "name": "Update Order Status Popup",
+      "node_id": "1099:9462",
+      "type": "GROUP"
     }
   ]
 }

@@ -1,0 +1,179 @@
+[Add Category]
+  [Top Header]
+    [Bread Crums]
+      T: Products
+      T: Dashboard / Categories
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Category Management
+      T: Manage marketplace categories and organize products across the asknget marketplace.
+    [I:Button | State=Default]
+      T: + Add Category
+    T: All Categories (32)
+    [Search Bar]
+        T: Search categories...
+    [Electronics Accessories]
+      [Image]
+        T: Gadgets, headphones, chargers, and accessories for everyday tech use.
+          T: Updated : 2 hours ago
+            [toggle]
+            T: Active
+          T: Subcategories : 8
+          T: Products : 1,248
+        T: Electronic Accessories
+    [Jewellery & Accessories]
+      [Image]
+        T: Trendy jewellery, watches, and fashion accessories for all occasions.
+          T: Updated : 28 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 8
+          T: Products : 892
+        T: Jewellery & Accessories
+    [Beauty & Personal Care]
+      [Image]
+        T: Skincare, cosmetics, personal care and wellness products.
+          T: Updated : 27 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 7
+          T: Products : 1,214
+        T: Beauty & Personal Care
+    [Groceries]
+      [Image]
+        T: Daily essentials, fresh produce, and pantry staples for every home.
+          T: Updated : 27 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 6
+          T: Products : 2,560
+        T: Groceries
+    [Home & Lifestyle]
+      [Image]
+        T: Home furnishings, decor essentials, and interior items.
+          T: Updated : 24 Sep 2026
+            [toggle]
+            T: Inactive
+          T: Subcategories : 6
+          T: Products : 680
+        T: Home & Lifestyle
+    [Fashion]
+      [Image]
+        T: Apparel, accessories, footwear, and bags for all seasons.
+          T: Updated : 22 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 6
+          T: Products : 3,420
+        T: Fashion
+    [Sports & Fitness]
+      [Image]
+        T: Workout gear, equipment, and activewear for sports and fitness.
+          T: Updated : 18 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 5
+          T: Products : 540
+        T: Sports & Fitness
+    [Crockery]
+      [Image]
+        T: Dinner sets, tea sets, and kitchen crockery for home and gifting.
+          T: Updated : 12 Sep 2026
+            [toggle]
+            T: Active
+          T: Subcategories : 5
+          T: Products : 420
+        T: Crockery
+    [Tabs]
+        T: Active (21)
+        T: Inactive (3)
+          T: All Categories (24)
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 10 of 12,684 orders
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories Active]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout
+  [Add Category Popup]
+      [I:Button | State=TErtiory Button]
+        T: Cancel
+      [I:Button | State=Default]
+        T: Add Category
+    [I:Input Fields | Property 1=Icon Input]
+      T: Parents Category
+        T: Select parent category
+    [I:Input Fields | Property 1=Icon Input]
+      T: Status
+        T: Active
+    [I:Input Fields | Property 1=Icon Input]
+      T: Display Order /  Units
+        T: 0
+    [Image Preview]
+      T: Category Image
+            T: Upload Image
+              T: Category-preview.jpg
+              T: JPG,PNG, MAX 2MB.
+    [I:Input Fields | Property 1=Default]
+      T: Category Name
+        T: Enter category name
+      [I:Input Fields | Property 1=Default]
+        T: Product Description
+          T: Write a detailed description of your product
+      T: 0/250

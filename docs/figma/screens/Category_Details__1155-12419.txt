@@ -1,0 +1,145 @@
+[Category Details]
+  [Top Header]
+    [Bread Crums]
+      T: Categories
+      T: Dashboard / Categories / Electronics Accessories / Headphones & Earbuds
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Headphones & Earbuds
+      T: Manage marketplace categories and organize products across the asknget marketplace.
+    [I:Button | State=Default]
+      T: + Add New Product
+    T: All Products (24)
+    [Search Bar]
+        T: Search products...
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 42 Units
+            [toggle]
+            T: Active
+          T: Brand: Sony
+          T: Sony XM5 Wireless
+          T: R 299.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 12 Units
+            [toggle]
+            T: Active
+          T: Brand: Apple
+          T: Apple AirPods Max
+          T: R 549.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 8 Units
+            [toggle]
+            T: Active
+          T: Brand: Bose
+          T: Bose QC Earbuds
+          T: R 229.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 21 Units
+            [toggle]
+            T: Active
+          T: Brand: Samsung
+          T: Samsung Buds Pro
+          T: R 199.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 39 Units
+            [toggle]
+            T: Active
+          T: Brand: Samsung
+          T: Samsung Buds FE
+          T: R 249.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 63 Units
+            [toggle]
+            T: Active
+          T: Brand: Apple
+          T: AirPods 4 with ANC
+          T: R 129.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 120 Units
+            [toggle]
+            T: Active
+          T: Brand: Sony
+          T: WF- C700N
+          T: R 220.00
+    [Electronics Accessories]
+      [Image]
+          T: In Stock : 12 Units
+            [toggle]
+            T: Active
+          T: Brand: Bose
+          T: QuietComfort Ultra 2nd Gen
+          T: R 369.00
+    [Tabs]
+        T: Active (21)
+        T: Inactive (3)
+          T: All Categories (24)
+    [Pagination]
+      [Pagination]
+          T: 1
+          T: 2
+          T: 3
+          T: 4
+          T: 5
+        [Left Arrow]
+        [Right Arrow]
+      T: Showing 10 of 12,684 orders
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories Active]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout
