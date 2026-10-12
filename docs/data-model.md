@@ -719,3 +719,35 @@ REST-style JSON; auth via access + refresh JWT.
     header row, and Low Performing reuses Product Conversion's placeholder rows. We read "low performing"
     as lowest conversion among products with views, not only zero-sales products. Confirm the columns.
 73. **Returns** is still a sidebar entry with no screen (Q26, Q40).
+
+**Figma 2026-10-09 — the Admin portal (13 new screens; see `docs/sprint-7-plan.md` §8)**
+
+74. **Is the admin portal next, and who is an admin?** Everything staff-facing hangs off `is_staff` today. The
+    design's "Admin" is one role; a marketplace usually needs several (support, finance, catalogue). Supersedes
+    Q36 once answered. Proposal: ship the portal with the single staff role, and design roles with the team.
+75. **"+ Add New Seller" (staff creates a seller).** There is no such flow: sellers apply and are reviewed. Does
+    staff entry skip KYC, or pre-fill an application that still needs documents? Proposal: an application
+    created on the seller's behalf that still goes through review; a waiver needs a written reason on record.
+76. **What is an "Inactive" seller?** The Sellers tabs are Active / Pending Review / Suspended / Inactive. Pending
+    and Suspended map to statuses we have; Inactive does not. Proposal: an active store with no order and no
+    sign-in for 90 days — computed, never stored.
+77. **Product "Suspended".** The Products tabs include Suspended (386) and a Returned (12), and the detail page
+    has a Suspend button. We have no suspended product state (draft, pending, active, rejected, archived).
+    Proposal: add `suspended` (staff only, hides the product, the seller sees why). *Returned* looks copied from
+    the Orders tabs and is treated as a slip.
+78. **Dashboard visitors and active/inactive users** need web analytics we do not collect (same as Q32). Omitted
+    unless a tracker is chosen.
+79. **Two formats for one thing.** Seller screens show a transaction as `TXN-10482`, the admin order page as
+    `TXN-20260930-28501`. Proposal: the dated form everywhere.
+80. **Category form wording.** The Add Category popup labels its description "Product Description" (a slip) and
+    its order field "Display Order / Units". Treated as category description and sort order. Its image limit is
+    2 MB JPG/PNG, against 1 MB for product images — kept as drawn.
+81. **Hiding a category.** The Subcategories screen says "Hidden from customers — 16 products not visible in
+    store". Proposal: hiding cascades — the category, its subcategories and their products leave the storefront
+    and the seller category picker; nothing is deleted and sellers see why. Confirm.
+82. **"+ Add New Product" inside Category Details.** Staff would create a product for a seller. We have no
+    staff-authored products (a product belongs to a store). Proposal: the button opens the seller's wizard
+    only if staff pick a store; otherwise omit it.
+83. **Seller rating and the "Trusted Seller" badge** (4.8 / 5, 126 reviews). We have product reviews, not seller
+    reviews. Proposal: the rating is the mean of approved reviews across the store's products; the badge needs a
+    rule from the team (for example 4.5+ with 50+ reviews).

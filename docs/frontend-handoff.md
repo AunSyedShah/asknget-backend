@@ -102,7 +102,8 @@ fails, send the user to login. `user.locale` is `{country, language, timezone, c
 
 Do not wire these to the API (render them from static or empty states, or leave them out, as the owner decides):
 **Team / Managers, Member Details, Edit Permissions, Notifications, Transactions (overview, list, details), Returns,
-Category Request**, refund and adjustment amounts in Sales Analytics, the daily Product Performance chart and the
+Category Request**, the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders,
+products; planned as the sprint after next), refund and adjustment amounts in Sales Analytics, the daily Product Performance chart and the
 Low Performing list in Product Analytics. They are planned for the next backend sprint
 (`docs/data-model.md`, questions Q62–Q73). Report what you need instead of assuming a shape.
 
@@ -119,8 +120,8 @@ Two ways, both from the backend repo (run from its root, Python 3.12+):
    saves a PNG into `docs/figma/renders/` (git-ignored). Use `--scale 0.2` for an overview. Use **that file**, the
    owner's duplicate: the original sits on someone else's Starter plan and is rate-limited for days at a time.
 
-`FIGMA_TOKEN` is the owner's personal token and is already stored in their Windows user environment, so a new
-session finds it. **Never print it, paste it into a file, or commit it.** If a call returns `429`, stop; do not retry
+`FIGMA_TOKEN` is the owner's personal token. The tool reads it from the backend repo's root `.env` (git-ignored), then
+from the environment, so a new session finds it without being told. **Never print it, paste it into a file, or commit it.** If a call returns `429`, stop; do not retry
 in a loop. Run `python docs/figma/snapshot.py --check` to learn whether the design changed since the last snapshot.
 Treat the design as a hypothesis: where it contradicts the API or itself, log it instead of silently choosing.
 
