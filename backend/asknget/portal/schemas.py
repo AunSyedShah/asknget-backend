@@ -831,21 +831,23 @@ class ChannelShareOut(Schema):
 
 
 class AnalyticsSalesOut(Schema):
-    """Sales Analytics. `net_sales_cents` here is gross − discounts − refunds −
-    adjustments (the designer's definition), which is a different quantity from the
-    overview's net."""
+    """Sales Analytics. `net_sales_cents` here is gross − discounts − refunds + adjustments
+    (the designer's definition; an adjustment is signed, + is a credit to the seller), which is a
+    different quantity from the overview's net. Gross counts every paid line, including ones later
+    cancelled or returned; refunds takes those back out (net of their share of any voucher)."""
 
     period: str
     bucket: str
     gross_sales_cents: Kpi
     discounts_cents: Kpi = Field(description="This store's pro-rata share of order-level vouchers")
-    refunds_cents: Kpi = Field(description="Always 0 until the payment provider exists (data-model.md Q50)")
+    refunds_cents: Kpi = Field(description="Cancelled and returned lines of paid orders, less their share of the voucher that came off them")
+    adjustments_cents: Kpi = Field(description="Staff credits (+) and debits (-) recorded in the ledger in the period")
     net_sales_cents: Kpi
     revenue_over_time: list[SeriesPoint]
     revenue_breakdown: list[WaterfallStepOut]
     sales_by_channel: list[ChannelShareOut]
     sales_by_category: list[CategoryShareOut]
-    refunds_tracked: bool = Field(description="False while refunds and adjustments are not recorded anywhere")
+    refunds_tracked: bool = Field(description="Always true now; kept so older clients that checked it keep working")
 
 
 class SearchTermOut(Schema):

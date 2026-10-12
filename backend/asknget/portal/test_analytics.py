@@ -249,11 +249,12 @@ class StorePerformanceTests(AnalyticsTestCase):
 class SalesAnalyticsTests(AnalyticsTestCase):
     def test_gross_net_and_the_waterfall(self):
         body = self.get(f"{A}/sales", self.token).json()
-        self.assertEqual(body["gross_sales_cents"]["value"], 2500)   # sold lines only
+        self.assertEqual(body["gross_sales_cents"]["value"], 4500)   # every paid line: 2500 that stuck + 2000 later cancelled / returned
         self.assertEqual(body["discounts_cents"]["value"], 0)
-        self.assertEqual(body["refunds_cents"]["value"], 0)
-        self.assertFalse(body["refunds_tracked"])                    # honest: no PSP yet
-        self.assertEqual(body["net_sales_cents"]["value"], 2500)
+        self.assertEqual(body["refunds_cents"]["value"], 2000)       # the cancelled order and the returned one
+        self.assertEqual(body["adjustments_cents"]["value"], 0)
+        self.assertTrue(body["refunds_tracked"])
+        self.assertEqual(body["net_sales_cents"]["value"], 2500)     # same as before: the lines that stuck
         self.assertEqual([s["label"] for s in body["revenue_breakdown"]],
                          ["Gross Sales", "Discounts", "Refunds", "Adjustments", "Net Sales"])
         self.assertEqual(body["revenue_breakdown"][-1]["amount_cents"], 2500)
@@ -287,6 +288,54 @@ class SalesAnalyticsTests(AnalyticsTestCase):
         self.assertEqual(mine + theirs, 101)
         self.assertEqual(mine, 67)   # 1000/1500 of 101, largest-remainder rounded
 
+    def test_a_cancelled_orders_voucher_no_longer_drags_net_down(self):
+        # o3 (Sam, 1000, cancelled) had a 100 voucher. Gross counts the order, the discount counts, and the
+        # refund takes back only what was actually paid for it, so net does not move.
+        from orders.models import Order
+
+        Order.objects.filter(pk=self.o3.pk).update(discount_cents=100)
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual(body["discounts_cents"]["value"], 100)
+        self.assertEqual(body["refunds_cents"]["value"], 1900)       # 1000 + 1000 lines, less the 100 that was never paid
+        self.assertEqual(body["net_sales_cents"]["value"], 2500)
+
+    def test_a_fully_refunded_order_nets_to_exactly_zero(self):
+        from orders.models import Order
+
+        Order.objects.filter(pk=self.o4.pk).update(discount_cents=250)       # the guest's returned order: 1000 of lines
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual(body["net_sales_cents"]["value"], 2500)
+
+    def test_an_unpaid_order_is_not_a_sale(self):
+        from orders.models import Order
+
+        order = self._order(self.sam, [(self.bb, 3)], Fulfilment.PENDING, days_ago=1)
+        Order.objects.filter(pk=order.pk).update(payment_status="unpaid", status="pending_payment")
+        self.assertEqual(self.get(f"{A}/sales", self.token).json()["gross_sales_cents"]["value"], 4500)
+
+    def test_staff_adjustments_come_from_the_ledger_and_are_signed(self):
+        from ledger import services as ledger
+
+        staff = make_user(is_staff=True)
+        ledger.adjust(self.store, amount_cents=1500, note="Goodwill credit", by=staff)
+        ledger.adjust(self.store, amount_cents=-400, note="Chargeback", by=staff)
+        body = self.get(f"{A}/sales", self.token).json()
+        self.assertEqual(body["adjustments_cents"]["value"], 1100)
+        self.assertEqual(body["net_sales_cents"]["value"], 2500 + 1100)                    # a credit adds to net
+        legs = {s["label"]: s["amount_cents"] for s in body["revenue_breakdown"]}
+        self.assertEqual((legs["Adjustments"], legs["Net Sales"]), (1100, 3600))
+        # the legs add up: gross - discounts - refunds + adjustments = net
+        self.assertEqual(legs["Gross Sales"] + legs["Discounts"] + legs["Refunds"] + legs["Adjustments"], legs["Net Sales"])
+
+    def test_the_chart_adds_up_to_the_cards(self):
+        from ledger import services as ledger
+
+        ledger.adjust(self.store, amount_cents=700, note="Goodwill credit", by=make_user(is_staff=True))
+        body = self.get(f"{A}/sales", self.token).json()
+        gross = sum(p["values"]["gross"] for p in body["revenue_over_time"])
+        net = sum(p["values"]["net"] for p in body["revenue_over_time"])
+        self.assertEqual((gross, net), (body["gross_sales_cents"]["value"], body["net_sales_cents"]["value"]))
+
     def test_channel_mix_defaults_to_website(self):
         body = self.get(f"{A}/sales", self.token).json()
         self.assertEqual([c["channel"] for c in body["sales_by_channel"]], ["web"])
@@ -295,7 +344,8 @@ class SalesAnalyticsTests(AnalyticsTestCase):
     def test_buckets_and_csv(self):
         self.assertEqual(self.get(f"{A}/sales", self.token, bucket="monthly").json()["bucket"], "monthly")
         rows = b"".join(self.get(f"{A}/export.csv", self.token, report="sales").streaming_content).decode()
-        self.assertIn("gross_sales_cents,2500", rows)
+        self.assertIn("gross_sales_cents,4500", rows)
+        self.assertIn("refunds_cents,2000", rows)
         self.assertIn("breakdown_Net Sales", rows)
         self.assertIn("channel_web", rows)
 

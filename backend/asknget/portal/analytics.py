@@ -24,6 +24,7 @@ from django.utils import timezone
 from catalog.models import Product, ProductImage
 from config import services as config
 from discovery.models import ProductEvent
+from ledger.models import LedgerEntry
 from orders.models import Order, OrderItem, OrderStatusEvent
 from orders.services import store_discount_cents
 
@@ -41,7 +42,7 @@ SEARCH_CACHE_SECONDS = 300
 # Refunds and "adjustments" are drawn on the Sales Analytics waterfall but no such
 # amount exists in the data yet — the PSP sprint owns them (data-model.md Q50).
 # They are reported as 0 rather than guessed at.
-REFUNDS_TRACKED = False
+REFUNDS_TRACKED = True
 
 
 def _kpi(cur, prev):
@@ -507,6 +508,45 @@ def _discounts_cents(store, start, end) -> int:
     return sum(store_discount_cents(o, store.pk) for o in orders)
 
 
+_PAID = [Order.OrderPaymentStatus.PAID, Order.OrderPaymentStatus.PARTIALLY_REFUNDED, Order.OrderPaymentStatus.REFUNDED]
+
+
+def _order_money(store, start, end) -> dict:
+    """{order_id: figures} for the paid orders this store took in a window: what its lines were worth
+    (`gross`, whatever became of them), its share of the voucher (`discount`), and how much went back
+    (`refund`: its cancelled and returned lines, less their own share of that voucher, so a fully refunded
+    order nets to exactly zero)."""
+    lines = OrderItem.objects.filter(
+        store=store, order__placed_at__gte=start, order__placed_at__lt=end, order__payment_status__in=_PAID,
+    ).values_list("order_id", "order__placed_at", "order__discount_cents", "status", "line_total_cents")
+    per: dict = {}
+    for order_id, placed, order_discount, status, cents in lines:
+        o = per.setdefault(order_id, {"placed": placed, "discounted": order_discount > 0, "gross": 0, "returned": 0})
+        o["gross"] += cents
+        if status in (OrderItem.FulfilmentStatus.CANCELLED, OrderItem.FulfilmentStatus.RETURNED):
+            o["returned"] += cents
+    shares = {}
+    discounted = [oid for oid, o in per.items() if o["discounted"]]
+    if discounted:
+        for order in Order.objects.filter(pk__in=discounted):
+            shares[order.pk] = store_discount_cents(order, store.pk)
+    for oid, o in per.items():
+        share = shares.get(oid, 0)
+        o["discount"] = share
+        # the refunded lines' slice of the discount, rounded half up, in integers
+        back = (2 * share * o["returned"] + o["gross"]) // (2 * o["gross"]) if o["gross"] else 0
+        o["refund"] = o["returned"] - back
+    return per
+
+
+def _adjustments(store, start, end) -> list[tuple]:
+    """(created_at, signed cents) for staff adjustments in the window: + credits the seller, - debits."""
+    return list(
+        LedgerEntry.objects.filter(store=store, type=LedgerEntry.Type.ADJUSTMENT, created_at__gte=start, created_at__lt=end)
+        .exclude(status=LedgerEntry.Status.FAILED).values_list("created_at", "amount_cents")
+    )
+
+
 def sales(store, period_name: str, *, bucket: str = "daily") -> dict:
     """The designer's revenue view: gross, what was taken off it, and what is left.
 
@@ -517,21 +557,27 @@ def sales(store, period_name: str, *, bucket: str = "daily") -> dict:
     p = period_range(period_name)
 
     def window(start, end):
-        gross = _sold_items(store).filter(order__placed_at__gte=start, order__placed_at__lt=end).aggregate(
-            s=Sum("line_total_cents"))["s"] or 0
-        discounts = _discounts_cents(store, start, end)
-        refunds = adjustments = 0          # no amounts exist until the PSP lands (Q50)
-        return {"gross": gross, "discounts": discounts, "refunds": refunds, "adjustments": adjustments,
-                "net": gross - discounts - refunds - adjustments}
+        orders = _order_money(store, start, end)
+        adjustments = _adjustments(store, start, end)
+        gross = sum(o["gross"] for o in orders.values())
+        discounts = sum(o["discount"] for o in orders.values())
+        refunds = sum(o["refund"] for o in orders.values())
+        adj = sum(amount for _, amount in adjustments)
+        return {"gross": gross, "discounts": discounts, "refunds": refunds, "adjustments": adj,
+                "net": gross - discounts - refunds + adj, "orders": orders, "adjustment_rows": adjustments}
 
     cur, prev = window(p.start, p.end), window(p.prev_start, p.prev_end)
 
-    series = _sales_series(store, p.start, p.end, bucket)
-    ratio = (cur["net"] / cur["gross"]) if cur["gross"] else 1.0
-    revenue_over_time = [
-        {"label": row["label"], "values": {"gross": row["values"]["sales"], "net": round(row["values"]["sales"] * ratio, 2)}}
-        for row in series
-    ]
+    # Gross and net per bucket, computed from the same per-order figures as the totals so the chart
+    # adds up to the cards (scaling by a single ratio would smear a refund across days it didn't happen on).
+    buckets: dict = defaultdict(lambda: {"gross": 0.0, "net": 0.0})
+    for o in cur["orders"].values():
+        point = buckets[_bucket_label(timezone.localtime(o["placed"]), bucket)]
+        point["gross"] += o["gross"]
+        point["net"] += o["gross"] - o["discount"] - o["refund"]
+    for created, amount in cur["adjustment_rows"]:
+        buckets[_bucket_label(timezone.localtime(created), bucket)]["net"] += amount
+    revenue_over_time = [{"label": label, "values": {k: round(v, 2) for k, v in values.items()}} for label, values in sorted(buckets.items())]
 
     channels = dict(
         _sold_items(store).filter(order__placed_at__gte=p.start, order__placed_at__lt=p.end)
@@ -544,13 +590,14 @@ def sales(store, period_name: str, *, bucket: str = "daily") -> dict:
         "gross_sales_cents": _kpi(cur["gross"], prev["gross"]),
         "discounts_cents": _kpi(cur["discounts"], prev["discounts"]),
         "refunds_cents": _kpi(cur["refunds"], prev["refunds"]),
+        "adjustments_cents": _kpi(cur["adjustments"], prev["adjustments"]),
         "net_sales_cents": _kpi(cur["net"], prev["net"]),
         "revenue_over_time": revenue_over_time,
         "revenue_breakdown": [
             {"label": "Gross Sales", "amount_cents": cur["gross"]},
             {"label": "Discounts", "amount_cents": -cur["discounts"]},
             {"label": "Refunds", "amount_cents": -cur["refunds"]},
-            {"label": "Adjustments", "amount_cents": -cur["adjustments"]},
+            {"label": "Adjustments", "amount_cents": cur["adjustments"]},
             {"label": "Net Sales", "amount_cents": cur["net"]},
         ],
         "sales_by_channel": [

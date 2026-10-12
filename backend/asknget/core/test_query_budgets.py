@@ -130,4 +130,4 @@ class QueryBudgetTests(ApiTestCase):
         self.budget(15, "/api/v1/seller/analytics/overview", token=self.seller)
 
     def test_seller_analytics_sales(self):
-        self.budget(10, "/api/v1/seller/analytics/sales", token=self.seller)
+        self.budget(9, "/api/v1/seller/analytics/sales", token=self.seller)   # was 10: refunds now come from the same pass as gross
