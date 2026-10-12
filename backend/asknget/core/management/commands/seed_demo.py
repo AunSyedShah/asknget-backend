@@ -140,6 +140,7 @@ class Command(BaseCommand):
             refresh_stock_status(product)
         self._seed_orders(store, seller, customer)
         self._seed_team_and_money(store, seller, admin)
+        self._seed_returns(store, seller, customer)
 
         Voucher.objects.get_or_create(code="SAVE20", defaults=dict(type="percent", value=20, min_subtotal_cents=5000))
         Voucher.objects.get_or_create(code="WELCOME5", defaults=dict(type="fixed", value=500, per_user_limit=1))
@@ -302,6 +303,53 @@ class Command(BaseCommand):
             product = Product.objects.filter(store=store).first()
             if product:
                 notifications.notify(store, "low_stock", {"product": product.name, "qty": 8}, link=("product", product.pk))
+
+    def _seed_returns(self, store, seller, customer):
+        """Three customer returns in different states (waiting for the seller, on its way back, refunded) so the
+        Returns screens have something to show. They go through the real services, so the timeline, stock and
+        ledger are what a real return would leave. Idempotent."""
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        from orders import services as order_services
+        from returns import services as returns
+        from returns.models import ReturnRequest
+        from returns.policy import terms_for
+
+        if ReturnRequest.objects.filter(store=store).exists():
+            return
+
+        def photo():
+            buf = BytesIO()
+            Image.new("RGB", (8, 8), "grey").save(buf, format="PNG")
+            return SimpleUploadedFile("photo.png", buf.getvalue(), content_type="image/png")
+
+        def find(product_name):
+            return (OrderItem.objects.filter(store=store, product_name=product_name, status="delivered", order__user__isnull=False)
+                    .select_related("order", "product").order_by("-order__placed_at").first())
+
+        Order.objects.filter(order_number="ASK-DEMO002", user__isnull=True).update(user=customer)   # a guest order cannot be returned
+        plan = [("Apple Watch", "damaged", "requested"), ("Coco Chanel Perfume", "wrong_item", "approved"), ("NARS BB Cream", "damaged", "refunded")]
+        for name, reason, goal in plan:
+            item = find(name)
+            if item is None:
+                continue
+            order = item.order
+            # Demo orders were written straight to the tables, so give their lines the terms checkout would have recorded.
+            terms = terms_for(order.country, {i.product.category_id for i in order.items.select_related("product")})
+            for line in order.items.select_related("product"):
+                OrderItem.objects.filter(pk=line.pk).update(return_terms=terms[line.product.category_id].as_dict())
+            user = order.user
+            req = returns.request_return(user, order_services.get_my_order(user, order.pk), item_ids=[item.pk], reason_code=reason,
+                                         note="Demo return", files=[photo()])
+            if goal in ("approved", "refunded"):
+                returns.approve(req, actor="seller", user=seller)
+            if goal == "approved":
+                returns.add_tracking(req, user=user, tracking_number="TCS 4409 1182", courier="TCS")
+            if goal == "refunded":
+                returns.mark_received(req, user=seller, condition="good")
 
     def _seed_orders(self, store, seller, member):
         if Order.objects.filter(order_number__startswith="ASK-DEMO").exists():

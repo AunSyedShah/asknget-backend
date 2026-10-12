@@ -271,7 +271,7 @@ class VisibilityAndReadStateTests(NotificationTestCase):
     def test_the_summary_counts_unread_per_tab_and_in_total(self):
         body = self.get(f"{N}/summary", self.token_a).json()
         self.assertEqual(body["unread"], 5)                                              # one each: order, payment, customer, stock, plan
-        self.assertEqual({k: v["unread"] for k, v in body["tabs"].items()}, {"orders": 1, "payments": 1, "inventory": 1, "customers": 1, "system": 1, "all": 5})
+        self.assertEqual({k: v["unread"] for k, v in body["tabs"].items()}, {"orders": 1, "payments": 1, "inventory": 1, "customers": 1, "returns": 0, "system": 1, "all": 5})
 
     def test_reading_is_personal(self):
         user, member_token = self.join({"inventory": "view"})

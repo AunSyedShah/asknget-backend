@@ -20,7 +20,8 @@ def region_payload(request) -> dict:
         "currency": country.currency,
         "postal_code_regex": country.postal_code_regex,
         "return_policy": (
-            {"window_days": policy.window_days, "summary": pick(policy.summary, request.language, country), "url": policy.url}
+            {"window_days": policy.window_days, "defect_days": policy.defect_days, "restocking_fee_bps": policy.restocking_fee_bps,
+             "summary": pick(policy.summary, request.language, country), "terms": pick(policy.terms, request.language, country), "url": policy.url}
             if policy and policy.is_active else None
         ),
     }

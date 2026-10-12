@@ -31,6 +31,7 @@ from orders.api import admin_orders_router, cart_router, checkout_router, my_ord
 from sellers.api import admin_sellers_router, lookups_router, seller_router
 from notifications.api import notifications_router
 from ledger.api import admin_ledger_router, admin_payouts_router, transactions_router
+from returns.api import admin_returns_router, my_returns_router, returns_public_router, seller_returns_router
 from team.api import accept_router, me_router as seller_me_router, team_router
 
 api = NinjaAPI(
@@ -70,6 +71,7 @@ api.add_router("/regions", regions_router)
 api.add_router("/auth", auth_router)
 me_router.add_router("", wishlist_router)
 me_router.add_router("", my_orders_router)
+me_router.add_router("", my_returns_router)
 me_router.add_router("", customer_chat_router)
 api.add_router("/me", me_router)
 api.add_router("", catalog_router)
@@ -102,3 +104,6 @@ api.add_router("/admin/payouts", admin_payouts_router)
 api.add_router("/seller/me", seller_me_router)
 api.add_router("/auth/team", accept_router)
 api.add_router("/admin/products", admin_products_router)
+api.add_router("", returns_public_router)
+api.add_router("/seller/returns", seller_returns_router)
+api.add_router("/admin/returns", admin_returns_router)

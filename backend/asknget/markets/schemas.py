@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from ninja import Schema
+from ninja import Field, Schema
 
 
 class CountryOut(Schema):
@@ -18,8 +18,11 @@ class CountryOut(Schema):
 
 
 class ReturnPolicyOut(Schema):
-    window_days: int
+    window_days: int = Field(description="Change of mind: days after delivery (0 = not accepted)")
+    defect_days: int = Field(description="Defective / wrong / not as described: days after delivery (0 = not accepted)")
+    restocking_fee_bps: int
     summary: str
+    terms: str
     url: str
 
 

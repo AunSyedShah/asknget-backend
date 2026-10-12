@@ -7,8 +7,10 @@ Rules, in one place:
 * **Delivered** -> the sale starts its hold; it becomes available per the store's resolved
   `payouts.hold_mode` (an admin setting). Until then it is *held*, not withdrawable.
 * **Cancelled / returned / refunded** -> a `refund` of the sale and a `fee_refund` of the
-  commission, once per store per order. A refund of money that was never yet available
-  cancels it out of the available balance rather than driving it negative.
+  commission, once per store per order (whatever has not already gone back).
+* **A customer return** -> `refund_items`: a `refund` of the returned value and the matching share of the commission,
+  once per return request.
+  A refund of money that was never yet available cancels it out of the available balance rather than driving it negative.
 * **Staff** add signed `adjustment`s and create / complete `payout`s.
 
 Every posting is idempotent (the table's unique constraint backs it up), so a retried webhook
@@ -141,6 +143,20 @@ def post_sales(order: Order, *, include_refunded: bool = False) -> list[LedgerEn
     return created
 
 
+def _given_back(order: Order) -> dict:
+    """{store_id: (sale refunded so far, commission refunded so far)}, all positive, across every kind of refund."""
+    totals = defaultdict(lambda: [0, 0])
+    for store_id, kind, amount in LedgerEntry.objects.filter(order=order, type__in=(T.REFUND, T.FEE_REFUND)).values_list("store_id", "type", "amount_cents"):
+        totals[store_id][0 if kind == T.REFUND else 1] += abs(amount)
+    return totals
+
+
+def _fully_refunded_stores(order: Order) -> set:
+    given = _given_back(order)
+    sales = dict(LedgerEntry.objects.filter(order=order, type=T.SALE).values_list("store_id", "amount_cents"))
+    return {store_id for store_id, amount in sales.items() if given.get(store_id, (0, 0))[0] >= amount}
+
+
 @transaction.atomic
 def release(order: Order, store_id=None) -> int:
     """The store's goods were delivered: start the hold on what they earned. Returns entries released."""
@@ -148,7 +164,7 @@ def release(order: Order, store_id=None) -> int:
     held = LedgerEntry.objects.filter(order=order, type__in=STOCK_OF_SALE, available_at__isnull=True)
     if store_id:
         held = held.filter(store_id=store_id)
-    refunded = set(LedgerEntry.objects.filter(order=order, type=T.REFUND).values_list("store_id", flat=True))
+    refunded = _fully_refunded_stores(order)
     count = 0
     for entry in held.select_related("store"):
         if entry.store_id in refunded:
@@ -170,24 +186,62 @@ def release(order: Order, store_id=None) -> int:
 
 @transaction.atomic
 def refund(order: Order, store_id=None) -> list[LedgerEntry]:
-    """Give a store's sale back to the buyer, and the commission back to the store. Once per store."""
+    """Give back to the buyer whatever of a store's sale has not already gone back, and the same share of the
+    commission to the store. Idempotent: once a store is fully refunded, a second call posts nothing. Earlier partial
+    refunds (customer returns) are respected, so a later whole-order refund cannot pay the same item twice."""
     now = timezone.now()
     sales = LedgerEntry.objects.filter(order=order, type=T.SALE).select_related("store")
     if store_id:
         sales = sales.filter(store_id=store_id)
+    given = _given_back(order)
     created = []
     for sale in sales:
-        if LedgerEntry.objects.filter(order=order, store=sale.store, type=T.REFUND).exists():
+        sale_back, fee_back = given.get(sale.store_id, (0, 0))
+        remaining = sale.amount_cents - sale_back
+        if remaining <= 0:
             continue
         # Money that is not yet available cancels out of the held amount; money that is comes off the balance now.
         when = sale.available_at if (sale.available_at is None or sale.available_at > now) else now
         common = dict(store=sale.store, order=order, currency=sale.currency, available_at=when, status=LedgerEntry.Status.COMPLETED)
-        created.append(_entry(type=T.REFUND, amount_cents=-sale.amount_cents, description=f"Refund for order {order.order_number}",
+        created.append(_entry(type=T.REFUND, amount_cents=-remaining, description=f"Refund for order {order.order_number}",
                               meta={"sale": sale.reference}, **common))
         fee = LedgerEntry.objects.filter(order=order, store=sale.store, type=T.FEE).first()
-        if fee:
-            created.append(_entry(type=T.FEE_REFUND, amount_cents=-fee.amount_cents, description=f"Commission returned for order {order.order_number}",
+        fee_remaining = abs(fee.amount_cents) - fee_back if fee else 0
+        if fee_remaining > 0:
+            created.append(_entry(type=T.FEE_REFUND, amount_cents=fee_remaining, description=f"Commission returned for order {order.order_number}",
                                   meta={"fee": fee.reference}, **common))
+    return created
+
+
+@transaction.atomic
+def refund_items(request) -> list[LedgerEntry]:
+    """A customer return was accepted: give back `request.refund_cents` of the store's sale, and the matching
+    share of the commission (pro-rata to the returned value; capped at what is left). Once per request."""
+    order, store = request.order, request.store
+    if LedgerEntry.objects.filter(return_request=request).exists():
+        return []
+    sale = LedgerEntry.objects.filter(order=order, store=store, type=T.SALE).first()
+    if sale is None or request.refund_cents <= 0:
+        return []
+    sale_back, fee_back = _given_back(order).get(store.pk, (0, 0))
+    amount = min(request.refund_cents, sale.amount_cents - sale_back)
+    if amount <= 0:
+        return []
+    now = timezone.now()
+    when = sale.available_at if (sale.available_at is None or sale.available_at > now) else now
+    common = dict(store=store, order=order, currency=sale.currency, available_at=when, status=LedgerEntry.Status.COMPLETED, return_request=request)
+    created = [_entry(type=T.REFUND, amount_cents=-amount, description=f"Return {request.reference} (order {order.order_number})",
+                      meta={"sale": sale.reference, "return": request.reference, "items_cents": request.items_cents,
+                            "restocking_fee_cents": request.restocking_fee_cents, "delivery_refund_cents": request.delivery_refund_cents}, **common)]
+    fee = LedgerEntry.objects.filter(order=order, store=store, type=T.FEE).first()
+    if fee:
+        net_total = sale.meta.get("lines_cents", 0) - sale.meta.get("discount_cents", 0)
+        returned_net = request.items_cents - request.discount_cents
+        share = _round_div(abs(fee.amount_cents) * returned_net, net_total) if net_total > 0 else 0
+        share = min(share, abs(fee.amount_cents) - fee_back)
+        if share > 0:
+            created.append(_entry(type=T.FEE_REFUND, amount_cents=share, description=f"Commission returned for {request.reference}",
+                                  meta={"fee": fee.reference, "return": request.reference}, **common))
     return created
 
 

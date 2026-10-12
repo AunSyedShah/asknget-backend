@@ -287,6 +287,25 @@ category only if they can view its section; read state is per person. Emitters (
 `stock_alert`, `payout_processed`, …) are called from the money-event hooks above, in the same transaction as the event.
 Low stock fires once per *crossing*, not on every sale below the line.
 
+## Returns (`returns` app)
+
+A buyer asks to return delivered items from one store's part of an order; the seller approves or rejects, the buyer ships it back, the seller
+receives it, and the ledger refunds. Plan, decisions and what was left open: `docs/returns-plan.md`; tables: `docs/data-model.md` §7f.
+
+- **Rules are data**: `markets.ReturnPolicy` (days for change of mind / defects, restocking fee, wording), `ReturnReason`, and per-category `ReturnRule`
+  overrides (`0` days = not accepted). Edit them in Django admin or via `/admin/returns/{policies,reasons,rules}`. `returns.policy.terms_for` resolves them and
+  checkout snapshots the result onto each `OrderItem.return_terms`, so editing a rule never rewrites an existing order.
+- **One workflow module**: every change goes through `returns.services` (it writes the timeline, restocks, calls `ledger.refund_items` and notifies), never
+  straight on the model. Statuses: requested, approved, rejected, escalated, received, refunded, cancelled.
+- **Money**: `ledger.refund_items` refunds the returned value and the matching share of the commission, once per request; `ledger.refund` (whole orders) only
+  pays what has not already gone back. A goodwill "returned" by a seller or staff is `409 return_in_progress` while a customer request for those lines is open.
+- **Courier slot**: `returns/couriers/` is where the technical lead's courier API plugs in. Subclass `Courier` (`book_return`, optionally `cancel`, `track`,
+  `parse_webhook`), `register()` it, add its import to `couriers.load()`, then set the admin setting `returns.courier` to its slug (per market or globally).
+  Until then the `manual` courier is used and the buyer types the tracking number. Webhooks arrive at `POST /couriers/{slug}/webhook`; polling is
+  `manage.py sync_return_tracking`. A courier failing never blocks an approval.
+- **Settings** (`manage.py show_settings` lists each effective value): `returns.courier`, `returns.auto_approve`, `returns.seller_response_days`, `returns.max_photos`, `returns.allow_escalation`.
+- **Not connected yet**: a payment provider (the buyer's refund stays `pending` until staff mark it paid) and the courier itself.
+
 ## Search & recommendations (`discovery` app)
 
 - **Search** — `GET /products?q=` is hybrid: filters apply first, then keyword ranking (Postgres websearch

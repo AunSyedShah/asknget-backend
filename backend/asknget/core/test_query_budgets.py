@@ -22,6 +22,7 @@ from catalog.services import refresh_stock_status
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
 from discovery.indexing import embed_products
 from orders.models import Order, OrderItem
+from returns.models import ReturnEvent, ReturnItem, ReturnPhoto, ReturnReason, ReturnRequest, ReturnShipment
 
 PRODUCTS = 6
 ORDERS = 5
@@ -131,3 +132,43 @@ class QueryBudgetTests(ApiTestCase):
 
     def test_seller_analytics_sales(self):
         self.budget(9, "/api/v1/seller/analytics/sales", token=self.seller)   # was 10: refunds now come from the same pass as gross
+
+    # Returns --------------------------------------------------------------
+
+    def _returns(self):
+        """One return per order, each with two lines, a photo, a few events and a shipment: more than one of everything."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        reason = ReturnReason.objects.get(code="changed_mind")
+        for i, order in enumerate(Order.objects.filter(user=self.buyer).order_by("order_number")):
+            order.items.update(status="delivered")
+            req = ReturnRequest.objects.create(
+                reference=f"RET-{i:05d}-1", order=order, store=self.store, user=self.buyer, country_id=self.store.country_id, reason=reason, reason_kind=reason.kind,
+                currency="ZAR", items_cents=2000, refund_cents=2000, response_due_at=timezone.now() + timedelta(days=3),
+            )
+            for item in order.items.all():
+                ReturnItem.objects.create(request=req, order_item=item, qty=1, line_total_cents=item.line_total_cents)
+            ReturnPhoto.objects.create(request=req, image=SimpleUploadedFile("p.png", b"x", content_type="image/png"))
+            for status in ("requested", "approved"):
+                ReturnEvent.objects.create(request=req, status=status, actor="buyer")
+            ReturnShipment.objects.create(request=req, courier="manual")
+        return ReturnRequest.objects.order_by("reference").first()
+
+    def test_my_returns_list_and_detail(self):
+        first = self._returns()
+        body = self.budget(4, "/api/v1/me/returns", token=self.member)
+        self.assertEqual(body["total"], ORDERS)
+        self.budget(8, f"/api/v1/me/returns/{first.pk}", token=self.member)
+
+    def test_seller_returns_list_detail_and_tabs(self):
+        first = self._returns()
+        body = self.budget(5, "/api/v1/seller/returns", token=self.seller)
+        self.assertEqual(body["total"], ORDERS)
+        self.budget(9, f"/api/v1/seller/returns/{first.pk}", token=self.seller)
+        self.budget(5, "/api/v1/seller/returns/summary", token=self.seller)
+
+    def test_admin_returns_queue(self):
+        self._returns()
+        staff = self.token_for(make_user(is_staff=True))
+        body = self.budget(4, "/api/v1/admin/returns", token=staff)
+        self.assertEqual(body["total"], ORDERS)

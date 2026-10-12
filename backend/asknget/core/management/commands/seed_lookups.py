@@ -33,7 +33,7 @@ COUNTRIES = {
             },
             instructions={"en": "Upload clear copies. We verify every application manually within 2 business days."},
         ),
-        "returns": dict(window_days=30, summary={"en": "Return eligible items within 30 days", "af": "Stuur geskikte items binne 30 dae terug"}),
+        "returns": dict(window_days=30, defect_days=180, summary={"en": "Return eligible items within 30 days", "af": "Stuur geskikte items binne 30 dae terug"}),
     },
     "PK": {
         "country": dict(name="Pakistan", subdomain="pk", currency="PKR", timezone="Asia/Karachi",
@@ -59,7 +59,7 @@ COUNTRIES = {
             instructions={"en": "Upload clear copies. We verify every application manually within 2 business days.",
                           "ur": "واضح کاپیاں اپ لوڈ کریں۔ ہر درخواست کی تصدیق 2 کاروباری دنوں میں دستی طور پر کی جاتی ہے۔"},
         ),
-        "returns": dict(window_days=7, summary={"en": "Return eligible items within 7 days", "ur": "اہل اشیاء 7 دن کے اندر واپس کریں"}),
+        "returns": dict(window_days=7, defect_days=14, summary={"en": "Return eligible items within 7 days", "ur": "اہل اشیاء 7 دن کے اندر واپس کریں"}),
     },
 }
 

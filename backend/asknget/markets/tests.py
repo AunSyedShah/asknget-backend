@@ -85,7 +85,7 @@ class ResolutionTests(ApiTestCase):
         self.assertEqual(body["country"]["code"], "PK")
         self.assertEqual(body["timezone"], "Asia/Karachi")
         self.assertEqual(body["currency"], "PKR")
-        self.assertEqual(body["return_policy"], {"window_days": 7, "summary": "7 days", "url": ""})
+        self.assertEqual(body["return_policy"], {"window_days": 7, "defect_days": 30, "restocking_fee_bps": 0, "summary": "7 days", "terms": "", "url": ""})
 
     def test_query_param(self):
         self.assertEqual(self.client.get("/api/v1/regions/current?region=PK").json()["country"]["code"], "PK")

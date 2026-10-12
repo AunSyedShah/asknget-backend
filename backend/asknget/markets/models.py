@@ -179,10 +179,18 @@ class ReturnPolicy(models.Model):
     every order at checkout, so changing it here never rewrites history."""
 
     country = models.OneToOneField(Country, on_delete=models.CASCADE, primary_key=True, related_name="return_policy")
-    window_days = models.PositiveSmallIntegerField(default=30, help_text="Design: 'Return eligible items within 30 days'")
+    window_days = models.PositiveSmallIntegerField(
+        default=30, help_text="Change of mind: days after delivery the buyer may ask to return an item they simply don't want. 0 = not accepted. "
+                              "Design: 'Return eligible items within 30 days'")
+    defect_days = models.PositiveSmallIntegerField(
+        default=30, help_text="Defective, wrong or not-as-described items: days after delivery. Often longer than the change-of-mind window "
+                              "(consumer law may require it). 0 = not accepted.")
+    restocking_fee_bps = models.PositiveSmallIntegerField(
+        default=0, help_text="Kept from a change-of-mind refund, in basis points of the item value (100 = 1 %). Never charged for a defect or wrong item.")
     summary = models.JSONField(default=dict, blank=True, help_text='i18n one-liner, e.g. {"en": "Return eligible items within 30 days"}')
+    terms = models.JSONField(default=dict, blank=True, help_text="i18n full terms shown on the return form")
     url = models.URLField(blank=True, help_text="Full policy page on the storefront")
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, help_text="Off = no returns of any kind in this market")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -193,3 +201,6 @@ class ReturnPolicy(models.Model):
 
     def clean(self):
         validate_i18n(self.summary, field="summary")
+        validate_i18n(self.terms, field="terms")
+        if self.restocking_fee_bps > 10000:
+            raise ValidationError({"restocking_fee_bps": "At most 10000 (100 %)."})

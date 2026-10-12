@@ -54,3 +54,28 @@ register(
     "notifications.recent_days", "int", 90, "Notifications: how far back",
     help="The notification list shows this many days of history.", scopes=("global",), min=1, max=365,
 )
+
+# --- Returns ----------------------------------------------------------------------------
+register(
+    "returns.courier", "str", "manual", "Return courier",
+    help="Which courier integration collects returned parcels in this market (see returns.couriers). "
+         "'manual' = the buyer posts it and enters the tracking number. An unknown name falls back to manual.",
+    scopes=("global", "country"),
+)
+register(
+    "returns.auto_approve", "bool", False, "Approve returns automatically",
+    help="On: a request that passes the policy is approved at once, without waiting for the seller.", scopes=("global", "country"),
+)
+register(
+    "returns.seller_response_days", "int", 3, "Seller response time (days)",
+    help="How long a seller has to approve or reject a return. After it the request shows as overdue to staff.",
+    scopes=("global", "country"), min=1, max=30,
+)
+register(
+    "returns.max_photos", "int", 5, "Photos per return",
+    help="The most photos a buyer can attach to one return request.", scopes=("global",), min=0, max=10,
+)
+register(
+    "returns.allow_escalation", "bool", True, "Buyers can dispute a rejection",
+    help="On: a buyer whose return was rejected can ask staff to decide.", scopes=("global", "country"),
+)

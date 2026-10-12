@@ -47,5 +47,5 @@ class KycPolicyAdmin(admin.ModelAdmin):
 
 @admin.register(ReturnPolicy)
 class ReturnPolicyAdmin(admin.ModelAdmin):
-    list_display = ("country", "window_days", "is_active", "url", "updated_at")
-    list_editable = ("window_days", "is_active")
+    list_display = ("country", "window_days", "defect_days", "restocking_fee_bps", "is_active", "updated_at")
+    list_editable = ("window_days", "defect_days", "restocking_fee_bps", "is_active")

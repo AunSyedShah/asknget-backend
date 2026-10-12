@@ -89,6 +89,27 @@ def product_reviewed(product, *, approved: bool, reason: str = "") -> None:
     notify(product.store_id, kind, {"product": product.name, "reason": reason}, link=("product", product.pk))
 
 
+def _return_params(r) -> dict:
+    return {"order": r.order.order_number, "customer": _customer(r.order), "items": r.items.count(),
+            "reason": pick(r.reason.label, country=r.country, default=r.reason.code)}
+
+
+def return_requested(r) -> None:
+    notify(r.store_id, "return_requested", _return_params(r), link=("return", r.pk))
+
+
+def return_cancelled(r) -> None:
+    notify(r.store_id, "return_cancelled", _return_params(r), link=("return", r.pk))
+
+
+def return_escalated(r) -> None:
+    notify(r.store_id, "return_escalated", _return_params(r), link=("return", r.pk))
+
+
+def return_decided(r, outcome: str) -> None:
+    notify(r.store_id, "return_decided", {**_return_params(r), "outcome": outcome}, link=("return", r.pk))
+
+
 def plan_changed(store) -> None:
     notify(store.pk, "plan_changed", {"plan": "premium" if store.is_premium else "standard"})
 

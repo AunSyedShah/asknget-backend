@@ -8,11 +8,11 @@ from pydantic import Field
 
 class NotificationOut(Schema):
     id: UUID
-    category: Literal["orders", "payments", "inventory", "customers", "system"]
+    category: Literal["orders", "payments", "inventory", "customers", "returns", "system"]
     kind: str
     title: str = Field(description="Rendered in the request's language")
     body: str
-    link_type: str = Field(description="order | product | payout | customer; empty when there is nothing to open")
+    link_type: str = Field(description="order | product | payout | customer | return; empty when there is nothing to open")
     link_id: str
     created_at: datetime
     group: Literal["today", "yesterday", "earlier"] = Field(description="The section heading, in the store's timezone")

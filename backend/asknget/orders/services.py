@@ -518,13 +518,16 @@ def checkout(request, cart: Cart, payload) -> Order:
             order=order, store_id=g["store_id"], option=option, name=option.name,
             eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents,
         )
+    from returns.policy import terms_for     # local: returns reads orders
+
+    return_terms = terms_for(country, {variants[i.variant_id].product.category_id for i in items})
     for item in items:
         v, line = variants[item.variant_id], line_out(item)
         OrderItem.objects.create(
             order=order, store=v.product.store, product=v.product, variant=v,
             product_name=line["product_name"], variant_summary=line["variant_summary"], image_url=line["image_url"] or "",
             qty=item.qty, unit_price_cents=line["unit_price_cents"], compare_at_price_cents=line["compare_at_price_cents"],
-            line_total_cents=line["line_total_cents"],
+            line_total_cents=line["line_total_cents"], return_terms=return_terms[v.product.category_id].as_dict(),
         )
         adjust_stock(v, delta=-item.qty, reason=StockMovement.Reason.SALE, order=order, locked=True)
         events.record_for_cart(events.ProductEvent.Kind.PURCHASE, product=v.product, cart=cart)
@@ -703,6 +706,10 @@ FULFILMENT_TO_ORDER = {
 def set_status(order: Order, *, status: str, actor_user, note: str = "", location: str = "") -> Order:
     if status not in ALLOWED_NEXT[order.status]:
         raise HttpError(409, f"Cannot move order from {order.status} to {status}")
+    if status in (Status.RETURNED, Status.REFUNDED):
+        from returns.services import assert_no_open_request    # a customer's return is already dealing with these lines
+
+        assert_no_open_request(order)
     if status == Status.CANCELLED:
         _restock(order, order.items.all(), reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
         order.cancelled_at = timezone.now()
@@ -765,6 +772,10 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
     current = items[0].status
     if status not in FULFILMENT_NEXT[current]:
         raise HttpError(409, f"Cannot move this order from {current} to {status}")
+    if status == Fulfilment.RETURNED:
+        from returns.services import assert_no_open_request
+
+        assert_no_open_request(order, store.pk)
     if status == Fulfilment.CANCELLED:
         _restock(order, items, reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
     elif status == Fulfilment.RETURNED:

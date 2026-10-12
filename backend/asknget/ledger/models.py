@@ -67,6 +67,8 @@ class LedgerEntry(TimeStampedModel):
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
     order = models.ForeignKey("orders.Order", on_delete=models.PROTECT, null=True, blank=True, related_name="ledger_entries")
     payout = models.ForeignKey(Payout, on_delete=models.PROTECT, null=True, blank=True, related_name="entries")
+    return_request = models.ForeignKey("returns.ReturnRequest", on_delete=models.PROTECT, null=True, blank=True, related_name="ledger_entries",
+                                       help_text="Set on the refund and commission refund that one customer return caused")
     reference = models.CharField(max_length=30, unique=True)
     description = models.CharField(max_length=255, blank=True)
     available_at = models.DateTimeField(
@@ -87,7 +89,12 @@ class LedgerEntry(TimeStampedModel):
             # One posting of each kind per order and store: confirming a payment twice, or refunding twice, cannot double-count.
             models.UniqueConstraint(
                 fields=["order", "store", "type"], name="uniq_ledger_posting_per_order_store",
-                condition=Q(type__in=["sale", "fee", "refund", "fee_refund"]),
+                condition=Q(type__in=["sale", "fee"]) | (Q(type__in=["refund", "fee_refund"]) & Q(return_request__isnull=True)),
+            ),
+            # ...and one refund of each kind per customer return.
+            models.UniqueConstraint(
+                fields=["return_request", "type"], name="uniq_ledger_refund_per_return",
+                condition=Q(return_request__isnull=False, type__in=["refund", "fee_refund"]),
             ),
             models.CheckConstraint(
                 name="ledger_amount_sign_matches_type",

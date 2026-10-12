@@ -7,7 +7,7 @@ Placeholders in {braces} are filled from the notification's `params` when it is 
 `{amount}` is built from `amount_cents` + `currency` if both are present.
 """
 
-CATEGORIES = ("orders", "payments", "inventory", "customers", "system")
+CATEGORIES = ("orders", "payments", "inventory", "customers", "returns", "system")
 
 # kind: (category, {lang: title}, {lang: body}, what the placeholders are)
 TEMPLATES = {
@@ -21,9 +21,13 @@ TEMPLATES = {
     "payout_processed": ("payments", {"en": "Payout Processed"}, {"en": "Your payout of {amount} has been processed successfully."}, "amount"),
     "product_approved": ("system", {"en": "Product Approved"}, {"en": "{product} is now live in your store."}, "product"),
     "product_rejected": ("system", {"en": "Product Rejected"}, {"en": "{product} was not approved: {reason}"}, "product, reason"),
+    "return_requested": ("returns", {"en": "Return Requested"}, {"en": "{customer} asked to return {items} item(s) from order #{order}: {reason}."}, "order, customer, items, reason"),
+    "return_cancelled": ("returns", {"en": "Return Withdrawn"}, {"en": "{customer} withdrew the return request for order #{order}."}, "order, customer"),
+    "return_escalated": ("returns", {"en": "Return Disputed"}, {"en": "{customer} disputed your rejection of the return for order #{order}. asknget will decide."}, "order, customer"),
+    "return_decided": ("returns", {"en": "Return Decision"}, {"en": "asknget decided the return for order #{order}: {outcome}."}, "order, outcome"),
     "plan_changed": ("system", {"en": "Plan Updated"}, {"en": "Your store is now on the {plan} plan."}, "plan"),
 }
 
 # Which part of the portal a category belongs to. A team member sees a category only if they can
 # view that section; `None` means everyone on the team.
-CATEGORY_SECTION = {"orders": "orders", "payments": "transactions", "inventory": "inventory", "customers": "customers", "system": None}
+CATEGORY_SECTION = {"orders": "orders", "payments": "transactions", "inventory": "inventory", "customers": "customers", "returns": "orders", "system": None}

@@ -260,6 +260,11 @@ class OrderItem(TimeStampedModel):
     compare_at_price_cents = models.PositiveIntegerField(null=True, blank=True)
     line_total_cents = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=FulfilmentStatus.choices, default=FulfilmentStatus.PENDING, db_index=True)
+    return_terms = models.JSONField(
+        default=dict, blank=True,
+        help_text='What the return rules said for this line at checkout: {"change_of_mind_days", "defect_days", "restocking_fee_bps"}. '
+                  "Empty on orders placed before returns existed (the order's own window applies).",
+    )
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["created_at"]

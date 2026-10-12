@@ -120,6 +120,7 @@ INSTALLED_APPS = [
     'team',
     'ledger',
     'notifications',
+    'returns',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
