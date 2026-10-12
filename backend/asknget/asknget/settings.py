@@ -118,6 +118,7 @@ INSTALLED_APPS = [
     'chat',
     'config',
     'team',
+    'ledger',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

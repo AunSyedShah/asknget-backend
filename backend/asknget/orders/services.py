@@ -588,6 +588,7 @@ def cancel(order: Order, *, user, reason: str) -> Order:
     order.save()
     order.items.update(status=Fulfilment.CANCELLED)
     _record_event(order, Status.CANCELLED, actor="buyer", actor_user=user, note=reason or "Cancelled by customer")
+    on_order_money_returned(order)
     return order
 
 
@@ -614,6 +615,32 @@ def track(*, order_number: str, email: str) -> Order:
     if order is None:
         raise HttpError(404, "No order matches that order ID and email")
     return order
+
+
+# --------------------------------------------------------------------------- #
+# Money events. One place each, so the ledger (and later notifications) hang off the
+# same moments no matter who triggered them: the buyer, staff, a seller or a PSP webhook.
+# Imports are local: the ledger imports orders, not the other way round.
+# --------------------------------------------------------------------------- #
+
+
+def on_payment_confirmed(order: Order) -> None:
+    from ledger import services as ledger
+
+    ledger.post_sales(order)
+
+
+def on_goods_delivered(order: Order, store_id=None) -> None:
+    from ledger import services as ledger
+
+    ledger.release(order, store_id)
+
+
+def on_order_money_returned(order: Order, store_id=None) -> None:
+    """Cancelled, returned or refunded: whatever was paid for these lines goes back."""
+    from ledger import services as ledger
+
+    ledger.refund(order, store_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -673,13 +700,21 @@ def set_status(order: Order, *, status: str, actor_user, note: str = "", locatio
         order.cancel_reason = note
     elif status == Status.RETURNED:
         _restock(order, order.items.all(), reason=StockMovement.Reason.RETURN, actor_user=actor_user)
+    just_paid = False
     if status == Status.CONFIRMED and order.payment_status == Order.OrderPaymentStatus.UNPAID:
         order.payment_status = Order.OrderPaymentStatus.PAID  # manual confirmation (bank transfer) until the PSP lands
+        just_paid = True
     order.status = status
     order.save()
     if ORDER_TO_FULFILMENT[status] is not None:
         order.items.update(status=ORDER_TO_FULFILMENT[status])
     _record_event(order, status, actor="admin", actor_user=actor_user, note=note, location=location)
+    if just_paid:
+        on_payment_confirmed(order)
+    if status == Status.DELIVERED:
+        on_goods_delivered(order)
+    elif status in (Status.CANCELLED, Status.RETURNED, Status.REFUNDED):
+        on_order_money_returned(order)
     return order
 
 
@@ -728,4 +763,8 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
         actor=OrderStatusEvent.OrderEventActor.SELLER, actor_user=actor_user,
     )
     derive_order_status(order)
+    if status == Fulfilment.DELIVERED:
+        on_goods_delivered(order, store.pk)
+    elif status in (Fulfilment.CANCELLED, Fulfilment.RETURNED):
+        on_order_money_returned(order, store.pk)
     return order
