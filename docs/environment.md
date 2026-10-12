@@ -64,6 +64,7 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | `MEDIA_ROOT` | `backend/asknget/media` | Where uploads land. Compose sets `/app/asknget/media`. |
 | `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. |
 | `STOREFRONT_URL` | *(empty)* | Public buyer site, used to build "View Product" links in the seller portal. |
+| `PORTAL_URL` | *(empty)* | The seller portal's address, used to build **team-invitation links** (`<PORTAL_URL>/accept-invite?token=…`). Falls back to `STOREFRONT_URL`; with neither, the e-mailed link has no host. |
 
 ### CORS
 
@@ -189,6 +190,13 @@ generate their own key and then share a database, a dump or a committed `db.sqli
 
 To avoid it altogether: use the shared development key from `backend/.env.example` for every
 non-production database, and never move a database between machines that used different keys.
+
+### Business settings live in the database, not here
+
+Commission, payout timing, thresholds, seat limits, role presets and notification wording are **not** environment
+variables. An admin changes them in Django admin (*Configuration*, *Team*, *Notifications*) and they apply on the next
+request. `manage.py show_settings [--country PK | --store <slug>]` prints every setting's effective value and whether it
+came from the store, the market, the platform or the code default.
 
 ## 5. Production checklist
 

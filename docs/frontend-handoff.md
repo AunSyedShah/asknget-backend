@@ -51,6 +51,7 @@ that now, but fix it at the source.
 | `X-Region: PK` | Market override. Unknown or inactive → `400 unknown_region`. Without it the market comes from the host's subdomain (`za.…`, `pk.…`), then the default country. |
 | `X-Language: ur` | The user's saved language (`GET /me` → `language`). Otherwise `Accept-Language`, then the country's default. |
 | `X-Timezone: Asia/Karachi` | Otherwise the country's timezone. |
+| `X-Store: <store id>` | **Seller calls only.** Which store, when a person belongs to several (own first, else the first joined). A store that isn't theirs is `403 no_active_store`. |
 | `X-Cart-Token` | **Guest** carts. The first `POST /cart/items` returns `cart_token` in the body; send it back on every cart and checkout call. Signing in merges the guest cart into the account cart and retires the token. |
 
 Responses carry `Content-Language` and `X-Region`. CORS exposes only those and `content-disposition`, and allows only
@@ -98,14 +99,40 @@ fails, send the user to login. `user.locale` is `{country, language, timezone, c
 - **Chat** is polled: `GET …/messages?after=<last message id>`. Use the id, never a timestamp.
 - **Premium gating** applies to `/seller/analytics/*` and the chat inbox (`/seller/chat*`). The one exception is `GET /seller/chat/summary` (unread counts), which every plan may call, so a standard seller can see that messages are waiting.
 
-## 5. In the design but not in the backend yet
+## 5. Built since the first version of this file (sprint 7)
 
-Do not wire these to the API (render them from static or empty states, or leave them out, as the owner decides):
-**Team / Managers, Member Details, Edit Permissions, Notifications, Transactions (overview, list, details), Returns,
-Category Request**, the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders,
-products; planned as the sprint after next), refund and adjustment amounts in Sales Analytics, the daily Product Performance chart and the
-Low Performing list in Product Analytics. They are planned for the next backend sprint
-(`docs/data-model.md`, questions Q62–Q73). Report what you need instead of assuming a shape.
+These screens now have real endpoints; wire them (shapes are in the index below and in `/api/v1/openapi.json`):
+
+| Screen | Endpoints |
+|---|---|
+| Team / Managers, Member Details, Edit Permissions | `/seller/team` (+ `/summary`, `/roles`, `/invites`, `/{id}`, `/{id}/activity`; `owner` is a valid id), `POST /auth/team/accept` |
+| Sidebar and who is signed in | `GET /seller/me`: `sections` is exactly what to render |
+| Notifications | `/seller/notifications` (+ `/summary` for the header badge, `/{id}/read`, `/read-all`) |
+| Transactions Overview, All Transactions, Transaction Details | `/seller/transactions/overview`, `/seller/transactions` (+ `/tabs`, `/export.csv`), `/seller/transactions/{reference}` |
+| Product Analytics | `/seller/analytics/products` now also returns `daily`, `low_performers`, `conversion_leaders` |
+| Sales Analytics | `refunds_cents` and `adjustments_cents` are real now (gross counts every paid line; refunds take cancelled/returned ones back out) |
+
+**New rules for clients:**
+- **`X-Store: <store id>`** on seller calls picks the store when a person belongs to several (their own first, otherwise the first
+  they joined). A store they don't belong to is `403 no_active_store`; the header never silently falls back.
+- **`403 permission_denied`** = the person's role lacks the level this route needs. Hide what `/seller/me` doesn't list rather than
+  letting them hit it. Plan limits are still `403 premium_required`: they mean different things, handle both.
+- **`409 member_limit`** on an invite = the store reached its seat limit (an admin setting).
+- **Team management is owner-only**; a member gets `403 permission_denied` on `/seller/team`.
+- **Notification text is rendered by the server in the request language** (`X-Language`); don't build sentences from `kind`.
+  Read state is per person.
+- **Transactions are read-only for sellers.** There is no withdraw button: staff create and complete payouts. A sale is *held*
+  (`available_at` null or in the future) until delivery plus the hold policy, so `status` is `pending` until then.
+- **Money**: amounts are signed (`+` is the seller's gain). `type` is `sale | payout | fee | refund | adjustment`; a commission
+  returned with a refund reads as `fee` with a positive amount.
+- **Invitation link**: `<portal>/accept-invite?token=…` calls `POST /auth/team/accept {token, full_name?, password?}`. `409 account_exists`
+  means that e-mail already has an account: sign in as it, then call again with the bearer token.
+
+## 5b. Still not in the backend
+
+Do not wire these (render static or empty states, or leave out, as the owner decides): **Returns**, **Category Request**,
+and the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders, products), planned as the
+next sprint (`docs/data-model.md` Q74–Q83). Report what you need instead of assuming a shape.
 
 ## 6. Reading the Figma design
 
@@ -138,7 +165,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-165 operations in 26 groups.
+190 operations in 30 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -153,6 +180,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/api/v1/auth/refresh` | - | Rotate refresh token |
 | POST | `/api/v1/api/v1/auth/register` | - | Register as a customer |
 | POST | `/api/v1/api/v1/auth/seller/register` | - | Register as a seller ('Create your seller account') |
+| POST | `/api/v1/api/v1/auth/team/accept` | bearer | Accept an invitation (sign in first if the e-mail already has an account) |
 
 #### cart
 
@@ -355,6 +383,15 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/api/v1/seller/inventory/{variant_id}/adjust` | bearer | Adjust stock (logged as a manual movement) |
 | GET | `/api/v1/api/v1/seller/inventory/{variant_id}/movements` | bearer | Inventory movements for one variant |
 
+#### seller: notifications
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/api/v1/seller/notifications` | bearer | Notifications (tabs: orders, payments, inventory, customers, system, all) |
+| POST | `/api/v1/api/v1/seller/notifications/read-all` | bearer | 'Mark All as Read' (optionally just one tab) |
+| GET | `/api/v1/api/v1/seller/notifications/summary` | bearer | Unread badge and the counts on each tab |
+| POST | `/api/v1/api/v1/seller/notifications/{notification_id}/read` | bearer | Mark one as read |
+
 #### seller: orders
 
 | Method | Path | Auth | What it does |
@@ -395,6 +432,31 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/api/v1/seller/products/{product_id}/status` | bearer | Step 5 'Submit for review' / 'Change Status' / Archive |
 | PATCH | `/api/v1/api/v1/seller/products/{product_id}/variants/{variant_id}` | bearer | Step 3: SKU / price / stock per variant |
 
+#### seller: team
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/api/v1/seller/me` | bearer | Who is working here and what may they see (drives the sidebar) |
+| GET | `/api/v1/api/v1/seller/team` | bearer | Team Members table (owner first) |
+| POST | `/api/v1/api/v1/seller/team/invites` | bearer | '+ Invite Member' |
+| GET | `/api/v1/api/v1/seller/team/roles` | bearer | Role presets (for the invite form and the filter) |
+| GET | `/api/v1/api/v1/seller/team/summary` | bearer | The four KPI cards |
+| DELETE | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Remove a member or cancel an invitation |
+| GET | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Member Details (`owner` is a valid id) |
+| PATCH | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Edit Permissions popup / change role / suspend |
+| GET | `/api/v1/api/v1/seller/team/{member_id}/activity` | bearer | Everything this person did (newest first) |
+| POST | `/api/v1/api/v1/seller/team/{member_id}/resend` | bearer | Send a pending invitation again (new link, new expiry) |
+
+#### seller: transactions
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/api/v1/seller/transactions` | bearer | All Transactions (tabs, search, filters) |
+| GET | `/api/v1/api/v1/seller/transactions/export.csv` | bearer | 'Export Transactions' — CSV of the current filters |
+| GET | `/api/v1/api/v1/seller/transactions/overview` | bearer | Transactions Overview: cards, recent transactions, summary |
+| GET | `/api/v1/api/v1/seller/transactions/tabs` | bearer | Counts for the tab labels: Sales (1,102), Payouts (24)… |
+| GET | `/api/v1/api/v1/seller/transactions/{reference}` | bearer | Transaction Details |
+
 #### admin · orders
 
 | Method | Path | Auth | What it does |
@@ -420,6 +482,16 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | Method | Path | Auth | What it does |
 |---|---|---|---|
 | GET | `/api/v1/api/v1/admin/chat/flagged` | bearer | Messages that look like off-platform contact details |
+
+#### admin: ledger
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| POST | `/api/v1/api/v1/admin/ledger/adjustments` | bearer | Staff: credit or debit a store, with a reason |
+| GET | `/api/v1/api/v1/admin/ledger/stores/{store_id}` | bearer | Staff: a store's balances (what a payout can be) |
+| GET | `/api/v1/api/v1/admin/payouts` | bearer | Staff: payouts, newest first |
+| POST | `/api/v1/api/v1/admin/payouts` | bearer | Staff: pay a store out of its available balance |
+| PATCH | `/api/v1/api/v1/admin/payouts/{payout_id}/status` | bearer | Staff: mark a payout completed or failed |
 
 #### admin: products
 

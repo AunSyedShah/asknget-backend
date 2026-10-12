@@ -118,6 +118,11 @@ env = { DATABASE_URL = "sqlite:///db.sqlite3", ZEAL = "1" }
 help = "Rebuild the developer guide PDF"
 cmd = "uv run --with reportlab python ../docs/build_developer_guide.py"
 
+[tool.poe.tasks.endpoints]
+help = "Regenerate the endpoint index in docs/frontend-handoff.md from the OpenAPI schema"
+cmd = "python ../docs/gen_endpoint_index.py"
+env = { DATABASE_URL = "sqlite:///db.sqlite3" }
+
 [tool.poe.tasks.figma]
 help = "Check whether the Figma design changed since the last snapshot"
 cmd = "python ../docs/figma/snapshot.py --check"

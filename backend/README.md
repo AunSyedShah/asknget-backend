@@ -32,7 +32,7 @@ backend/
   If all three are cold, `uv run --with zstandard python docs/figma/snapshot.py --from-fig <file.fig>`
   reads a local export offline (Figma → File → Save local copy). It is additive: a .fig cannot expand
   component instances, so it fills in missing screens rather than overwriting richer API-derived ones.
-- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers), [`../docs/sprint-6-plan.md`](../docs/sprint-6-plan.md) (analytics + seller-defined shipping) · Live API docs: `/api/v1/docs`.
+- Data model: [`../docs/data-model.md`](../docs/data-model.md) · Sprint plans and decisions: [`../docs/sprint-2-plan.md`](../docs/sprint-2-plan.md), [`../docs/sprint-3-plan.md`](../docs/sprint-3-plan.md), [`../docs/sprint-4-plan.md`](../docs/sprint-4-plan.md) (markets), [`../docs/sprint-5-plan.md`](../docs/sprint-5-plan.md) (premium sellers), [`../docs/sprint-6-plan.md`](../docs/sprint-6-plan.md) (analytics + seller-defined shipping), [`../docs/sprint-7-plan.md`](../docs/sprint-7-plan.md) (admin-managed config, team, transactions, notifications) · Live API docs: `/api/v1/docs`.
 
 ## Setup
 
@@ -231,6 +231,61 @@ A store is **standard** or **premium** (`Store.is_premium`, staff toggle in Djan
   re-deliver its own anchor, because responses round datetimes to milliseconds. Unread counters are
   denormalised and written only by `chat.services.send()`. Messages that look like off-platform contact
   details are flagged for staff (`GET /admin/chat/flagged`), never blocked; 30 messages/minute per user.
+
+## Admin-managed configuration (`config` app)
+
+Principle (sprint 7): **anything a business person might change is data an admin edits in Django admin**, not a
+constant. Contract and reasoning: `docs/sprint-7-plan.md` §1.
+
+- **Settings** — a typed registry of scalar tunables (`config/definitions.py`: type, bounds, choices, allowed scopes,
+  default). An override is a `Setting` row at one scope — store, market, or global — and the most specific wins, then
+  the code default. `from config import services as config; config.get("payouts.hold_days", store=store)`; `get_many`
+  is one query. No cache, so an edit applies on the next request. Every save is validated against the definition.
+  Add a tunable by registering it, nothing else. `manage.py show_settings [--country PK | --store <slug>]` prints each
+  effective value and where it came from.
+- **Commission** — `CommissionRule`: store / category (nearest parent counts) / market / global, effective-dated so a
+  rate can be scheduled; each posted fee records the rate and rule it used, so changing a rate never rewrites history.
+- Also data: `TeamRole` presets, `NotificationTemplate` wording (per language), and the markets' policies from sprint 4.
+
+## Team and permissions (`team` app)
+
+A store has its **owner** (implicit: full access, cannot be removed) and **members**. Access is `none` / `view` /
+`manage` in each of eight sections (`dashboard, orders, products, inventory, customers, marketing, analytics,
+transactions`); reading needs `view`, anything that changes state needs `manage`.
+
+- `StoreAuth(section="orders")` guards a router; `StoreAuth(owner_only=True)` the team itself; plain `StoreAuth()` is any
+  member. `403 permission_denied` is the permission answer; `403 premium_required` stays the plan answer. The store
+  is the one you own, else one you are an active member of; **`X-Store: <id>`** chooses between several and never falls
+  back to a store you didn't ask for. The owner path is still one query.
+- **Roles are rows** (`TeamRole`): choosing one *copies* its levels, so editing a role never widens anyone already in it.
+- **Invitations** — `POST /seller/team/invites`, an e-mailed link (`PORTAL_URL`), token stored only as a hash, lifetime
+  and seat limit are admin settings. `POST /auth/team/accept` signs in an existing account or creates one.
+- `GET /seller/me` says who is working, in which store, and which sections to show in the sidebar.
+- **Recent Activity** — actions that matter (price changes, status moves, stock, order moves, exports, delivery options,
+  team changes) are written to `StoreActivity` with `team.services.log(...)`; autosave is deliberately not logged.
+
+## Transactions — the ledger (`ledger` app)
+
+Append-only, per store; every balance is computed from it. Full rules: `docs/data-model.md` §7e.
+
+- **Payment confirmed** (`orders.services.on_payment_confirmed`) posts per store a `sale` (items − its voucher share + its
+  delivery charge — the stores' sales add up to the buyer's total to the cent) and a `fee` (commission per line).
+- **Delivery** starts the hold; `payouts.hold_mode` (`return_window` / `fixed_days` / `none`, per market or store) decides
+  when it becomes *available*. **Cancel / return / refund** posts a `refund` and `fee_refund`, once per store.
+- Idempotent in the database (one posting of each kind per order and store; the sign of each type is a constraint).
+- **Staff move money, sellers only read it**: payouts and adjustments through `/admin/payouts`, `/admin/ledger` or Django
+  admin, via the same service functions. A payout can't exceed the available balance or fall below `payouts.minimum_cents`.
+- `manage.py backfill_ledger [--dry-run]` posts orders paid before the ledger existed, whole and dated when they happened.
+- The money events live in one place each in `orders.services` (`on_payment_confirmed`, `on_goods_delivered`,
+  `on_order_money_returned`, `on_order_cancelled`) — add new reactions there, not in the views.
+
+## Notifications (`notifications` app)
+
+The event and its `params` are stored; the **sentence is rendered when read**, in the reader's language, from a
+`NotificationTemplate` an admin can reword, translate or switch off (English required, others optional). A person sees a
+category only if they can view its section; read state is per person. Emitters (`notifications.services.order_paid`,
+`stock_alert`, `payout_processed`, …) are called from the money-event hooks above, in the same transaction as the event.
+Low stock fires once per *crossing*, not on every sale below the line.
 
 ## Search & recommendations (`discovery` app)
 

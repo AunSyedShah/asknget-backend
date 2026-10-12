@@ -241,3 +241,20 @@ why this is a sprint of its own and not an add-on to a seller-facing one.
 **Recommendation:** finish this sprint first. The admin portal is mostly read-side aggregation over data that exists,
 so it is low-risk once Q74–Q83 are answered, and it reuses what this sprint builds (the ledger for Payouts,
 `StoreActivity` for Activity, the settings layer for anything an admin tunes). Roughly the size of sprint 6.
+
+## 10. As built (2026-10-12) — where it differs from the plan above
+
+Steps 1–6 are done and tested (423 tests, SQLite and Postgres). Differences, so the plan is not mistaken for the record:
+
+| Plan said | Built | Why |
+|---|---|---|
+| A sale becomes available at *placed + the return window* | It stays **held until the store's goods are delivered**, then `payouts.hold_mode` decides (`return_window` / `fixed_days` / `none`); `none` is the only mode that releases at payment | Money must not be releasable before the goods arrive (Q84) |
+| A failed payout "reverses" its entry | A failed payout's entry is **excluded from every balance** | Same effect, no extra row to keep consistent |
+| Refund reverses the fee | Separate `fee_refund` entry type | The unique-per-posting rule would otherwise forbid a second `fee` entry |
+| `Country.commission_rate_bps` column | `CommissionRule` table: store / category / market / global, effective-dated | "Commission is dynamic" needs history and per-category / per-store deals |
+| "Plan page owner-only" | `GET /seller/plan` is readable by **any member** | The sidebar needs it to draw the locks |
+| Sales Analytics refunds "read from the ledger" | Refunds computed from the order lines (cancelled / returned, net of their voucher share); only **adjustments** come from the ledger | Gross had to change to include later-refunded lines, otherwise they'd be subtracted twice; it also keeps the figure correct for orders that predate the ledger (Q85) |
+| — | `manage.py show_settings`, `backfill_ledger`, `poe endpoints` | Operating tools the dynamic design needs |
+| — | Backfilled history is dated when it happened and keeps refunds | Found while seeding: a naive backfill put a year of history in the current month (Q88) |
+
+Not done, by design: the delivery-fee deduction (Q63); seller withdrawals; e-mail / push notifications; a store switcher UI; the Admin portal (§9).

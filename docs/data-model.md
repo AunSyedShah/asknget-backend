@@ -511,6 +511,75 @@ adjustments. Refunds and adjustments are **0 until the PSP exists** (Q50) and th
 `orders.services.store_discount_cents()` allocates an order's voucher across its stores pro-rata on subtotal
 share, largest-remainder rounded so the parts sum to the whole (Q49); analytics uses it now, payouts later.
 
+## 7e. Configuration, team, transactions, notifications (sprint 7 — Figma 2026-09-29, `docs/sprint-7-plan.md`)
+
+The owner's principle: **the application should be as dynamic as possible.** Anything a business person
+might change is data an admin edits in Django admin, not a constant.
+
+### `config_setting` (typed scalar tunables)
+`key`, `scope` (`global` \| `country` \| `store`), `country`, `store`, `value` JSON, `note`, `updated_by`. Resolved
+store → market → global → code default; **no cache**, an edit applies on the next request. The catalogue of keys
+lives in code (`config/definitions.py`: type, bounds, choices, allowed scopes, default) and every save is
+validated against it, in admin or anywhere else; the database constraints back that up.
+
+| Key | Default | Scopes | Used by |
+|---|---|---|---|
+| `payouts.hold_mode` | `return_window` (or `fixed_days`, `none`) | global, market, store | when a delivered sale becomes available |
+| `payouts.hold_days` | 7 | global, market, store | `fixed_days` mode |
+| `payouts.minimum_cents` | 0 | global, market | the smallest payout staff can create |
+| `analytics.low_performer_min_views` | 20 | global, market, store | Product Analytics |
+| `analytics.low_performer_limit` | 5 | global, market | length of that list |
+| `team.invite_expiry_days` | 7 | global, market | invite links |
+| `team.max_members` | 0 = unlimited | global, market, store | seat limit |
+| `notifications.recent_days` | 90 | global | how far back the bell reaches |
+
+### `config_commissionrule`
+`scope` (`global` \| `country` \| `category` \| `store`) + the matching FK, `rate_bps` (500 = 5 %), `effective_from`,
+`is_active`, `note`. Per order line the most specific rule already in effect wins: store → the line's category (the
+nearest parent with a rule counts) → market → global; ties go to the latest `effective_from`. A future date
+schedules a change. No rule at all means 0 and says so (`rule_id` null). One global 5 % rule is seeded as a
+starting point.
+
+### Team: `team_teamrole`, `team_storemember`, `team_storeactivity`
+- **Sections** (the design's eight): `dashboard, orders, products, inventory, customers, marketing, analytics,
+  transactions`; **levels** `none` < `view` < `manage`. Reading needs `view`, anything that changes state needs `manage`.
+- `TeamRole` (key, name, `permissions` {section: level}, `counts_as_manager`, `is_active`): presets as data. Choosing one
+  *copies* its levels onto the member, so editing a role never widens anyone already in it.
+- `StoreMember` (store, user — null until accepted, email, role, `permissions`, status `invited` \| `active` \|
+  `suspended`, `invite_token_hash` — sha256, the raw token exists only in the e-mail, `invite_expires_at`, `joined_at`,
+  `last_active_at`). Unique per (store, lower(email)).
+- The **owner is implicit** (`Store.owner`): all access, can't be edited or removed, the only one who manages the team.
+- `StoreActivity` (store, actor, `action`, `summary`, target): an append-only history in words ("Updated price for
+  BB Cream"). Autosave is deliberately not logged.
+- Mapping of existing areas to sections: chat inbox → `customers`, delivery options → `products`, header search →
+  whichever of products / orders / customers the person can view.
+
+### Ledger: `ledger_ledgerentry`, `ledger_payout`, `ledger_ledgercounter`
+Append-only; every balance is computed from it. `LedgerEntry`: store, `type`, signed `amount_cents`, currency,
+`status`, order, payout, `reference` (`TXN-YYYYMMDD-<n>`, gap-free from a locked counter), `available_at`, `meta`.
+
+| Type | Sign | Meaning |
+|---|---|---|
+| `sale` | + | items − the store's pro-rata voucher share + its own delivery charge. The stores' sales add up to the buyer's total to the cent |
+| `fee` | − | commission, per line from the rule in force, scaled by the voucher; the rate and rule used are recorded in `meta` |
+| `refund` / `fee_refund` | − / + | the sale back to the buyer / the commission back to the store, once per store per order |
+| `adjustment` | ± | staff, always with a note |
+| `payout` | − | money sent to the store (staff create and complete it) |
+
+Rules enforced by the database: one `sale`/`fee`/`refund`/`fee_refund` per (order, store); the sign of each type.
+`available_at` is empty until the store's goods are **delivered**, then set from the resolved `payouts.hold_mode`
+(`return_window`: delivery + the order's return window; `fixed_days`; `none`: available at payment). A refund of money
+not yet available shares the sale's date, so the two cancel out of the *held* amount instead of driving the balance
+negative. Balances: **available** = Σ entries whose `available_at` has passed (failed payouts excluded); **held** =
+Σ the rest; **pending payout** = Σ payouts still processing.
+
+### Notifications: `notifications_notificationtemplate`, `_storenotification`, `_notificationread`
+The event and its `params` are stored, **not the sentence**. `NotificationTemplate` (kind, category, `title` and `body` as
+per-language JSON with English required, `is_active`) is rendered when read, in the reader's language, so one event
+reads correctly to an English owner and an Urdu manager. An admin rewords, translates or switches a kind off. Read state
+is per person (`NotificationRead`). A person sees a category only if they can view its section (orders → Orders,
+payments → Transactions, inventory → Inventory, customers → Customers; `system` is for everyone).
+
 ---
 
 ## 8. Marketing & support
@@ -644,15 +713,18 @@ REST-style JSON; auth via access + refresh JWT.
 49. **Discount attribution per store** — "Sales Analytics" makes Discounts a headline KPI and a leg of the revenue waterfall, so a store's net sales must subtract *its share* of order-level vouchers. This is Q34 and it is now blocking: allocate pro-rata across stores, or treat vouchers as marketplace-funded and show sellers zero?
     **Resolved (sprint 6).** Pro-rata on subtotal share (`orders.services.store_discount_cents`), largest-remainder rounded so the per-store parts sum to the order's discount exactly. Who *funds* the voucher is a separate, still-open commercial question that only matters once payouts exist.
 50. **Refunds and "Adjustments"** — both appear in the waterfall (R6,840 and R11,274). We record `payment_status` but never an amount, and "adjustments" is undefined: chargebacks? manual credits? platform fees? Needs the PSP and a definition.
+    **Resolved (sprint 7).** Refunds are the cancelled and returned lines of paid orders (less the voucher share that came off them), computed from the orders; adjustments are staff-created ledger entries, signed (+ credits the seller). Neither needed the PSP. *Paying a refund out through a PSP* still does.
 51. **Sales by Channel** (Website 67.8% / Mobile App 27.5% / Others 4.7%) — we do not record how an order was placed. Cheap to add (`Order.channel`, set by the client at checkout) but the frontend must send it and someone must own the list.
     **Resolved (sprint 6).** `Order.channel` exists with `web` (default) / `mobile_app` / `other`. **Still needed from the team:** the clients must actually send it — until they do, every order reads *Website* and the chart is honest but flat.
 52. **Transactions page** — new sidebar entry, title and Export button only. Confirm it means *seller payouts and fees*, not buyer transactions; the payments sprint owns it.
+    **Resolved (sprint 7).** Transactions is the seller's ledger: sales, commission, refunds, adjustments and payouts. Payouts are created and completed by staff; there is no seller "Withdraw" until a PSP exists.
 53. **Per-product delivery options** — the wizard's Shipping popup lets a seller choose Express (R25), Seller Delivery (R20) and Customer Pickup (R15) **per product**. Today delivery methods are platform-level per market and the buyer picks one at checkout. Which wins? If the design does, `DeliveryMethod` becomes a per-store (or per-product) catalogue and checkout must reconcile options across a multi-store cart. Supersedes Q24.
     **Resolved (sprint 6).** The design wins, fully seller-defined (your call over the middle ground I proposed). Prices live on the *store's* option, and a product selects which of them it supports rather than pricing its own — see Q58.
 54. **Product image limit** — the Media popup says "PNG, JPG upto 1-MB"; we enforce 5 MB and also allow webp/gif. Tighten to match, or is 1 MB just placeholder copy?
     **Resolved (sprint 6).** Tightened: 1 MB, PNG/JPEG only. Reverting is a one-line settings change if 1 MB proves too tight for product photography.
 55. **Category request flow** — a new popup lets sellers request a category with a supporting document. New models and a staff queue (like the KYC one). In scope for which sprint?
 56. **Product Analytics page is unfinished** — only the KPI row is drawn (Total Products, Top Selling, Low Performing, Avg. Product Revenue). Confirm the rest before we build to it.
+    **Resolved (sprint 7).** The page was drawn in the 2026-09-29 design and is built; see Q72.
 57. **Product pricing fields the wizard asks for but we do not store** — the Pricing popup has **Cost Price** (R500, alongside Selling R850 and Compare-at R1,000) and **Barcode**. Cost price implies margin reporting (and belongs in Sales Analytics); barcode implies scanning or a feed. Confirm both, then `Product.cost_price_cents` and `Product.barcode` are a one-migration change.
     **Resolved (sprint 6).** Both added. `cost_price_cents` is seller-only and no margin report reads it yet; `barcode` is not unique and nothing scans it — both are stored so the wizard stops losing what sellers type.
 
@@ -680,44 +752,55 @@ REST-style JSON; auth via access + refresh JWT.
     double-entry ledger per store, a payout schedule and a withdraw action — none of which exists, and all of
     which depend on the PSP (Q9, Q50). Confirm this sprint builds the ledger shape only, with amounts from
     orders, and payouts stay manual until the PSP lands. Answers Q52: the page is seller payouts and fees.
+    **Resolved (sprint 7).** The ledger exists (`ledger` app). Payouts are staff-managed; a PSP will later automate completing them.
 63. **The seller pays delivery fees?** The Transaction Summary deducts "Delivery Fees −R8,640" from the
     seller's payout, and the Detail shows "Delivery Fee −R40". Under the sprint 6 decision the *seller*
     sets and receives delivery prices (Q53), so the buyer's shipping should arrive as income, not leave as a
     fee. Either the platform delivers and charges the seller (a logistics model we have not got), or this
     line is the buyer's shipping passed through. Which? This decides Q60.
+    **Resolved (sprint 7).** Left out by decision (2026-09-29): shipping stays the seller's income, nothing is deducted from them.
 64. **Transaction Detail arithmetic does not add up.** Order R1,240 − Delivery R40 − Tax/Adjustments R18 =
     R1,182, but Net Amount shows R1,120. The R62 gap is exactly 5% of the order, which looks like a missing
     **Platform Fee** line. Confirm the commission rate (per market? per category? per plan — cf. Q43) and
     that it belongs in the breakdown.
+    **Resolved (sprint 7).** Commission is a **rule the admin manages**, not a constant: store / category / market / global, effective-dated, with the rate used recorded on each fee. The 5 % is only the seeded starting rule. The detail page's breakdown reads Items, Discount, Delivery (the seller's own income), Platform fee, Net.
 65. **"Update Status" on a transaction.** The detail page gives the seller a button to change a financial
     transaction's status. A seller must not be able to mark their own payout or refund complete; we will
     treat this as staff-only (or a copy-paste from View Order) unless told otherwise. The same stray button
     sits on the Notifications page.
+    **Resolved (sprint 7).** Staff only. A seller can read their money, never move it.
 66. **Adjustments sign.** The Transaction Summary shows Adjustments as **+R2,240** (added to payout), while
     Sales Analytics' waterfall subtracts them. Adjustments can go both ways, so we will store a signed
     amount — confirm what creates one (manual staff credit/debit, chargeback, promo subsidy).
+    **Resolved (sprint 7).** Adjustments are signed (+ credits the seller), created by staff, and need a written reason.
 67. **Team / Managers — roles vs permissions.** Roles shown: Owner, Manager, Inventory Manager, Order Manager,
     Marketing Manager, Finance Manager, Support Agent. Member Details lists 8 modules with a level each
     (View / View + Manage), but the Edit Permissions popup has **6 on/off toggles** (no Marketing, no
     Transactions, no View-vs-Manage). Proposal: a role is a named preset of per-module levels
     (none / view / manage), the popup edits the level per module, Owner is fixed and cannot be removed.
     Confirm, and whether members can belong to several stores. Supersedes Q17/Q20's deferred sub-roles.
+    **Resolved (sprint 7).** One model: a level per section (`none` / `view` / `manage`) for all eight. Roles are `TeamRole` rows an admin edits; the popup's toggle means `manage` on or off.
 68. **Invites.** "+ Invite Member" and a Pending status exist but no invite popup or accept screen. We would
     e-mail a signed, expiring link; the invitee sets a password or signs in. Confirm expiry (7 days?) and
     whether a phone OTP is required as for sellers.
+    **Resolved (sprint 7).** An e-mailed link, valid `team.invite_expiry_days` (default 7, admin setting), usable once; accepting creates the account if the e-mail has none (and marks it verified). No phone OTP.
 69. **"Marketing" module** appears in permissions, but sellers have no marketing features (vouchers are
     platform-wide). Is seller-created vouchers/promotions coming, or is the row placeholder?
+    **Resolved (sprint 7).** `marketing` exists as a permission and guards nothing yet.
 70. **Recent Activity** on Member Details needs an audit log of seller-portal actions (price change, stock
     update, CSV export). Cheap to add as one append-only table if we log at the service layer; confirm
     retention and whether the owner sees *every* member's activity.
+    **Resolved (sprint 7).** Explicit entries written by the actions that matter (price changes, status moves, stock adjustments, order moves, exports, delivery options, team changes); autosave is not logged. Visible to the owner on the member's page.
 71. **Notifications** — tabs Orders / Payments / Inventory / Customers / System, with New Order, Low Stock,
     Payment Received, Payout Processed, New Customer, Order Cancelled. Confirm this is in-app only for now
     (e-mail/push waits on the worker, Q48), that it is per store rather than per member, and what "System"
     covers. Low-stock uses each variant's threshold, fired once per crossing, not on every sale.
+    **Resolved (sprint 7).** In-app only. Wording is editable per language (`NotificationTemplate`); read state is per person; low stock fires once per crossing.
 72. **Product Analytics** is now drawn (was Q56): Top Products, a Product Performance chart (Orders / Units
     Sold / Revenue / Views per day), Product Conversion and Low Performing Products. The tables have no
     header row, and Low Performing reuses Product Conversion's placeholder rows. We read "low performing"
     as lowest conversion among products with views, not only zero-sales products. Confirm the columns.
+    **Resolved (sprint 7).** Low performers are the lowest conversion among live products with at least `analytics.low_performer_min_views` views (default 20); both that threshold and the list length are admin settings, per market or store.
 73. **Returns** is still a sidebar entry with no screen (Q26, Q40).
 
 **Figma 2026-10-09 — the Admin portal (13 new screens; see `docs/sprint-7-plan.md` §8)**
@@ -751,3 +834,22 @@ REST-style JSON; auth via access + refresh JWT.
 83. **Seller rating and the "Trusted Seller" badge** (4.8 / 5, 126 reviews). We have product reviews, not seller
     reviews. Proposal: the rating is the mean of approved reviews across the store's products; the badge needs a
     rule from the team (for example 4.5+ with 50+ reviews).
+
+**Sprint 7 — decisions taken while building (please confirm)**
+
+84. **The payout hold starts at delivery, not at payment.** The plan said "placed + the return window", but money
+    cannot be released before the goods arrive, so a sale stays *held* until the store's goods are delivered and the
+    hold then starts (`payouts.hold_mode`). `none` is the only mode that releases at payment. Confirm.
+85. **Two refund figures, on purpose.** The ledger's refunds are cash: the whole sale including the delivery charge
+    that goes back. Sales Analytics' refunds are item value net of voucher, so it reconciles with Gross Sales. They
+    differ by the delivery charge.
+86. **Defaults taken, reversible:** team management is owner-only and seats are unlimited until `team.max_members` is
+    set; adjustments are staff-created; `marketing` guards nothing; notifications are in-app only; transaction
+    references are `TXN-YYYYMMDD-<n>` everywhere.
+87. **A premium plan could carry a lower commission (Q43)** — today that is a store-scoped `CommissionRule` set by
+    hand; tying it to the plan automatically is a small follow-up if wanted.
+88. **Backfilled history uses today's rules.** `backfill_ledger` posts old orders with the commission rates and hold
+    policy in force now, not those of the time, and its references carry today's date though the entries are dated to
+    the order. Only matters for data that existed before the ledger.
+89. **Seller portal address.** Invite e-mails link to `PORTAL_URL`, falling back to `STOREFRONT_URL`; until one is set the
+    link has no host. What is the portal's address?

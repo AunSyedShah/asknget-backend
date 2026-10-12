@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.8"
+VERSION = "0.9"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -225,6 +225,11 @@ story += [
         ["Seller-defined shipping (per-store delivery options, per-store cart groups)", "Implemented", "sellers.StoreDeliveryOption; /seller/delivery-options, PATCH /cart/delivery (sprint 6). Platform DeliveryMethod is deprecated"],
         ["Refunds and 'Adjustments' in Sales Analytics; Transactions page", "Planned", "Both need the payment provider - reported as 0 rather than guessed (Q50, Q52)"],
         ["Delivery zones, pickup addresses, splitting one shipping fee between sellers", "Planned", "See data-model.md section 10 Q59-Q61"],
+        ["Admin-managed configuration (commission rules, payout timing, thresholds, seat limits)", "Implemented", "config app, edited in Django admin; show_settings prints each effective value (sprint 7)"],
+        ["Team / Managers: members, per-section permissions, invitations, activity", "Implemented", "/seller/team, /seller/me, /auth/team/accept; X-Store header (sprint 7)"],
+        ["Transactions: seller ledger, balances, staff payouts and adjustments", "Implemented", "/seller/transactions, /admin/payouts, /admin/ledger; sellers read, staff move money (sprint 7)"],
+        ["Notifications (in-app bell, per person, editable wording per language)", "Implemented", "/seller/notifications (sprint 7)"],
+        ["Admin portal (13 screens), Returns, Category Request", "Planned", "Admin portal is the next sprint - data-model.md Q74-Q83"],
         ["Subscriptions / self-serve upgrade to premium", "Planned", "Premium is a staff-flipped flag until the payments sprint - see data-model.md section 10 Q42"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
@@ -656,7 +661,46 @@ story += [
         ["Staff: off-platform contact details", "GET /admin/chat/flagged", "Email/phone/link/'whatsapp' in a message is flagged for review, never blocked"],
     ]),
 
-    P("6.16 Support and marketing", "h2"),
+    P("6.16 Team, permissions and notifications", "h2"),
+    P("A store has its <b>owner</b> and <b>members</b>. Access is <font face='Courier'>none</font>, <font face='Courier'>view</font> or "
+      "<font face='Courier'>manage</font> in each of eight sections (dashboard, orders, products, inventory, customers, marketing, "
+      "analytics, transactions): reading needs view, anything that changes state needs manage. The owner always has full access and "
+      "is the only one who manages the team. Roles are <b>presets that admins edit</b> (choosing one copies its levels, so editing a "
+      "role never widens anyone already in it). A refused call is <font face='Courier'>403 permission_denied</font>; a plan limit "
+      "stays <font face='Courier'>403 premium_required</font>. Send <font face='Courier'>X-Store</font> to pick a store when a person "
+      "belongs to several."),
+    flow([
+        ["Sidebar: who am I here, what may I see", "GET /seller/me", "store, is_owner, role, permissions[8], sections[] (render exactly these), can_manage_team"],
+        ["Team Members table + cards", "GET /seller/team?status=&role=&q=&last_active=, GET /seller/team/summary", "Owner first; summary = total, active, pending_invites, managers. Owner only"],
+        ["'+ Invite Member'", "GET /seller/team/roles, POST /seller/team/invites {email, role?, permissions?}", "E-mails a link (valid team.invite_expiry_days); 409 member_limit past the seat limit, 409 if already on the team"],
+        ["Pending member", "POST /seller/team/{id}/resend, DELETE /seller/team/{id}", "Resend issues a new link and kills the old one"],
+        ["Member Details", "GET /seller/team/{id} (owner = 'owner'), GET .../{id}/activity", "8 permission rows, recent activity in words"],
+        ["Edit Permissions popup", "PATCH /seller/team/{id} {role?, permissions?, status?}", "Switching role resets levels to that role's; changed levels read 'Custom'; status active|suspended"],
+        ["Invitee opens the link", "POST /auth/team/accept {token, full_name?, password?}", "New e-mail: creates the account and returns tokens. Existing account: 409 account_exists - sign in, then call again"],
+        ["Bell badge / tabs", "GET /seller/notifications/summary", "unread + per-tab {total, unread} for the tabs this person may see, plus all"],
+        ["Notifications list", "GET /seller/notifications?tab=&page=", "title/body rendered in the request language; group today|yesterday|earlier; is_read is per person"],
+        ["Mark read", "POST /seller/notifications/{id}/read, POST .../read-all?tab=", "Reading one does not clear it for a team mate"],
+    ]),
+
+    P("6.17 Transactions", "h2"),
+    P("The ledger is a per-store, append-only record of money; balances are computed from it. When a payment is confirmed each "
+      "store in the order gets a <b>sale</b> (its items, less its pro-rata share of any voucher, plus its own delivery charge - the "
+      "stores' sales add up to the buyer's total to the cent) and a <b>fee</b> (the commission, from the rule in force, recorded with "
+      "the entry). The sale is <b>held</b> until the store's goods are delivered; then the payout hold - an admin setting per market "
+      "or store - decides when it becomes <b>available</b>. A cancelled, returned or refunded order posts a refund and returns the "
+      "commission, once per store. <b>Sellers only read</b>: staff create and complete payouts and adjustments."),
+    flow([
+        ["Overview cards, recent, summary", "GET /seller/transactions/overview?period=", "total_sales, total_fees (KPIs), pending_payout {value, held}, available_balance, recent[5], summary"],
+        ["All Transactions", "GET /seller/transactions?tab=&q=&status=&date_from=&date_to=&amount_min=&amount_max=", "Rows: reference, type, signed amount, status (completed|pending|processing|refunded|failed), order, customer"],
+        ["Tab labels 'Sales (1,102)'", "GET /seller/transactions/tabs", "sale, payout, fee, refund, adjustment, all"],
+        ["Transaction Details", "GET /seller/transactions/{reference}", "order, payment, breakdown (items, discount, delivery, platform fee, net), the hold that applied"],
+        ["'Export Transactions'", "GET /seller/transactions/export.csv (same filters)", "CSV"],
+        ["Staff: balances", "GET /admin/ledger/stores/{store_id}", "available, held, pending payout"],
+        ["Staff: adjustment", "POST /admin/ledger/adjustments {store_id, amount_cents (signed), note}", "A reason is required"],
+        ["Staff: payouts", "POST /admin/payouts, GET /admin/payouts, PATCH /admin/payouts/{id}/status {completed|failed}", "Cannot exceed the available balance or fall below payouts.minimum_cents; a failed payout frees the money"],
+    ]),
+
+    P("6.18 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -745,6 +789,12 @@ story += [
         ["POST /admin/stores/{id}/plan", "staff", "PlanSetIn", "200 PlanOut", "404"],
         ["GET /seller/analytics/overview|sales|funnel|products|search|customers|fulfilment", "store", "?period= (+bucket/sort/limit)", "200 Analytics*Out", "403 premium_required"],
         ["GET /seller/analytics/export.csv", "store", "?report=&period=", "200 text/csv", "403"],
+        ["GET /seller/me", "any member", "-", "200 MeOut", "403"],
+        ["GET|POST|PATCH|DELETE /seller/team...", "owner", "InviteIn, MemberPatchIn", "200 MemberRowOut | MemberDetailOut", "403, 404, 409 (member_limit), 422"],
+        ["POST /auth/team/accept", "optional", "AcceptIn", "200 AcceptOut", "403, 404, 409 (account_exists), 410, 422"],
+        ["GET|POST /seller/notifications...", "any member", "-", "200 NotificationOut | SummaryOut", "404"],
+        ["GET /seller/transactions...", "transactions", "?tab=&q=&status=&date_from=&date_to=", "200 EntryOut | OverviewOut | DetailOut", "403, 404"],
+        ["POST|GET|PATCH /admin/payouts, /admin/ledger/...", "staff", "PayoutIn, AdjustmentIn", "200 | 201 PayoutOut | EntryOut", "404, 409, 422"],
         ["GET|POST /me/conversations", "member", "ConversationOpenIn", "200 page[CustomerConversationOut] / 201 CustomerThreadOut", "404, 422, 429"],
         ["GET /me/conversations/{id}[/messages]", "member", "?after=&limit=", "200 CustomerThreadOut / [MessageOut]", "404, 422"],
         ["POST /me/conversations/{id}/messages|read", "member", "MessageIn", "201 MessageOut / 200", "404, 422, 429"],
@@ -918,9 +968,9 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
     table([
         ["Order", "Scope", "Depends on"],
         ["1", "Payment provider: client-side tokenisation, POST /checkout/{id}/pay, webhooks -> payment_status/paid, saved cards, refunds on cancel", "Provider decision (see data-model.md section 10)"],
-        ["2", "Seller portal remainder: Returns flow, Notifications, Team/Managers (sub-roles), Transactions, category requests, invoice PDF, social login", "Design for those screens + answers to Q20-Q34, Q52, Q55"],
+        ["2", "Seller portal remainder: Returns flow, category requests, invoice PDF, social login", "Design for those screens + answers to Q20-Q34, Q52, Q55"],
         ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
-        ["4", "Vendor sub-roles/permissions, self-serve premium subscriptions, delivery zones", "Product decisions + design"],
+        ["4", "Self-serve premium subscriptions, delivery zones. Next sprint: the Admin portal (13 screens added 2026-10-09)", "Product decisions + design"],
         ["5", "Email/SMS providers; more worker jobs (category counts, rating refresh, cart expiry)", "Worker service exists; add commands"],
         ["6", "LLM query understanding ('gift under $50 for dry skin' -> filters) and a streaming shopping assistant", "Claude API key; ASGI (uvicorn) for streaming - only those endpoints go async"],
     ], (14 * mm, 112 * mm, 46 * mm)),
