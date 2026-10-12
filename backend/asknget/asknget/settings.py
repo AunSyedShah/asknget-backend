@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -33,7 +34,15 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-only-change-me')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h]
+# Vercel sets VERCEL=1 for builds and functions, plus the hostnames of this very deployment
+# (production alias, branch alias, unique URL). Allowing exactly those, rather than a
+# *.vercel.app wildcard, keeps other people's Vercel projects out.
+ON_VERCEL = bool(os.environ.get('VERCEL'))
+VERCEL_HOSTS = [
+    h for h in (os.environ.get(n, '') for n in ('VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL')) if h
+] if ON_VERCEL else []
+
+ALLOWED_HOSTS = [h for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h] + VERCEL_HOSTS
 
 # Fernet key for core.fields.EncryptedTextField (ID numbers, bank accounts).
 # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -121,6 +130,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     *(['zeal.middleware.zeal_middleware'] if ZEAL_ENABLED else []),
+    'core.middleware.CollapseLeadingSlashesMiddleware',  # //api/... -> /api/... before CORS/region look at the path
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # must come before anything that can return a response
     'whitenoise.middleware.WhiteNoiseMiddleware',  # serves /static (admin, Swagger UI) from the app image
@@ -158,17 +168,32 @@ WSGI_APPLICATION = 'asknget.wsgi.application'
 
 # Postgres in every real environment (DATABASE_URL=postgres://user:pass@host:5432/asknget);
 # falls back to SQLite so a fresh checkout runs without any setup.
+#
+# Vercel never gets that fallback: its filesystem is read-only apart from an ephemeral
+# /tmp, so a SQLite file there silently loses every write on the next cold start.
+if ON_VERCEL and not os.environ.get('DATABASE_URL'):
+    raise ImproperlyConfigured(
+        "DATABASE_URL is required on Vercel (a hosted Postgres, e.g. Neon or Supabase). SQLite is not "
+        "supported there: the filesystem is read-only and /tmp is wiped between invocations."
+    )
+
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
+        # Serverless: every invocation may be a new process, so a held-open connection is a leak.
+        conn_max_age=0 if ON_VERCEL else 600,
     )
 }
-if DATABASES['default'].get('ENGINE', '').endswith('postgresql') and os.environ.get('DB_POOL', '1') == '1':
-    # psycopg connection pool per process (needs psycopg[pool]); pooling and
-    # persistent connections are mutually exclusive in Django.
-    DATABASES['default']['CONN_MAX_AGE'] = 0
-    DATABASES['default'].setdefault('OPTIONS', {})['pool'] = True
+if DATABASES['default'].get('ENGINE', '').endswith('postgresql'):
+    if ON_VERCEL:
+        # Providers' poolers (PgBouncer in transaction mode) cannot keep server-side cursors.
+        DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    if os.environ.get('DB_POOL', '0' if ON_VERCEL else '1') == '1':
+        # psycopg connection pool per process (needs psycopg[pool]); pooling and
+        # persistent connections are mutually exclusive in Django. Off on Vercel, where
+        # each function instance would hold its own pool against the database's limit.
+        DATABASES['default']['CONN_MAX_AGE'] = 0
+        DATABASES['default'].setdefault('OPTIONS', {})['pool'] = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -231,9 +256,9 @@ MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 # container until uploads move to object storage / a reverse proxy.
 SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
 
-# Behind a reverse proxy (Docker/nginx) trust its scheme header and origins.
-CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o]
-if os.environ.get('BEHIND_PROXY') == '1':
+# Behind a reverse proxy (Docker/nginx, Vercel) trust its scheme header and origins.
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o] + [f'https://{h}' for h in VERCEL_HOSTS]
+if os.environ.get('BEHIND_PROXY') == '1' or ON_VERCEL:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     USE_X_FORWARDED_HOST = True
 

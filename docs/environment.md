@@ -204,3 +204,45 @@ non-production database, and never move a database between machines that used di
   storage.
 - Secrets in a real deployment belong in the orchestrator's secret store (Docker/Swarm secrets, k8s
   Secrets, SSM…), with `env_file` kept only for local work.
+
+---
+
+## 6. Deploying the API on Vercel
+
+`main` deploys as it is: there is no separate Vercel branch to maintain. Vercel's Python runtime is 3.12,
+so the project supports `>=3.12` (Docker still builds on 3.13), and `uv.lock` is kept.
+
+**Set these in the Vercel project (Settings → Environment Variables), for Production and Preview:**
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | A hosted Postgres (Neon, Supabase…). **Required**: the app refuses to start on Vercel without it, because SQLite cannot work there (read-only filesystem, `/tmp` wiped between invocations). Prefer the provider's *pooled* connection string. |
+| `SECRET_KEY` | A fresh random value. Also signs the login tokens: left unset, the public development default is used. |
+| `DEBUG` | `0`. The default is `1`. |
+| `FIELD_ENCRYPTION_KEY` | A key generated for this deployment, not the shared development one (`manage.py check` warns, `core.W003`, if it sees that). Back it up: it cannot be recovered. |
+| `CORS_ALLOWED_ORIGINS` | The frontend, exactly: `https://asknget-frontend-one.vercel.app`. Comma-separated for more than one. |
+| `CORS_ALLOWED_ORIGIN_REGEXES` | Optional, for the frontend's preview deployments, e.g. `^https://asknget-frontend-[a-z0-9-]+\.vercel\.app$`. Keep it specific to your project: `^https://.*\.vercel\.app$` would let anyone's Vercel site call the API. |
+
+**Automatic when Vercel is detected (`VERCEL=1`):** this deployment's own hostnames
+(`VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`) are added to `ALLOWED_HOSTS` and
+`CSRF_TRUSTED_ORIGINS` as exact hosts (no `*.vercel.app`); the `X-Forwarded-Proto` header is trusted;
+connections are not held open and the psycopg pool is off, so a function instance does not exhaust the
+database's connection limit; server-side cursors are disabled for transaction poolers.
+
+**Schema and data are not created by Vercel.** Run them once from your machine against the hosted
+database, and again after any release that adds migrations:
+
+```bash
+cd backend/asknget
+DATABASE_URL=<hosted url> uv run python manage.py migrate
+DATABASE_URL=<hosted url> uv run python manage.py seed_lookups
+```
+
+**Known limits:**
+- **Uploads don't persist.** Product images and seller KYC documents are written to the local filesystem,
+  which is read-only on Vercel. They need object storage (S3, Vercel Blob, R2) before sellers can upload.
+- **Static files** (the admin, the Swagger UI) are not collected by Vercel; whether the API docs render there
+  is untested.
+- A leading double slash (`https://api//api/v1/...`, from a frontend base URL ending in `/`) is served as
+  `/api/v1/...`. `APPEND_SLASH` does nothing for it: `//api/...` is a 404 with the setting on or off.
+
