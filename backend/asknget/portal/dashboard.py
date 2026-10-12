@@ -97,12 +97,17 @@ def summary(store, user, period_name: str) -> dict:
     }
 
 
-def search(store, q: str, limit: int = 5) -> dict:
+def search(store, q: str, limit: int = 5, allowed=("products", "orders", "customers")) -> dict:
+    """`allowed`: the sections the caller may view. The header search spans three of them, so a team
+    member limited to Orders must not find products or customers through it."""
     q = q.strip()
-    prods = Product.objects.filter(store=store).filter(Q(name__icontains=q) | Q(variants__sku__icontains=q)).distinct().order_by("-updated_at")[:limit]
-    ords = store_orders(store).filter(Q(order_number__icontains=q) | Q(contact_email__icontains=q) | Q(contact_first_name__icontains=q) | Q(contact_last_name__icontains=q)).order_by("-placed_at")[:limit]
-    return {
-        "products": [{"id": str(p.id), "label": p.name, "sub": p.status} for p in prods],
-        "orders": [{"id": str(o.id), "label": o.order_number, "sub": f"{o.contact_first_name} {o.contact_last_name} · {o.store_status}"} for o in ords],
-        "customers": [{"id": c["key"], "label": c["name"], "sub": c["email"]} for c in customers_svc.list_customers(store, q=q)[:limit]],
-    }
+    out = {"products": [], "orders": [], "customers": []}
+    if "products" in allowed:
+        prods = Product.objects.filter(store=store).filter(Q(name__icontains=q) | Q(variants__sku__icontains=q)).distinct().order_by("-updated_at")[:limit]
+        out["products"] = [{"id": str(p.id), "label": p.name, "sub": p.status} for p in prods]
+    if "orders" in allowed:
+        ords = store_orders(store).filter(Q(order_number__icontains=q) | Q(contact_email__icontains=q) | Q(contact_first_name__icontains=q) | Q(contact_last_name__icontains=q)).order_by("-placed_at")[:limit]
+        out["orders"] = [{"id": str(o.id), "label": o.order_number, "sub": f"{o.contact_first_name} {o.contact_last_name} · {o.store_status}"} for o in ords]
+    if "customers" in allowed:
+        out["customers"] = [{"id": c["key"], "label": c["name"], "sub": c["email"]} for c in customers_svc.list_customers(store, q=q)[:limit]]
+    return out

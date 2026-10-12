@@ -41,7 +41,7 @@ from .schemas import (
 )
 
 customer_chat_router = Router(tags=["me: chat"], auth=JWTAuth())
-seller_chat_router = Router(tags=["seller: chat"], auth=StoreAuth())
+seller_chat_router = Router(tags=["seller: chat"], auth=StoreAuth(section="customers"))
 admin_chat_router = Router(tags=["admin: chat"], auth=StaffAuth())
 
 Role = Message.SenderRole

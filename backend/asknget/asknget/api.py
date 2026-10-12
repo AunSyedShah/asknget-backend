@@ -29,6 +29,7 @@ from portal.api import (
 )
 from orders.api import admin_orders_router, cart_router, checkout_router, my_orders_router, orders_public_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
+from team.api import accept_router, me_router as seller_me_router, team_router
 
 api = NinjaAPI(
     title="asknget API",
@@ -91,4 +92,7 @@ api.add_router("/admin/stores", admin_stores_router)
 api.add_router("/seller/chat", seller_chat_router)
 api.add_router("/admin/chat", admin_chat_router)
 api.add_router("/seller/search", search_router)
+api.add_router("/seller/team", team_router)
+api.add_router("/seller/me", seller_me_router)
+api.add_router("/auth/team", accept_router)
 api.add_router("/admin/products", admin_products_router)

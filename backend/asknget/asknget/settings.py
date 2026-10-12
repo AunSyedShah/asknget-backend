@@ -68,6 +68,7 @@ SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
 PRODUCT_IMAGE_MAX_BYTES = 1 * 1024 * 1024  # seller wizard Media popup: 'PNG, JPG upto 1-MB'
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
+PORTAL_URL = os.environ.get('PORTAL_URL', '').rstrip('/')  # seller portal, for team-invitation links (falls back to STOREFRONT_URL)
 
 # Markets. Countries (currency, timezone, languages, KYC + return policy) live in the
 # `markets.Country` table and are edited in Django admin; this is only the fallback
@@ -116,6 +117,7 @@ INSTALLED_APPS = [
     'markets',
     'chat',
     'config',
+    'team',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

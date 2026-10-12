@@ -26,6 +26,8 @@ from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
 from core.schemas import ErrorOut, MessageOut
 
 from . import analytics, customers, dashboard, entitlements, inventory, orders, products
+from team import services as team
+
 from .auth import StoreAuth
 from .schemas import (
     AdminProductRowOut,
@@ -86,16 +88,16 @@ from .schemas import (
     VariantPatchIn,
 )
 
-products_router = Router(tags=["seller: products"], auth=StoreAuth())
+products_router = Router(tags=["seller: products"], auth=StoreAuth(section="products"))
 admin_products_router = Router(tags=["admin: products"], auth=StaffAuth())
-inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth())
-orders_router = Router(tags=["seller: orders"], auth=StoreAuth())
-customers_router = Router(tags=["seller: customers"], auth=StoreAuth())
-dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
+inventory_router = Router(tags=["seller: inventory"], auth=StoreAuth(section="inventory"))
+orders_router = Router(tags=["seller: orders"], auth=StoreAuth(section="orders"))
+customers_router = Router(tags=["seller: customers"], auth=StoreAuth(section="customers"))
+dashboard_router = Router(tags=["seller: dashboard"], auth=StoreAuth(section="dashboard"))
 search_router = Router(tags=["seller: dashboard"], auth=StoreAuth())
 plan_router = Router(tags=["seller: plan"], auth=StoreAuth())
-delivery_router = Router(tags=["seller: delivery"], auth=StoreAuth())
-analytics_router = Router(tags=["seller: analytics"], auth=StoreAuth())
+delivery_router = Router(tags=["seller: delivery"], auth=StoreAuth(section="products"))
+analytics_router = Router(tags=["seller: analytics"], auth=StoreAuth(section="analytics"))
 admin_stores_router = Router(tags=["admin: stores"], auth=StaffAuth())
 
 _NOT_FOUND = {404: ErrorOut}
@@ -136,7 +138,11 @@ def product_detail(request, product_id: UUID):
 @products_router.patch("/{product_id}", response=_EDIT, summary="Autosave any wizard step (basic info, pricing, shipping…)")
 def product_patch(request, product_id: UUID, payload: ProductPatchIn):
     product = products.get_product(request.store, product_id)
-    products.patch(product, payload.model_dump(exclude_unset=True))
+    changes = payload.model_dump(exclude_unset=True)
+    products.patch(product, changes)
+    # Autosave fires on every wizard step; only a price change is worth a line in the history.
+    if "price_cents" in changes or "compare_at_price_cents" in changes:
+        team.log(request.store, request.auth, "update_price", f"Updated price for {product.name}", product)
     return _out(request.store, product_id)
 
 
@@ -180,7 +186,9 @@ def content_put(request, product_id: UUID, payload: ContentIn):
 
 @products_router.post("/{product_id}/status", response=_EDIT, summary="Step 5 'Submit for review' / 'Change Status' / Archive")
 def status_change(request, product_id: UUID, payload: StatusChangeIn):
-    products.change_status(products.get_product(request.store, product_id), payload.action)
+    product = products.get_product(request.store, product_id)
+    products.change_status(product, payload.action)
+    team.log(request.store, request.auth, f"product_{payload.action}", f"{payload.action.replace('_', ' ').capitalize()}: {product.name}", product)
     return _out(request.store, product_id)
 
 
@@ -248,13 +256,16 @@ def inventory_kpis(request):
 
 @inventory_router.get("/export.csv", summary="'Export' — CSV, one line per variant")
 def inventory_export(request):
+    team.log(request.store, request.auth, "export_inventory", "Exported inventory CSV")
     return inventory.export(request.store)
 
 
 @inventory_router.post("/{variant_id}/adjust", response={200: InventoryVariantOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Adjust stock (logged as a manual movement)")
 def inventory_adjust(request, variant_id: UUID, payload: StockAdjustIn):
     inventory.adjust(request.store, variant_id, set_to=payload.set, delta=payload.delta, note=payload.note, actor=request.auth)
-    return inventory.variant_row(inventory.get_variant(request.store, variant_id))
+    variant = inventory.get_variant(request.store, variant_id)
+    team.log(request.store, request.auth, "update_inventory", f"Updated inventory for {variant.product.name}", variant.product)
+    return inventory.variant_row(variant)
 
 
 @inventory_router.get("/{variant_id}/movements", response={200: list[StockMovementOut], 404: ErrorOut}, summary="Inventory movements for one variant")
@@ -287,6 +298,7 @@ def orders_tabs(request):
 
 @orders_router.get("/export.csv", summary="'Export' — CSV of this store's orders")
 def orders_export(request):
+    team.log(request.store, request.auth, "export_orders", "Exported orders CSV")
     return orders.export(request.store)
 
 
@@ -298,12 +310,14 @@ def order_detail(request, order_id: UUID):
 @orders_router.post("/{order_id}/status", response=_ORDER, summary="'Update Status' (processing → packed → shipped → delivered; returned after delivery)")
 def order_status(request, order_id: UUID, payload: OrderStatusIn):
     order = orders.update_status(request.store, order_id, status=payload.status, note=payload.note, actor=request.auth)
+    team.log(request.store, request.auth, "update_order", f"Moved order {order.order_number} to {payload.status}", order)
     return orders.detail(order, request.store)
 
 
 @orders_router.post("/{order_id}/cancel", response=_ORDER, summary="'Cancel Order' (this store's lines; stock restored)")
 def order_cancel(request, order_id: UUID, payload: OrderCancelIn):
     order = orders.cancel(request.store, order_id, reason=payload.reason, actor=request.auth)
+    team.log(request.store, request.auth, "cancel_order", f"Cancelled order {order.order_number}", order)
     return orders.detail(order, request.store)
 
 
@@ -335,6 +349,7 @@ def customers_tabs(request):
 
 @customers_router.get("/export.csv", summary="'Export Customers' — CSV")
 def customers_export(request):
+    team.log(request.store, request.auth, "export_customers", "Exported customers CSV")
     return customers.export(request.store)
 
 
@@ -378,18 +393,23 @@ def delivery_list(request):
 
 @delivery_router.post("", response={201: DeliveryOptionOut, 409: ErrorOut, 422: ErrorOut}, summary="Add a delivery option")
 def delivery_create(request, payload: DeliveryOptionIn):
-    return 201, products.option_out(products.create_delivery_option(request.store, payload.dict()))
+    option = products.create_delivery_option(request.store, payload.dict())
+    team.log(request.store, request.auth, "add_delivery_option", f"Added delivery option {option.name}", option)
+    return 201, products.option_out(option)
 
 
 @delivery_router.patch("/{option_id}", response={200: DeliveryOptionOut, 404: ErrorOut, 422: ErrorOut})
 def delivery_patch(request, option_id: UUID, payload: DeliveryOptionPatchIn):
-    return products.option_out(products.patch_delivery_option(request.store, option_id, payload.dict(exclude_unset=True)))
+    option = products.patch_delivery_option(request.store, option_id, payload.dict(exclude_unset=True))
+    team.log(request.store, request.auth, "update_delivery_option", f"Changed delivery option {option.name}", option)
+    return products.option_out(option)
 
 
 @delivery_router.delete("/{option_id}", response={204: None, 404: ErrorOut, 409: ErrorOut},
                         summary="Remove one (deactivated instead when orders or products reference it)")
 def delivery_delete(request, option_id: UUID):
     products.delete_delivery_option(request.store, option_id)
+    team.log(request.store, request.auth, "remove_delivery_option", "Removed a delivery option")
     return 204, None
 
 
@@ -456,7 +476,9 @@ def analytics_fulfilment(request, period: PeriodLit = "month"):
 
 @analytics_router.get("/export.csv", response={200: None, 403: ErrorOut}, summary="Any report as CSV")
 def analytics_export(request, report: ReportLit = "overview", period: PeriodLit = "month"):
-    return analytics.export(_gate(request), report, period)
+    store = _gate(request)
+    team.log(request.store, request.auth, "export_analytics", f"Exported {report} analytics CSV")
+    return analytics.export(store, report, period)
 
 
 @admin_stores_router.post("/{store_id}/plan", response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
@@ -472,4 +494,5 @@ def admin_set_plan(request, store_id: UUID, payload: PlanSetIn):
 
 @search_router.get("", response=PortalSearchOut, summary="Header 'Search anything...' across own products, orders and customers")
 def portal_search(request, q: str = Query(..., min_length=1, max_length=80), limit: int = Query(5, ge=1, le=10)):
-    return dashboard.search(request.store, q, limit)
+    allowed = [s for s in ("products", "orders", "customers") if request.access.allows(s, "view")]
+    return dashboard.search(request.store, q, limit, allowed)
