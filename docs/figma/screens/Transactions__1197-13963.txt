@@ -1,0 +1,157 @@
+[Transactions]
+  [Top Header]
+    [Bread Crums]
+      T: Transactions
+      T: Dashboard  / Transactions
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Transactions
+      T: Manage at marketplace transactions, payments and refunds.
+    [KPI - 1]
+          T: Rs. 40,480.00
+              T: R 12, 842
+              T: Total Transactions
+    [KPI - 5]
+          T: 93.5%
+              T: 12,382
+              T: Successful
+    [KPI - 7]
+          T: 2.9%
+              T: 328
+              T: Pending
+    [KPI - 8]
+          T: 1.9%
+              T: 233
+              T: Failed
+    [Tabs]
+        T: Successful (12,382)
+        T: Pending (328)
+        T: Failed (233)
+        T: Inactive (6)
+          T: All Transactions (12,842)
+    [I:Button | State=Default]
+      T: Export Transactions
+    [Customers]
+        [Filters]
+            [Search Bar]
+                T: Search by name, customer ID, email or phone...
+              [Brand]
+                  T: Customer Type
+              [Brand]
+                  T: Business Type
+              [Brand]
+                  T: Category
+              [Brand]
+                  T: Status
+              [Brand]
+                  T: Filters
+            T: All Transactions
+              [Row 1]
+                  T: CUS-2026-008421
+                  T: +27 71 456 8921
+                  T: olivia.martin@gmail.com
+                  T: 24
+                  T: Sep 14, 2026
+                  T: R 48,620
+                  T: Approved
+                    T: Olivia Martin
+              [Row 2]
+                  T: CUS-2026-008422
+                  T: +27 71 456 8921
+                  T: james.wilson@gmail.com
+                  T: 18
+                  T: Sep 14, 2026
+                  T: R 36,840
+                  T: Approved
+                    T: James Wilson
+              [Row 3]
+                  T: CUS-2026-008423
+                  T: +27 71 456 8921
+                  T: emma.roberts@gmail.com
+                  T: 12
+                  T: Sep 14, 2026
+                  T: R 18,420
+                  T: Approved
+                    T: Emma Roberts
+              [Row 4]
+                  T: CUS-2026-008424
+                  T: +27 71 456 8921
+                  T: daniel.smith@gmail.com
+                  T: 9
+                  T: Sep 14, 2026
+                  T: R 14,280
+                  T: Approved
+                    T: Daniel Smith
+              [Row 5]
+                  T: CUS-2026-008425
+                  T: +27 71 456 8921
+                  T: sophia.lee@gmail.com
+                  T: 31
+                  T: Sep 14, 2026
+                  T: R 62,480
+                  T: Approved
+                    T: Sophia Lee
+              [Row 6]
+                  T: CUS-2026-008426
+                  T: +27 71 456 8921
+                  T: noah.williams@gmail.com
+                  T: 6
+                  T: Sep 14, 2026
+                  T: R  8,640
+                  T: Approved
+                    T: Noah Williams
+    [Pagination]
+      T: Showing 6 of 28,460 customers
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Tra Active]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

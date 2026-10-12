@@ -1,0 +1,46 @@
+[View Details]
+  T: Order #ORD-00123
+            T: NARS BB Cream
+            T: shade: Natural
+            T: $25.99
+            T: $40.99
+            T: QTY: 1
+            T: Size: 30ml
+            T: Shade: Natural
+        T: Payment Information
+        T: View Order
+              T: Payment Method
+              T: Card
+              T: Visa •••• 4242
+              T: Payment Status
+              T: Paid
+          T: Subtotal
+          T: R 25.99
+          T: Shipping
+          T: Free
+          T: Discount
+          T: - R12
+          T: Total
+          T: R 25.99
+      T: Payment Breakdown
+      T: View Order
+      T: Delivery Timeline
+              T: Your order has been received and confirmed.
+                T: Order Placed
+                T: Sep 12, 2025  | 12:30 PM
+              T: Payment is confirmed and order is being prepared.
+                T: Confirmed
+                T: Sep 12, 2025  | 12:30 PM
+              T: Package has been handed over to TCS for shipment.
+                T: Shipped
+                T: Sep 12, 2025  | 12:30 PM
+              T: Package is out for delivery and will arrive today.
+                T: Out for delivery
+                T: Sep 12, 2025  | 12:30 PM
+              T: Delivered
+              T: Estimated: Oct 12, 2026.
+              T: 5
+      T: View Order
+        T: Shipping Address
+              T: 123, Maple Street, Apt 42, Sanfrancisco, USA, 94200 / United States
+              T: Sarah Johnson

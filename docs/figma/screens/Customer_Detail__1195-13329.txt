@@ -1,0 +1,141 @@
+[Customer Detail]
+  [Top Header]
+    [Bread Crums]
+      T: Customers
+      T: Dashboard  / Customers / Olivia Martin
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Olivia Martin
+      T: Customer ID: CUS-2026-008421
+      T: Customer since 12 Jan 2026
+      [Status]
+        T: Active
+    [I:Button | State=Default]
+      T: Suspend Customer
+    [KPI - 1]
+          T: 12 new this month
+            T: Active 172
+            T: 14 Low Stock
+              T: 24
+              T: Total Orders
+    [KPI - 5]
+          T: 15% vs last month
+            T: 1,238 Delivered
+            T: 46 Pending
+              T: R 48,620
+              T: Total Spent
+    [KPI - 7]
+          T: 12.5% vs last month
+            T: Last30 days
+            T: 14 Low Stock
+              T: R 2,026
+              T: Avg. Order Value
+    [KPI - 8]
+          T: Trusted Seller
+            T: 126 reviews
+            T: 14 Low Stock
+              T: 12 Jan 2026
+              T: Customer Since
+    [KPI - 9]
+          T: Documents approved
+            T: Active 172
+            T: 14 Low Stock
+              T: Active
+              T: Account Status
+    [Tabs]
+        T: Orders
+        T: Reviews
+        T: Activity
+        T: Addresses
+        T: Payouts
+        T: Activity
+          T: Overview
+    [Recent Orders]
+                T: #ORD-28502
+                T: R 1,240
+                T: 30 Sep 2026
+                T: Processing
+                T: #ORD-28476
+                T: R 2,840
+                T: 28 Sep 2026
+                T: Delivered
+                T: #ORD-28421
+                T: R 860
+                T: 25 Sep 2026
+                T: Delivered
+                T: #ORD-28318
+                T: R 2,160
+                T: 18 Sep 2026
+                T: Cancelled
+        T: Recent Orders
+    [Recent Activity]
+          T: Placed order #ORD-28502
+          T: 30 Sep 2026 · 11:42 AM
+        [Icon]
+          T: Submitted product review
+          T: 30 Sep 2026 · 10:18 AM
+        [Icon]
+          T: Updated delivery address
+          T: 29 Sep 2026 · 04:28 PM
+        [Icon]
+      T: Recent Activity
+    [Contact Information]
+                T: Full Name
+              T: Olivia Martin
+                T: Email
+              T: olivia.martin@email.com
+                T: Phone
+              T: +92 300 4567890
+                T: Customer ID
+              T: CUS-2026-008421
+        T: Contact Information
+    [Account Information]
+                T: Customer ID
+              T: CUS-2026-008421
+                T: Account Status
+              T: Approved
+                T: Verification
+              T: Verified
+                T: Customer Since
+              T: 12 Jan 2026
+                T: Last Active
+              T: 30 Sep 2026, 11:42 AM
+        T: Account Information
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers Active]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

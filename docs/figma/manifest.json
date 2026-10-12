@@ -1,8 +1,8 @@
 {
   "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
   "page": "Web UI Design",
-  "version": "2408376029043747207",
-  "lastModified": "2026-10-09T15:13:07Z",
+  "version": "2409463274772617281",
+  "lastModified": "2026-10-12T13:16:38Z",
   "fetched_via": "files",
   "screens": [
     {
@@ -40,12 +40,6 @@
       "node_id": "237:1063",
       "file": "Cart__237-1063.txt",
       "lines": 45
-    },
-    {
-      "name": "Track Order",
-      "node_id": "256:5097",
-      "file": "Track_Order__256-5097.txt",
-      "lines": 11
     },
     {
       "name": "My Account - Personal Info",
@@ -114,6 +108,12 @@
       "lines": 45
     },
     {
+      "name": "View Details",
+      "node_id": "1201:14380",
+      "file": "View_Details__1201-14380.txt",
+      "lines": 46
+    },
+    {
       "name": "My Account - Completed Orders",
       "node_id": "284:7773",
       "file": "My_Account_Completed_Orders__284-7773.txt",
@@ -133,9 +133,21 @@
     },
     {
       "name": "Order Placed",
-      "node_id": "256:5077",
-      "file": "Order_Placed__256-5077.txt",
-      "lines": 7
+      "node_id": "1201:15224",
+      "file": "Order_Placed__1201-15224.txt",
+      "lines": 77
+    },
+    {
+      "name": "Track order",
+      "node_id": "1201:15783",
+      "file": "Track_order__1201-15783.txt",
+      "lines": 102
+    },
+    {
+      "name": "Live Track Order",
+      "node_id": "1201:17027",
+      "file": "Live_Track_Order__1201-17027.txt",
+      "lines": 80
     },
     {
       "name": "Logout Popup",
@@ -426,10 +438,28 @@
       "lines": 157
     },
     {
+      "name": "Customers",
+      "node_id": "1185:10068",
+      "file": "Customers__1185-10068.txt",
+      "lines": 157
+    },
+    {
+      "name": "Transactions",
+      "node_id": "1197:13963",
+      "file": "Transactions__1197-13963.txt",
+      "lines": 157
+    },
+    {
       "name": "Seller Details",
       "node_id": "1166:14620",
       "file": "Seller_Details__1166-14620.txt",
       "lines": 136
+    },
+    {
+      "name": "Customer Detail",
+      "node_id": "1195:13329",
+      "file": "Customer_Detail__1195-13329.txt",
+      "lines": 141
     },
     {
       "name": "Add Category",
