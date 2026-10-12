@@ -198,9 +198,39 @@ class WizardTests(SellerTestCase):
         docs = self.get(f"{SELLER}/application/documents", token).json()
         self.assertEqual(len(docs), 1)
         self.assertEqual(docs[0]["file_name"], "id-v2.pdf")
-        self.assertTrue(docs[0]["url"].endswith("id-v2.pdf"))
+        self.assertTrue(docs[0]["url"].startswith("/api/v1/files/seller-documents/"), docs[0]["url"])
+        self.assertNotIn("id-v2", SellerDocument.objects.get(pk=v2["id"]).file.name)        # stored under a server-chosen name
         old = SellerDocument.objects.get(pk=v1["id"])
         self.assertEqual(str(old.superseded_by_id), v2["id"])
+
+    def test_documents_are_private_and_served_only_through_signed_links(self):
+        token = self.register_seller()
+        doc = self.upload(token, "id_passport", "my-id.pdf")
+        url = self.get(f"{SELLER}/application/documents", token).json()[0]["url"]
+        res = self.client.get(url)                                                   # no Authorization header needed
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(b"".join(res.streaming_content), PDF)
+        self.assertEqual((res["Content-Type"], res["X-Content-Type-Options"]), ("application/pdf", "nosniff"))
+        self.assertIn("my-id.pdf", res["Content-Disposition"])
+        self.assertEqual(self.client.get(url[:-3] + "xyz").status_code, 404)        # tampered signature
+        other = SellerDocument.objects.exclude(pk=doc["id"]).first()
+        if other:
+            self.assertEqual(self.client.get(url.replace(doc["id"], str(other.pk))).status_code, 404)
+        with override_settings(SIGNED_FILE_TTL_SECONDS=-1):
+            self.assertEqual(self.client.get(url).status_code, 404)                 # expired
+        stored = SellerDocument.objects.get(pk=doc["id"]).file.name
+        self.assertEqual(self.client.get(f"/{settings.MEDIA_URL.lstrip('/')}{stored}").status_code, 404)    # never from /media/
+
+    def test_a_document_must_really_be_what_it_claims(self):
+        token = self.register_seller()
+        fake_pdf = self.client.post(f"{SELLER}/application/documents",
+                                    {"type": "id_passport", "file": SimpleUploadedFile("id.pdf", b"<html>", content_type="application/pdf")},
+                                    headers=self._h(token))
+        self.assertEqual(fake_pdf.status_code, 422)
+        fake_png = self.client.post(f"{SELLER}/application/documents",
+                                    {"type": "id_passport", "file": SimpleUploadedFile("id.png", b"<html>", content_type="image/png")},
+                                    headers=self._h(token))
+        self.assertEqual(fake_png.status_code, 422)
 
     def test_submit_requires_complete_application(self):
         token = self.register_seller()

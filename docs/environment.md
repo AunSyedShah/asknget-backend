@@ -62,7 +62,8 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | See **CORS** below. |
 | `BEHIND_PROXY` | *(unset)* | `1` makes Django trust `X-Forwarded-Proto`/`Host` from nginx. Set by `compose.yaml` for the `web` service. |
 | `MEDIA_ROOT` | `backend/asknget/media` | Where uploads land. Compose sets `/app/asknget/media`. |
-| `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. |
+| `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. Seller documents are never served from `/media/` either way. |
+| `SIGNED_FILE_TTL_SECONDS` | `3600` | How long a signed link to a private file (seller documents) works. |
 | `STOREFRONT_URL` | *(empty)* | Public buyer site, used to build "View Product" links in the seller portal. |
 | `PORTAL_URL` | *(empty)* | The seller portal's address, used to build **team-invitation links** (`<PORTAL_URL>/accept-invite?token=…`). Falls back to `STOREFRONT_URL`; with neither, the e-mailed link has no host. |
 

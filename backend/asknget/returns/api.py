@@ -113,10 +113,12 @@ def courier_webhook(request: HttpRequest, slug: str):
 # --------------------------------------------------------------------------------------
 
 
-@my_returns_router.get("/orders/{order_id}/returnable", response={200: ReturnableOut, 404: ErrorOut}, summary="Which lines can be returned (optionally for a reason)")
+@my_returns_router.get("/orders/{order_id}/returnable", response={200: ReturnableOut, 404: ErrorOut, 422: ErrorOut}, summary="Which lines can be returned (optionally for a reason)")
 def returnable(request, order_id: UUID, reason: str | None = None):
     order = order_services.get_my_order(request.auth, order_id)
     chosen = services.reasons_for(order.country).filter(code=reason).first() if reason else None
+    if reason and chosen is None:
+        raise HttpError(422, "unknown_reason")
     checks = policy.eligibility(order, chosen.kind if chosen else None)
     lines = [
         {"order_item_id": c.item.pk, "product_name": c.item.product_name, "variant_summary": c.item.variant_summary, "image_url": c.item.image_url,

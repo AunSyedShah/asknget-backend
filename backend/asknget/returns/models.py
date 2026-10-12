@@ -67,7 +67,11 @@ class ReturnRule(TimeStampedModel):
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["category__name", "country_id"]
-        constraints = [models.UniqueConstraint(fields=["country", "category"], name="uniq_return_rule_per_country_category")]
+        constraints = [
+            models.UniqueConstraint(fields=["country", "category"], name="uniq_return_rule_per_country_category"),
+            # SQL treats empty countries as all different, so the rule above cannot stop two "every market" rules.
+            models.UniqueConstraint(fields=["category"], condition=Q(country__isnull=True), name="uniq_return_rule_all_markets_per_category"),
+        ]
 
     def __str__(self):
         return f"{self.category} @ {self.country_id or 'all markets'}"

@@ -694,6 +694,18 @@ FULFILMENT_NEXT = {
     Fulfilment.RETURNED: set(),
 }
 
+# Lines that are finished with: a customer return can leave one store's lines in different states (one returned,
+# the rest delivered), so a store's status is taken from its lines still in play.
+SETTLED = (Fulfilment.RETURNED, Fulfilment.CANCELLED)
+
+
+def store_status(items) -> str:
+    """The status of one store's part of an order: its first line still in play, else its first line.
+    `items` are that store's lines, oldest first."""
+    live = [i for i in items if i.status not in SETTLED]
+    return (live or list(items))[0].status
+
+
 # Fulfilment → Order.OrderStatus vocabulary for the per-store timeline events.
 FULFILMENT_TO_ORDER = {
     Fulfilment.PENDING: Status.CONFIRMED, Fulfilment.PROCESSING: Status.PROCESSING, Fulfilment.PACKED: Status.PACKED,
@@ -769,7 +781,7 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
     items = list(OrderItem.objects.filter(order=order, store=store).select_related("variant"))
     if not items:
         raise HttpError(404, "Order not found")
-    current = items[0].status
+    current = store_status(items)
     if status not in FULFILMENT_NEXT[current]:
         raise HttpError(409, f"Cannot move this order from {current} to {status}")
     if status == Fulfilment.RETURNED:
@@ -780,7 +792,7 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
         _restock(order, items, reason=StockMovement.Reason.CANCEL, actor_user=actor_user)
     elif status == Fulfilment.RETURNED:
         _restock(order, items, reason=StockMovement.Reason.RETURN, actor_user=actor_user)
-    OrderItem.objects.filter(order=order, store=store).update(status=status)
+    OrderItem.objects.filter(order=order, store=store, status=current).update(status=status)   # lines already returned stay so
     OrderStatusEvent.objects.create(
         order=order, store=store, status=FULFILMENT_TO_ORDER[status], note=note[:255],
         actor=OrderStatusEvent.OrderEventActor.SELLER, actor_user=actor_user,

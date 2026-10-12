@@ -140,7 +140,12 @@ card refunds stay manual (staff mark them paid). The owner also asked to **leave
 A delivered parcel does **not** refund by itself: the seller still inspects and marks it received. The same registry is meant to carry the seller's outbound shipments
 (`book_shipment`) later; that is not built.
 
+**Bug fixes after review (2026-10-13, `docs/bugfix-plan.md`)**: refunded orders are not returnable again and a buyer is never owed more than the
+ledger refunded; sellers act only on new requests; every transition locks its row; courier calls and e-mails run after commit; webhooks never guess
+a parcel; commission comes back at each line's own rate; the seller's order screens follow the lines still in play; a final change-of-mind refusal
+still allows a defect claim; uploads are stored under server-chosen names and KYC documents only through signed links. Tested on SQLite and Postgres.
+
 **Not built / unverified**
 
 * Screens (Q90), real policy numbers (Q91), the courier integration itself (Q92), PSP refunds (Q93), buyer e-mail in other languages (Q95), exchanges (Q96).
-* Run on SQLite only. The Postgres run needs Docker; the new ledger constraints are partial unique constraints, which Postgres supports, but they are untested there.
+* (Postgres: tested, 2026-10-13.)

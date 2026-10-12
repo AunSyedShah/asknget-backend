@@ -236,6 +236,8 @@ MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 # Let Django serve uploads itself. On by default in DEBUG; set SERVE_MEDIA=1 in the
 # container until uploads move to object storage / a reverse proxy.
 SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
+# How long a signed link to a private file (seller documents) works.
+SIGNED_FILE_TTL_SECONDS = int(os.environ.get('SIGNED_FILE_TTL_SECONDS', 3600))
 
 # Behind a reverse proxy (Docker/nginx) trust its scheme header and origins.
 CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o]

@@ -916,3 +916,10 @@ REST-style JSON; auth via access + refresh JWT.
     a damaged parcel waits for a staff decision; a rejection can be disputed once and staff's decision is final (a setting turns disputes off).
 95. **Buyers have no notification inbox,** so buyer-facing return events are plain e-mails (English). Per-language e-mail templates and an in-app inbox are follow-ups.
 96. **Exchange / replacement** as a resolution is not built (refund only).
+97. **Defaults changed by the bug fixes (`docs/bugfix-plan.md`), reversible:** a final rejection blocks the same lines only for the same family of
+    reason (change of mind vs the seller's fault) unless the seller already received the goods; a parcel staff refuse a refund for goes back to the
+    buyer (said in the e-mail, timeline and seller notification; a tracked return-to-customer shipment is not built); sellers approve or reject only
+    new requests. **A refund after a payout is a debt, not a hold:** holding every sale for the 180-day defect window would starve sellers, so a late
+    refund may take the balance below zero, payouts are refused until later sales cover it. Confirm.
+98. **Seller documents are private.** They are served only through signed links that expire (`SIGNED_FILE_TTL_SECONDS`, 1 hour); nginx refuses
+    `/media/seller_documents/`. Documents uploaded before keep their old file names on disk but are reachable only the same way.

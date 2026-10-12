@@ -90,8 +90,8 @@ def product_reviewed(product, *, approved: bool, reason: str = "") -> None:
 
 
 def _return_params(r) -> dict:
-    return {"order": r.order.order_number, "customer": _customer(r.order), "items": r.items.count(),
-            "reason": pick(r.reason.label, country=r.country, default=r.reason.code)}
+    # `reason` is the label in every language: it is rendered in the reader's language, not the buyer's.
+    return {"order": r.order.order_number, "customer": _customer(r.order), "items": r.items.count(), "reason": r.reason.label or {"en": r.reason.code}}
 
 
 def return_requested(r) -> None:
@@ -106,7 +106,8 @@ def return_escalated(r) -> None:
     notify(r.store_id, "return_escalated", _return_params(r), link=("return", r.pk))
 
 
-def return_decided(r, outcome: str) -> None:
+def return_decided(r, outcome: dict) -> None:
+    """`outcome` is per language, like a template ({"en": "approved"})."""
     notify(r.store_id, "return_decided", {**_return_params(r), "outcome": outcome}, link=("return", r.pk))
 
 
@@ -135,7 +136,8 @@ def render(notification: StoreNotification, known: dict, country=None) -> tuple[
     template, default = known.get(notification.kind), TEMPLATES.get(notification.kind)
     title_map = template.title if template else (default[1] if default else {})
     body_map = template.body if template else (default[2] if default else {})
-    params = dict(notification.params)
+    # A parameter may itself be per-language ({"en": ..., "ur": ...}): pick the reader's language, like the template.
+    params = {k: (pick(v, country=country) if isinstance(v, dict) else v) for k, v in notification.params.items()}
     if "amount_cents" in params and "currency" in params:
         params["amount"] = f"{params['currency']} {params['amount_cents'] / 100:,.2f}"
     return _fill(pick(title_map, country=country, default=notification.kind), params), _fill(pick(body_map, country=country), params)

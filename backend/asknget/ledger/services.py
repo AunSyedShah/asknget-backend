@@ -213,6 +213,29 @@ def refund(order: Order, store_id=None) -> list[LedgerEntry]:
     return created
 
 
+def _commission_on(request, sale: LedgerEntry, fee: LedgerEntry) -> int:
+    """The commission that was charged on the returned lines: each line at its own category's rate (recorded on the fee
+    entry), reduced by the voucher exactly as `post_sales` reduced it. Fees posted without that breakdown fall back to
+    a share of the whole commission by value."""
+    gross = sale.meta.get("lines_cents", 0)
+    net = gross - sale.meta.get("discount_cents", 0)
+    if gross <= 0 or net <= 0:
+        return 0
+    rates = {line.get("category_id"): line.get("bps", 0) for line in fee.meta.get("lines", [])}
+    if not rates:
+        return _round_div(abs(fee.amount_cents) * (request.items_cents - request.discount_cents), net)
+    fallback = fee.meta.get("effective_bps", 0)
+    weighted = 0
+    for cents, category_id in request.items.values_list("order_item__line_total_cents", "order_item__product__category_id"):
+        key = str(category_id) if category_id else None
+        weighted += rates.get(key, fallback) * cents
+    return _round_div(weighted * net, 10000 * gross)
+
+
+def has_sale(order: Order, store) -> bool:
+    return LedgerEntry.objects.filter(order=order, store=store, type=T.SALE).exists()
+
+
 @transaction.atomic
 def refund_items(request) -> list[LedgerEntry]:
     """A customer return was accepted: give back `request.refund_cents` of the store's sale, and the matching
@@ -235,10 +258,7 @@ def refund_items(request) -> list[LedgerEntry]:
                             "restocking_fee_cents": request.restocking_fee_cents, "delivery_refund_cents": request.delivery_refund_cents}, **common)]
     fee = LedgerEntry.objects.filter(order=order, store=store, type=T.FEE).first()
     if fee:
-        net_total = sale.meta.get("lines_cents", 0) - sale.meta.get("discount_cents", 0)
-        returned_net = request.items_cents - request.discount_cents
-        share = _round_div(abs(fee.amount_cents) * returned_net, net_total) if net_total > 0 else 0
-        share = min(share, abs(fee.amount_cents) - fee_back)
+        share = min(_commission_on(request, sale, fee), abs(fee.amount_cents) - fee_back)
         if share > 0:
             created.append(_entry(type=T.FEE_REFUND, amount_cents=share, description=f"Commission returned for {request.reference}",
                                   meta={"fee": fee.reference, "return": request.reference}, **common))
@@ -374,6 +394,8 @@ def validate_payout(store, amount_cents: int) -> None:
 
 @transaction.atomic
 def create_payout(store, *, amount_cents: int, note: str, by) -> Payout:
+    # Lock the store's row first: two payouts at the same moment would otherwise both see the same available balance.
+    list(type(store).objects.select_for_update().filter(pk=store.pk).values_list("pk", flat=True))
     validate_payout(store, amount_cents)
     payout = Payout.objects.create(
         store=store, amount_cents=amount_cents, currency=store.country.currency, reference=new_reference("PAY"), note=note[:255], created_by=by,

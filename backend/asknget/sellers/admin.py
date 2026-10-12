@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.utils.html import format_html
+
+from .files import document_url
 
 from .models import (
     SellerApplication,
@@ -16,11 +19,21 @@ class DirectorInline(admin.TabularInline):
     extra = 0
 
 
+def _open_link(doc):
+    """Documents are private (never under /media/): link through a signed, expiring URL."""
+    return format_html('<a href="{}" target="_blank" rel="noopener">Open</a>', document_url(doc)) if doc and doc.pk and doc.file else "-"
+
+
 class DocumentInline(admin.TabularInline):
     model = SellerDocument
     fk_name = "application"
     extra = 0
-    fields = ("type", "file", "file_name", "version", "status", "reviewer_note")
+    fields = ("type", "open_file", "file_name", "version", "status", "reviewer_note")
+    readonly_fields = ("open_file",)
+
+    @admin.display(description="File")
+    def open_file(self, obj):
+        return _open_link(obj)
 
 
 class StatusEventInline(admin.TabularInline):
@@ -57,8 +70,14 @@ class SellerInfoRequestAdmin(admin.ModelAdmin):
 
 @admin.register(SellerDocument)
 class SellerDocumentAdmin(admin.ModelAdmin):
-    list_display = ("application", "type", "version", "status", "file_name", "created_at")
+    list_display = ("application", "type", "version", "status", "file_name", "open_file", "created_at")
     list_filter = ("type", "status")
+    exclude = ("file",)
+    readonly_fields = ("open_file",)
+
+    @admin.display(description="File")
+    def open_file(self, obj):
+        return _open_link(obj)
 
 
 @admin.register(Store)

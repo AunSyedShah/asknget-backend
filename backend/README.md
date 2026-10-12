@@ -305,6 +305,14 @@ receives it, and the ledger refunds. Plan, decisions and what was left open: `do
   `manage.py sync_return_tracking`. A courier failing never blocks an approval.
 - **Settings** (`manage.py show_settings` lists each effective value): `returns.courier`, `returns.auto_approve`, `returns.seller_response_days`, `returns.max_photos`, `returns.allow_escalation`.
 - **Not connected yet**: a payment provider (the buyer's refund stays `pending` until staff mark it paid) and the courier itself.
+- **Transitions lock the request row** (`returns.services._locked`) and talk to the courier / send e-mail only **after commit**
+  (`transaction.on_commit`). Keep both when adding a step. Tests use `CommitClient` to run those callbacks.
+
+## Uploads
+
+Every upload goes through `core.uploads`: images are opened with Pillow and stored as `<random>.<detected format>`, other files get the
+extension of an allow-listed content type. The client's file name is display text only. nginx serves `/media/` with `nosniff` and refuses
+`/media/seller_documents/`: seller documents are reachable only through signed, expiring links (`sellers.files`, `SIGNED_FILE_TTL_SECONDS`).
 
 ## Search & recommendations (`discovery` app)
 

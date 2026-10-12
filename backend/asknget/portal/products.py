@@ -27,6 +27,7 @@ from catalog.models import (
     WishlistItem,
 )
 from core.models import coerce_nulls
+from core.uploads import safe_image
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem
 
@@ -298,8 +299,9 @@ def add_image(product: Product, file, alt: str = "") -> ProductImage:
     count = product.images.count()
     if count >= MAX_IMAGES:
         raise HttpError(422, f"At most {MAX_IMAGES} images")
+    content = safe_image(file, max_bytes=settings.PRODUCT_IMAGE_MAX_BYTES)     # real format, server-chosen name
     image = ProductImage(product=product, alt=alt[:200], sort_order=count, is_primary=count == 0)
-    image.image.save(file.name, file, save=True)
+    image.image.save(content.name, content, save=True)
     return image
 
 

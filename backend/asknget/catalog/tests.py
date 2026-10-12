@@ -1,9 +1,11 @@
 """End-to-end tests for the public catalog, reviews and wishlist."""
 
 import tempfile
+from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from PIL import Image
 
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
 from sellers.models import Store
@@ -141,11 +143,21 @@ class ReviewTests(CatalogTestCase):
         bad = self.client.post(self.URL, {"name": "A B", "email": "a@x.com", "rating": 5, "body": "x",
                                           "files": SimpleUploadedFile("x.exe", b"MZ", content_type="application/octet-stream")})
         self.assertEqual(bad.status_code, 422)
+        fake = self.client.post(self.URL, {"name": "A B", "email": "a@x.com", "rating": 5, "body": "x",
+                                           "files": SimpleUploadedFile("p.png", b"\x89PNG", content_type="image/png")})
+        self.assertEqual(fake.status_code, 422)                                       # claims to be a PNG, is not one
+        buf = BytesIO()
+        Image.new("RGB", (4, 4), "red").save(buf, format="PNG")
+        page = buf.getvalue() + b"<script>alert(1)</script>"                          # a real PNG with HTML on the end
         ok = self.client.post(self.URL, {"name": "A B", "email": "a@x.com", "rating": 5, "body": "x",
-                                         "files": [SimpleUploadedFile("p.png", b"\x89PNG", content_type="image/png"),
-                                                   SimpleUploadedFile("v.mp4", b"0000", content_type="video/mp4")]})
+                                         "files": [SimpleUploadedFile("evil.html", page, content_type="image/png"),
+                                                   SimpleUploadedFile("v.html", b"0000", content_type="video/mp4")]})
         self.assertEqual(ok.status_code, 201, ok.content)
-        self.assertEqual([m.type for m in Review.objects.get().media.all()], ["image", "video"])
+        media = list(Review.objects.get().media.all())
+        self.assertEqual([m.type for m in media], ["image", "video"])
+        # The client's name never reaches the disk: the extension (which decides how it is served) is ours.
+        self.assertTrue(media[0].file.name.endswith(".png") and "evil" not in media[0].file.name, media[0].file.name)
+        self.assertTrue(media[1].file.name.endswith(".mp4") and ".html" not in media[1].file.name, media[1].file.name)
 
     def test_published_list_summary_and_sort(self):
         for name, rating in (("Ayesha Khan", 5), ("Bilal Ahmed", 3), ("Sara", 4)):

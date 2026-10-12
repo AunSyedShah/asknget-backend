@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Avg, Case, Count, IntegerField, Max, Min, Prefetch, Q, Sum, When
 from ninja.errors import HttpError
 
+from core.uploads import safe_image, safe_name
 from markets import services as markets
 from markets.context import get_country
 from markets.models import Country
@@ -289,6 +290,7 @@ def adjust_stock(variant: ProductVariant, *, delta: int | None = None, set_to: i
 REVIEW_SORTS = {"new": ("-created_at",), "top": ("-rating", "-created_at"), "low": ("rating", "-created_at")}
 REVIEW_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 REVIEW_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm"}
+REVIEW_VIDEO_EXTENSIONS = {"video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm"}
 REVIEW_MAX_FILES = 5
 
 
@@ -325,18 +327,24 @@ def create_review(product: Product, *, user, name: str | None, email: str | None
         raise HttpError(409, "You have already reviewed this product")
     if len(files) > REVIEW_MAX_FILES:
         raise HttpError(422, f"At most {REVIEW_MAX_FILES} photos/videos")
+    stored = []                      # (type, file) with a server-chosen name: see core.uploads
     for f in files:
         if f.content_type not in REVIEW_IMAGE_TYPES | REVIEW_VIDEO_TYPES:
             raise HttpError(422, f"Unsupported file type: {f.content_type}")
         if f.size > settings.REVIEW_MEDIA_MAX_BYTES:
             raise HttpError(422, "Each file must be 25 MB or smaller")
+        if f.content_type in REVIEW_IMAGE_TYPES:
+            stored.append(("image", safe_image(f, max_bytes=settings.REVIEW_MEDIA_MAX_BYTES, label="Each file")))
+        else:
+            f.name = safe_name(f.content_type, REVIEW_VIDEO_EXTENSIONS)
+            stored.append(("video", f))
 
     review = Review.objects.create(
         product=product, user=user, order_item=_verified_order_item(user, product),
         reviewer_name=name, reviewer_email=email, rating=rating, body=body,
     )
-    for i, f in enumerate(files):
-        media = ReviewMedia(review=review, sort_order=i, type="image" if f.content_type in REVIEW_IMAGE_TYPES else "video")
+    for i, (kind, f) in enumerate(stored):
+        media = ReviewMedia(review=review, sort_order=i, type=kind)
         media.file.save(f.name, f, save=True)
     return review
 

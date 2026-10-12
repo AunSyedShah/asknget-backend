@@ -4,7 +4,7 @@ Screens: Cart, Checkout, Order Placed, Track Order, My Account – My Orders.
 Money is integer cents + currency everywhere.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -256,7 +256,8 @@ class OrderDetailOut(OrderSummaryOut):
     cancel_reason: str
     country: str = Field(alias="country_id", description="Market the order was placed in")
     return_window_days: int = Field(description="Return policy snapshotted at checkout (0 = no returns)")
-    return_eligible_until: Optional[datetime] = Field(None, description="Last delivery event + return window; null until delivered")
+    return_eligible_until: Optional[datetime] = Field(None, description="The last moment any delivered line can still be returned, for any reason "
+                                                                        "(per-line terms: category rules and the defect window); null until delivered")
 
     @staticmethod
     def resolve_events(obj):
@@ -264,12 +265,9 @@ class OrderDetailOut(OrderSummaryOut):
 
     @staticmethod
     def resolve_return_eligible_until(obj):
-        if not obj.return_window_days:
-            return None
-        delivered = [e.created_at for e in obj.status_events.all() if e.status == "delivered"]
-        if not delivered:
-            return None
-        return max(delivered) + timedelta(days=obj.return_window_days)
+        from returns.policy import eligible_until      # local: returns reads orders
+
+        return eligible_until(obj)                       # per line: category rules and the defect window count
 
 
 class OrderPlacedOut(Schema):

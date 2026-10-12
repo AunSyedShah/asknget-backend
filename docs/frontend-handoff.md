@@ -142,11 +142,23 @@ These screens now have real endpoints; wire them (shapes are in the index below 
 | Admin Settings | `GET/PUT /admin/returns/policies[/{code}]`, `/admin/returns/reasons`, `/admin/returns/rules` |
 
 Rules to know: one request covers **one store's** lines (`422 one_store_per_request`); an ineligible line is `409` with the reason as the detail
-(`not_delivered`, `window_closed`, `not_returnable`, `already_requested`, `already_returned`); `422 photo_required` when the reason needs a photo;
+(`not_delivered`, `window_closed`, `not_returnable`, `already_requested`, `already_returned`, `already_refunded`); an unknown `?reason=` on
+`/returnable` is `422 unknown_reason`; a seller can only approve or reject a **new** request (`requested`): disputes and damaged parcels are staff's;
+a final refusal of a change-of-mind return still lets the buyer claim a defect within the defect window; `422 photo_required` when the reason needs a photo;
 a goodwill "returned" on the seller or admin order screen is `409 return_in_progress` while a request for those lines is open. A refund is
 `refund_status: pending` until staff pay it (no payment provider yet). Notifications have a new tab `returns`. Pickups use a courier
 integration that is not connected yet: `shipment.courier` is `manual`, the buyer enters the tracking number; when a courier is connected the
 same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them, so render them when present.
+
+**Changed by the bug fixes of 2026-10-13 (`docs/bugfix-plan.md`):**
+- **Seller documents**: `url` on a document is now a **signed link that expires** (`/api/v1/files/seller-documents/{id}?t=…`, one hour by
+  default). Use it directly in an `<a>` or `<img>`; fetch the document list again for a fresh link instead of storing one. `/media/seller_documents/…`
+  no longer works.
+- **Uploads** (photos, review media, product images, avatars, documents) are stored under a server-chosen name and checked for what they really
+  are: a file that is not the image (or PDF) it claims to be is `422`. Show `file_name` to people, never the stored path.
+- **Order detail `return_eligible_until`** is now the last moment *any* line can be returned for *any* reason (category rules and the defect window
+  count), so it can be later than placed date + the market's change-of-mind days.
+- **Endpoint index paths** below were printed as `/api/v1/api/v1/…` before; they are right now.
 
 ## 5b. Still not in the backend
 
@@ -185,388 +197,394 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-219 operations in 33 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+220 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/auth/login` | - | Login |
-| POST | `/api/v1/api/v1/auth/logout` | bearer | Logout |
-| POST | `/api/v1/api/v1/auth/otp/send` | bearer | Send a 6-digit code by email or SMS |
-| POST | `/api/v1/api/v1/auth/otp/verify` | - | Otp Verify |
-| POST | `/api/v1/api/v1/auth/password/forgot` | - | Password Forgot |
-| POST | `/api/v1/api/v1/auth/password/reset` | - | Password Reset |
-| POST | `/api/v1/api/v1/auth/refresh` | - | Rotate refresh token |
-| POST | `/api/v1/api/v1/auth/register` | - | Register as a customer |
-| POST | `/api/v1/api/v1/auth/seller/register` | - | Register as a seller ('Create your seller account') |
-| POST | `/api/v1/api/v1/auth/team/accept` | bearer | Accept an invitation (sign in first if the e-mail already has an account) |
+| POST | `/api/v1/auth/login` | - | Login |
+| POST | `/api/v1/auth/logout` | bearer | Logout |
+| POST | `/api/v1/auth/otp/send` | bearer | Send a 6-digit code by email or SMS |
+| POST | `/api/v1/auth/otp/verify` | - | Otp Verify |
+| POST | `/api/v1/auth/password/forgot` | - | Password Forgot |
+| POST | `/api/v1/auth/password/reset` | - | Password Reset |
+| POST | `/api/v1/auth/refresh` | - | Rotate refresh token |
+| POST | `/api/v1/auth/register` | - | Register as a customer |
+| POST | `/api/v1/auth/seller/register` | - | Register as a seller ('Create your seller account') |
+| POST | `/api/v1/auth/team/accept` | bearer | Accept an invitation (sign in first if the e-mail already has an account) |
 
 #### cart
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/cart` | bearer | Current cart (creates a guest cart if none) |
-| PATCH | `/api/v1/api/v1/cart` | bearer | Order note / delivery type |
-| PATCH | `/api/v1/api/v1/cart/delivery` | bearer | Choose a seller's delivery option for their part of the cart |
-| DELETE | `/api/v1/api/v1/cart/items` | bearer | Empty the cart ('clear cart and switch region') |
-| POST | `/api/v1/api/v1/cart/items` | bearer | 'Add to Cart' (merges qty if the variant is already there) |
-| DELETE | `/api/v1/api/v1/cart/items/{item_id}` | bearer | Remove line |
-| PATCH | `/api/v1/api/v1/cart/items/{item_id}` | bearer | Change quantity |
-| DELETE | `/api/v1/api/v1/cart/voucher` | bearer | Cart Remove Voucher |
-| POST | `/api/v1/api/v1/cart/voucher` | bearer | 'Discount Voucher → Apply' |
+| GET | `/api/v1/cart` | bearer | Current cart (creates a guest cart if none) |
+| PATCH | `/api/v1/cart` | bearer | Order note / delivery type |
+| PATCH | `/api/v1/cart/delivery` | bearer | Choose a seller's delivery option for their part of the cart |
+| DELETE | `/api/v1/cart/items` | bearer | Empty the cart ('clear cart and switch region') |
+| POST | `/api/v1/cart/items` | bearer | 'Add to Cart' (merges qty if the variant is already there) |
+| DELETE | `/api/v1/cart/items/{item_id}` | bearer | Remove line |
+| PATCH | `/api/v1/cart/items/{item_id}` | bearer | Change quantity |
+| DELETE | `/api/v1/cart/voucher` | bearer | Cart Remove Voucher |
+| POST | `/api/v1/cart/voucher` | bearer | 'Discount Voucher → Apply' |
 
 #### catalog
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/brands` | - | Brands |
-| GET | `/api/v1/api/v1/categories` | - | Category tree with item counts |
-| GET | `/api/v1/api/v1/products` | bearer | Search / browse products |
-| GET | `/api/v1/api/v1/products/best-sellers` | bearer | Landing: 'Best Sellers' |
-| GET | `/api/v1/api/v1/products/featured` | bearer | Landing: 'Featured Products' |
-| GET | `/api/v1/api/v1/products/filters` | - | Sidebar filter options (categories, brands, colours, price range) |
-| GET | `/api/v1/api/v1/products/new-arrivals` | bearer | Product New Arrivals |
-| GET | `/api/v1/api/v1/products/top-discounted` | bearer | Landing: 'Top Discounted' |
-| GET | `/api/v1/api/v1/products/{slug}` | bearer | Product Details |
-| GET | `/api/v1/api/v1/products/{slug}/related` | bearer | 'You may also like' |
-| GET | `/api/v1/api/v1/products/{slug}/reviews` | - | Reviews tab list |
-| POST | `/api/v1/api/v1/products/{slug}/reviews` | bearer | 'Add your review' (multipart; guests must send name + email) |
-| GET | `/api/v1/api/v1/products/{slug}/reviews/summary` | - | '4.9 out of 5 (205 Reviews)' + star bars |
+| GET | `/api/v1/brands` | - | Brands |
+| GET | `/api/v1/categories` | - | Category tree with item counts |
+| GET | `/api/v1/products` | bearer | Search / browse products |
+| GET | `/api/v1/products/best-sellers` | bearer | Landing: 'Best Sellers' |
+| GET | `/api/v1/products/featured` | bearer | Landing: 'Featured Products' |
+| GET | `/api/v1/products/filters` | - | Sidebar filter options (categories, brands, colours, price range) |
+| GET | `/api/v1/products/new-arrivals` | bearer | Product New Arrivals |
+| GET | `/api/v1/products/top-discounted` | bearer | Landing: 'Top Discounted' |
+| GET | `/api/v1/products/{slug}` | bearer | Product Details |
+| GET | `/api/v1/products/{slug}/related` | bearer | 'You may also like' |
+| GET | `/api/v1/products/{slug}/reviews` | - | Reviews tab list |
+| POST | `/api/v1/products/{slug}/reviews` | bearer | 'Add your review' (multipart; guests must send name + email) |
+| GET | `/api/v1/products/{slug}/reviews/summary` | - | '4.9 out of 5 (205 Reviews)' + star bars |
 
 #### checkout
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/checkout` | bearer | 'Place Order' (no payment capture yet — order stays pending_payment) |
+| POST | `/api/v1/checkout` | bearer | 'Place Order' (no payment capture yet — order stays pending_payment) |
 
 #### discovery
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/products/{slug}/frequently-bought-together` | bearer | Frequently Bought Together |
-| GET | `/api/v1/api/v1/products/{slug}/similar` | bearer | 'You may also like' (semantic) |
-| GET | `/api/v1/api/v1/recommendations` | bearer | 'Recommended for you' |
-| GET | `/api/v1/api/v1/search/suggest` | - | Search-bar suggestions |
+| GET | `/api/v1/products/{slug}/frequently-bought-together` | bearer | Frequently Bought Together |
+| GET | `/api/v1/products/{slug}/similar` | bearer | 'You may also like' (semantic) |
+| GET | `/api/v1/recommendations` | bearer | 'Recommended for you' |
+| GET | `/api/v1/search/suggest` | - | Search-bar suggestions |
+
+#### files
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/files/seller-documents/{doc_id}` | - | A seller document, through a signed link from the API (expires) |
 
 #### lookups
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/lookups/banks` | - | 'Select your bank' |
-| GET | `/api/v1/api/v1/lookups/seller` | - | Dropdown options for the seller wizard (+ the market's KYC policy) |
+| GET | `/api/v1/lookups/banks` | - | 'Select your bank' |
+| GET | `/api/v1/lookups/seller` | - | Dropdown options for the seller wizard (+ the market's KYC policy) |
 
 #### marketing
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/banners` | - | Landing hero / promo tiles (live ones only) |
-| POST | `/api/v1/api/v1/contact` | bearer | 'Send a Message' |
-| POST | `/api/v1/api/v1/newsletter/subscribe` | - | 'Subscribe Now' |
-| GET | `/api/v1/api/v1/site-info` | - | Footer + 'Contact Info' block |
+| GET | `/api/v1/banners` | - | Landing hero / promo tiles (live ones only) |
+| POST | `/api/v1/contact` | bearer | 'Send a Message' |
+| POST | `/api/v1/newsletter/subscribe` | - | 'Subscribe Now' |
+| GET | `/api/v1/site-info` | - | Footer + 'Contact Info' block |
 
 #### me
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/me` | bearer | Me |
-| PATCH | `/api/v1/api/v1/me` | bearer | Me Update |
-| GET | `/api/v1/api/v1/me/addresses` | bearer | Address List |
-| POST | `/api/v1/api/v1/me/addresses` | bearer | Address Create |
-| DELETE | `/api/v1/api/v1/me/addresses/{address_id}` | bearer | Address Delete |
-| GET | `/api/v1/api/v1/me/addresses/{address_id}` | bearer | Address Detail |
-| PATCH | `/api/v1/api/v1/me/addresses/{address_id}` | bearer | Address Update |
-| POST | `/api/v1/api/v1/me/addresses/{address_id}/default` | bearer | Address Set Default |
-| POST | `/api/v1/api/v1/me/avatar` | bearer | Upload profile photo (PNG/JPG/GIF, ≤ 2 MB) |
-| GET | `/api/v1/api/v1/me/chat/summary` | bearer | Unread badge |
-| GET | `/api/v1/api/v1/me/conversations` | bearer | My conversations with sellers |
-| POST | `/api/v1/api/v1/me/conversations` | bearer | 'Message seller' — opens the thread (or reuses it) and sends the first message |
-| GET | `/api/v1/api/v1/me/conversations/{conversation_id}` | bearer | My Conversation |
-| GET | `/api/v1/api/v1/me/conversations/{conversation_id}/messages` | bearer | Poll for new messages |
-| POST | `/api/v1/api/v1/me/conversations/{conversation_id}/messages` | bearer | My Send |
-| POST | `/api/v1/api/v1/me/conversations/{conversation_id}/read` | bearer | My Read |
-| GET | `/api/v1/api/v1/me/orders` | bearer | My Orders (All / Ongoing / Completed / Cancelled) |
-| GET | `/api/v1/api/v1/me/orders/{order_id}` | bearer | 'View Detail' / 'Track Order' |
-| POST | `/api/v1/api/v1/me/orders/{order_id}/cancel` | bearer | My Order Cancel |
-| POST | `/api/v1/api/v1/me/orders/{order_id}/reorder` | bearer | 'Re-Order' → items back in the cart |
-| GET | `/api/v1/api/v1/me/orders/{order_id}/returnable` | bearer | Which lines can be returned (optionally for a reason) |
-| POST | `/api/v1/api/v1/me/orders/{order_id}/returns` | bearer | Ask to return items (multipart: reason, note, item_ids[], photos[]) |
-| POST | `/api/v1/api/v1/me/password` | bearer | Change password (Password Manager) |
-| GET | `/api/v1/api/v1/me/payment-methods` | bearer | Payment Method List |
-| POST | `/api/v1/api/v1/me/payment-methods` | bearer | Payment Method Create |
-| DELETE | `/api/v1/api/v1/me/payment-methods/{pm_id}` | bearer | Payment Method Delete |
-| POST | `/api/v1/api/v1/me/payment-methods/{pm_id}/default` | bearer | Payment Method Set Default |
-| GET | `/api/v1/api/v1/me/returns` | bearer | My returns (tabs: all, open, requested, approved, rejected, refunded, cancelled) |
-| GET | `/api/v1/api/v1/me/returns/{return_id}` | bearer | Return status and timeline |
-| POST | `/api/v1/api/v1/me/returns/{return_id}/cancel` | bearer | Withdraw before it is sent |
-| POST | `/api/v1/api/v1/me/returns/{return_id}/escalate` | bearer | Dispute a rejection: staff decide |
-| POST | `/api/v1/api/v1/me/returns/{return_id}/tracking` | bearer | 'I sent it': add the tracking number |
-| POST | `/api/v1/api/v1/me/terms` | bearer | Me Accept Terms |
-| GET | `/api/v1/api/v1/me/wishlist` | bearer | My Account – Wishlist |
-| DELETE | `/api/v1/api/v1/me/wishlist/{product_id}` | bearer | Wishlist Remove |
-| PUT | `/api/v1/api/v1/me/wishlist/{product_id}` | bearer | Add to wishlist (idempotent) |
+| GET | `/api/v1/me` | bearer | Me |
+| PATCH | `/api/v1/me` | bearer | Me Update |
+| GET | `/api/v1/me/addresses` | bearer | Address List |
+| POST | `/api/v1/me/addresses` | bearer | Address Create |
+| DELETE | `/api/v1/me/addresses/{address_id}` | bearer | Address Delete |
+| GET | `/api/v1/me/addresses/{address_id}` | bearer | Address Detail |
+| PATCH | `/api/v1/me/addresses/{address_id}` | bearer | Address Update |
+| POST | `/api/v1/me/addresses/{address_id}/default` | bearer | Address Set Default |
+| POST | `/api/v1/me/avatar` | bearer | Upload profile photo (PNG/JPG/GIF, ≤ 2 MB) |
+| GET | `/api/v1/me/chat/summary` | bearer | Unread badge |
+| GET | `/api/v1/me/conversations` | bearer | My conversations with sellers |
+| POST | `/api/v1/me/conversations` | bearer | 'Message seller' — opens the thread (or reuses it) and sends the first message |
+| GET | `/api/v1/me/conversations/{conversation_id}` | bearer | My Conversation |
+| GET | `/api/v1/me/conversations/{conversation_id}/messages` | bearer | Poll for new messages |
+| POST | `/api/v1/me/conversations/{conversation_id}/messages` | bearer | My Send |
+| POST | `/api/v1/me/conversations/{conversation_id}/read` | bearer | My Read |
+| GET | `/api/v1/me/orders` | bearer | My Orders (All / Ongoing / Completed / Cancelled) |
+| GET | `/api/v1/me/orders/{order_id}` | bearer | 'View Detail' / 'Track Order' |
+| POST | `/api/v1/me/orders/{order_id}/cancel` | bearer | My Order Cancel |
+| POST | `/api/v1/me/orders/{order_id}/reorder` | bearer | 'Re-Order' → items back in the cart |
+| GET | `/api/v1/me/orders/{order_id}/returnable` | bearer | Which lines can be returned (optionally for a reason) |
+| POST | `/api/v1/me/orders/{order_id}/returns` | bearer | Ask to return items (multipart: reason, note, item_ids[], photos[]) |
+| POST | `/api/v1/me/password` | bearer | Change password (Password Manager) |
+| GET | `/api/v1/me/payment-methods` | bearer | Payment Method List |
+| POST | `/api/v1/me/payment-methods` | bearer | Payment Method Create |
+| DELETE | `/api/v1/me/payment-methods/{pm_id}` | bearer | Payment Method Delete |
+| POST | `/api/v1/me/payment-methods/{pm_id}/default` | bearer | Payment Method Set Default |
+| GET | `/api/v1/me/returns` | bearer | My returns (tabs: all, open, requested, approved, rejected, refunded, cancelled) |
+| GET | `/api/v1/me/returns/{return_id}` | bearer | Return status and timeline |
+| POST | `/api/v1/me/returns/{return_id}/cancel` | bearer | Withdraw before it is sent |
+| POST | `/api/v1/me/returns/{return_id}/escalate` | bearer | Dispute a rejection: staff decide |
+| POST | `/api/v1/me/returns/{return_id}/tracking` | bearer | 'I sent it': add the tracking number |
+| POST | `/api/v1/me/terms` | bearer | Me Accept Terms |
+| GET | `/api/v1/me/wishlist` | bearer | My Account – Wishlist |
+| DELETE | `/api/v1/me/wishlist/{product_id}` | bearer | Wishlist Remove |
+| PUT | `/api/v1/me/wishlist/{product_id}` | bearer | Add to wishlist (idempotent) |
 
 #### meta
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/health` | - | Liveness probe |
+| GET | `/api/v1/health` | - | Liveness probe |
 
 #### orders
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/orders/track` | - | Track Order by ID + email |
+| POST | `/api/v1/orders/track` | - | Track Order by ID + email |
 
 #### regions
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/regions` | - | Active countries (country switcher) |
-| GET | `/api/v1/api/v1/regions/current` | - | Market, language and timezone resolved for this request |
+| GET | `/api/v1/regions` | - | Active countries (country switcher) |
+| GET | `/api/v1/regions/current` | - | Market, language and timezone resolved for this request |
 
 #### returns
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/couriers/{slug}/webhook` | - | Courier callback (404 for couriers without one) |
-| GET | `/api/v1/api/v1/returns/policy` | - | The market's return rules and the reasons on the form |
+| POST | `/api/v1/couriers/{slug}/webhook` | - | Courier callback (404 for couriers without one) |
+| GET | `/api/v1/returns/policy` | - | The market's return rules and the reasons on the form |
 
 #### seller
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/application` | bearer | Full application (wizard + review page) |
-| POST | `/api/v1/api/v1/seller/application/directors` | bearer | '+ Add Another Director' |
-| DELETE | `/api/v1/api/v1/seller/application/directors/{director_id}` | bearer | Director Delete |
-| PATCH | `/api/v1/api/v1/seller/application/directors/{director_id}` | bearer | Director Update |
-| GET | `/api/v1/api/v1/seller/application/documents` | bearer | Latest version of each document |
-| POST | `/api/v1/api/v1/seller/application/documents` | bearer | Upload or replace a KYC document (PDF/JPG/PNG ≤ 10 MB) |
-| POST | `/api/v1/api/v1/seller/application/resubmit` | bearer | Update Application → Resubmit |
-| GET | `/api/v1/api/v1/seller/application/status` | bearer | Application Status / progress timeline |
-| PATCH | `/api/v1/api/v1/seller/application/steps/banking` | bearer | Step 4 autosave |
-| PATCH | `/api/v1/api/v1/seller/application/steps/basic-info` | bearer | Step 1 autosave |
-| PATCH | `/api/v1/api/v1/seller/application/steps/business-info` | bearer | Step 2 autosave |
-| PATCH | `/api/v1/api/v1/seller/application/steps/representative` | bearer | Step 3 autosave |
-| POST | `/api/v1/api/v1/seller/application/submit` | bearer | Review & Submit → Submit |
-| GET | `/api/v1/api/v1/seller/store` | bearer | My store |
-| POST | `/api/v1/api/v1/seller/store/activate` | bearer | 'Activate & Start Selling' |
-| GET | `/api/v1/api/v1/seller/store/slug-available` | bearer | Check a store URL |
+| GET | `/api/v1/seller/application` | bearer | Full application (wizard + review page) |
+| POST | `/api/v1/seller/application/directors` | bearer | '+ Add Another Director' |
+| DELETE | `/api/v1/seller/application/directors/{director_id}` | bearer | Director Delete |
+| PATCH | `/api/v1/seller/application/directors/{director_id}` | bearer | Director Update |
+| GET | `/api/v1/seller/application/documents` | bearer | Latest version of each document |
+| POST | `/api/v1/seller/application/documents` | bearer | Upload or replace a KYC document (PDF/JPG/PNG ≤ 10 MB) |
+| POST | `/api/v1/seller/application/resubmit` | bearer | Update Application → Resubmit |
+| GET | `/api/v1/seller/application/status` | bearer | Application Status / progress timeline |
+| PATCH | `/api/v1/seller/application/steps/banking` | bearer | Step 4 autosave |
+| PATCH | `/api/v1/seller/application/steps/basic-info` | bearer | Step 1 autosave |
+| PATCH | `/api/v1/seller/application/steps/business-info` | bearer | Step 2 autosave |
+| PATCH | `/api/v1/seller/application/steps/representative` | bearer | Step 3 autosave |
+| POST | `/api/v1/seller/application/submit` | bearer | Review & Submit → Submit |
+| GET | `/api/v1/seller/store` | bearer | My store |
+| POST | `/api/v1/seller/store/activate` | bearer | 'Activate & Start Selling' |
+| GET | `/api/v1/seller/store/slug-available` | bearer | Check a store URL |
 
 #### seller: analytics
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/analytics/customers` | bearer | Repeat rate, new vs returning per month, top customers |
-| GET | `/api/v1/api/v1/seller/analytics/export.csv` | bearer | Any report as CSV |
-| GET | `/api/v1/api/v1/seller/analytics/fulfilment` | bearer | Time to ship and deliver, status mix, cancellation/return rates |
-| GET | `/api/v1/api/v1/seller/analytics/funnel` | bearer | Views → wishlist → cart → purchase, with the biggest drop-off |
-| GET | `/api/v1/api/v1/seller/analytics/overview` | bearer | Gross vs net sales, AOV, repeat/cancellation/return rates |
-| GET | `/api/v1/api/v1/seller/analytics/products` | bearer | Best sellers and slow movers |
-| GET | `/api/v1/api/v1/seller/analytics/sales` | bearer | Sales Analytics: gross vs net, discounts, refunds, revenue over time, channel and category mix |
-| GET | `/api/v1/api/v1/seller/analytics/search` | bearer | What shoppers typed; market searches that found nothing |
+| GET | `/api/v1/seller/analytics/customers` | bearer | Repeat rate, new vs returning per month, top customers |
+| GET | `/api/v1/seller/analytics/export.csv` | bearer | Any report as CSV |
+| GET | `/api/v1/seller/analytics/fulfilment` | bearer | Time to ship and deliver, status mix, cancellation/return rates |
+| GET | `/api/v1/seller/analytics/funnel` | bearer | Views → wishlist → cart → purchase, with the biggest drop-off |
+| GET | `/api/v1/seller/analytics/overview` | bearer | Gross vs net sales, AOV, repeat/cancellation/return rates |
+| GET | `/api/v1/seller/analytics/products` | bearer | Best sellers and slow movers |
+| GET | `/api/v1/seller/analytics/sales` | bearer | Sales Analytics: gross vs net, discounts, refunds, revenue over time, channel and category mix |
+| GET | `/api/v1/seller/analytics/search` | bearer | What shoppers typed; market searches that found nothing |
 
 #### seller: chat
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/chat` | bearer | Inbox (premium) |
-| GET | `/api/v1/api/v1/seller/chat/summary` | bearer | Unread badge — allowed on every plan; free sellers get counts only |
-| GET | `/api/v1/api/v1/seller/chat/{conversation_id}` | bearer | Seller Conversation |
-| POST | `/api/v1/api/v1/seller/chat/{conversation_id}/close` | bearer | Mark resolved; a new customer message reopens it |
-| GET | `/api/v1/api/v1/seller/chat/{conversation_id}/messages` | bearer | Seller Messages |
-| POST | `/api/v1/api/v1/seller/chat/{conversation_id}/messages` | bearer | Seller Send |
-| POST | `/api/v1/api/v1/seller/chat/{conversation_id}/read` | bearer | Seller Read |
+| GET | `/api/v1/seller/chat` | bearer | Inbox (premium) |
+| GET | `/api/v1/seller/chat/summary` | bearer | Unread badge — allowed on every plan; free sellers get counts only |
+| GET | `/api/v1/seller/chat/{conversation_id}` | bearer | Seller Conversation |
+| POST | `/api/v1/seller/chat/{conversation_id}/close` | bearer | Mark resolved; a new customer message reopens it |
+| GET | `/api/v1/seller/chat/{conversation_id}/messages` | bearer | Seller Messages |
+| POST | `/api/v1/seller/chat/{conversation_id}/messages` | bearer | Seller Send |
+| POST | `/api/v1/seller/chat/{conversation_id}/read` | bearer | Seller Read |
 
 #### seller: customers
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/customers` | bearer | Customers table (tabs, search, sort) |
-| GET | `/api/v1/api/v1/seller/customers/export.csv` | bearer | 'Export Customers' — CSV |
-| GET | `/api/v1/api/v1/seller/customers/overview` | bearer | Customers Overview: KPIs, growth chart, breakdown, recent |
-| GET | `/api/v1/api/v1/seller/customers/tabs` | bearer | Customers Tabs |
-| GET | `/api/v1/api/v1/seller/customers/{key}` | bearer | View Customer: profile, their orders with this store, notes |
-| POST | `/api/v1/api/v1/seller/customers/{key}/message` | bearer | 'Message Customer' — opens or reuses the chat thread (premium) |
-| POST | `/api/v1/api/v1/seller/customers/{key}/notes` | bearer | 'Add Note' (private to the store) |
-| DELETE | `/api/v1/api/v1/seller/customers/{key}/notes/{note_id}` | bearer | Customer Note Delete |
+| GET | `/api/v1/seller/customers` | bearer | Customers table (tabs, search, sort) |
+| GET | `/api/v1/seller/customers/export.csv` | bearer | 'Export Customers' — CSV |
+| GET | `/api/v1/seller/customers/overview` | bearer | Customers Overview: KPIs, growth chart, breakdown, recent |
+| GET | `/api/v1/seller/customers/tabs` | bearer | Customers Tabs |
+| GET | `/api/v1/seller/customers/{key}` | bearer | View Customer: profile, their orders with this store, notes |
+| POST | `/api/v1/seller/customers/{key}/message` | bearer | 'Message Customer' — opens or reuses the chat thread (premium) |
+| POST | `/api/v1/seller/customers/{key}/notes` | bearer | 'Add Note' (private to the store) |
+| DELETE | `/api/v1/seller/customers/{key}/notes/{note_id}` | bearer | Customer Note Delete |
 
 #### seller: dashboard
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/dashboard` | bearer | Seller Dashboard: KPIs, revenue chart, performance, latest orders, stock breakdown |
-| GET | `/api/v1/api/v1/seller/search` | bearer | Header 'Search anything...' across own products, orders and customers |
+| GET | `/api/v1/seller/dashboard` | bearer | Seller Dashboard: KPIs, revenue chart, performance, latest orders, stock breakdown |
+| GET | `/api/v1/seller/search` | bearer | Header 'Search anything...' across own products, orders and customers |
 
 #### seller: delivery
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/delivery-options` | bearer | My delivery options |
-| POST | `/api/v1/api/v1/seller/delivery-options` | bearer | Add a delivery option |
-| DELETE | `/api/v1/api/v1/seller/delivery-options/{option_id}` | bearer | Remove one (deactivated instead when orders or products reference it) |
-| PATCH | `/api/v1/api/v1/seller/delivery-options/{option_id}` | bearer | Delivery Patch |
+| GET | `/api/v1/seller/delivery-options` | bearer | My delivery options |
+| POST | `/api/v1/seller/delivery-options` | bearer | Add a delivery option |
+| DELETE | `/api/v1/seller/delivery-options/{option_id}` | bearer | Remove one (deactivated instead when orders or products reference it) |
+| PATCH | `/api/v1/seller/delivery-options/{option_id}` | bearer | Delivery Patch |
 
 #### seller: inventory
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/inventory` | bearer | Inventory table (per product, variants nested) |
-| GET | `/api/v1/api/v1/seller/inventory/export.csv` | bearer | 'Export' — CSV, one line per variant |
-| GET | `/api/v1/api/v1/seller/inventory/kpis` | bearer | Inventory Kpis |
-| POST | `/api/v1/api/v1/seller/inventory/{variant_id}/adjust` | bearer | Adjust stock (logged as a manual movement) |
-| GET | `/api/v1/api/v1/seller/inventory/{variant_id}/movements` | bearer | Inventory movements for one variant |
+| GET | `/api/v1/seller/inventory` | bearer | Inventory table (per product, variants nested) |
+| GET | `/api/v1/seller/inventory/export.csv` | bearer | 'Export' — CSV, one line per variant |
+| GET | `/api/v1/seller/inventory/kpis` | bearer | Inventory Kpis |
+| POST | `/api/v1/seller/inventory/{variant_id}/adjust` | bearer | Adjust stock (logged as a manual movement) |
+| GET | `/api/v1/seller/inventory/{variant_id}/movements` | bearer | Inventory movements for one variant |
 
 #### seller: notifications
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/notifications` | bearer | Notifications (tabs: orders, payments, inventory, customers, system, all) |
-| POST | `/api/v1/api/v1/seller/notifications/read-all` | bearer | 'Mark All as Read' (optionally just one tab) |
-| GET | `/api/v1/api/v1/seller/notifications/summary` | bearer | Unread badge and the counts on each tab |
-| POST | `/api/v1/api/v1/seller/notifications/{notification_id}/read` | bearer | Mark one as read |
+| GET | `/api/v1/seller/notifications` | bearer | Notifications (tabs: orders, payments, inventory, customers, system, all) |
+| POST | `/api/v1/seller/notifications/read-all` | bearer | 'Mark All as Read' (optionally just one tab) |
+| GET | `/api/v1/seller/notifications/summary` | bearer | Unread badge and the counts on each tab |
+| POST | `/api/v1/seller/notifications/{notification_id}/read` | bearer | Mark one as read |
 
 #### seller: orders
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/orders` | bearer | Orders table (tabs, search, date range) |
-| GET | `/api/v1/api/v1/seller/orders/export.csv` | bearer | 'Export' — CSV of this store's orders |
-| GET | `/api/v1/api/v1/seller/orders/overview` | bearer | Orders Overview: KPIs, monthly chart, status donut, latest |
-| GET | `/api/v1/api/v1/seller/orders/tabs` | bearer | Orders Tabs |
-| GET | `/api/v1/api/v1/seller/orders/{order_id}` | bearer | View Order |
-| POST | `/api/v1/api/v1/seller/orders/{order_id}/cancel` | bearer | 'Cancel Order' (this store's lines; stock restored) |
-| GET | `/api/v1/api/v1/seller/orders/{order_id}/invoice` | bearer | 'Print / Download Invoice' — invoice data (PDF layout is UI-side) |
-| POST | `/api/v1/api/v1/seller/orders/{order_id}/status` | bearer | 'Update Status' (processing → packed → shipped → delivered; returned after delivery) |
+| GET | `/api/v1/seller/orders` | bearer | Orders table (tabs, search, date range) |
+| GET | `/api/v1/seller/orders/export.csv` | bearer | 'Export' — CSV of this store's orders |
+| GET | `/api/v1/seller/orders/overview` | bearer | Orders Overview: KPIs, monthly chart, status donut, latest |
+| GET | `/api/v1/seller/orders/tabs` | bearer | Orders Tabs |
+| GET | `/api/v1/seller/orders/{order_id}` | bearer | View Order |
+| POST | `/api/v1/seller/orders/{order_id}/cancel` | bearer | 'Cancel Order' (this store's lines; stock restored) |
+| GET | `/api/v1/seller/orders/{order_id}/invoice` | bearer | 'Print / Download Invoice' — invoice data (PDF layout is UI-side) |
+| POST | `/api/v1/seller/orders/{order_id}/status` | bearer | 'Update Status' (processing → packed → shipped → delivered; returned after delivery) |
 
 #### seller: plan
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/plan` | bearer | Current plan and what it unlocks (drives the sidebar locks and the upgrade card) |
+| GET | `/api/v1/seller/plan` | bearer | Current plan and what it unlocks (drives the sidebar locks and the upgrade card) |
 
 #### seller: products
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/products` | bearer | Products table (tabs, filters, sort) |
-| POST | `/api/v1/api/v1/seller/products` | bearer | '+ Add New Product' → step 1 'Save & Continue' (creates a draft) |
-| GET | `/api/v1/api/v1/seller/products/kpis` | bearer | Products KPI cards + tab counts |
-| DELETE | `/api/v1/api/v1/seller/products/{product_id}` | bearer | 'Delete Product' (soft; active products must be archived first) |
-| GET | `/api/v1/api/v1/seller/products/{product_id}` | bearer | Everything the wizard/edit screen needs |
-| PATCH | `/api/v1/api/v1/seller/products/{product_id}` | bearer | Autosave any wizard step (basic info, pricing, shipping…) |
-| GET | `/api/v1/api/v1/seller/products/{product_id}/analytics` | bearer | 'View Analytics' |
-| PUT | `/api/v1/api/v1/seller/products/{product_id}/content` | bearer | Key Benefits / How to Use sections (PDP tabs) |
-| PUT | `/api/v1/api/v1/seller/products/{product_id}/delivery-options` | bearer | Wizard step 4: which delivery options this product supports (empty = all) |
-| POST | `/api/v1/api/v1/seller/products/{product_id}/duplicate` | bearer | 'Duplicate Product' → new draft |
-| POST | `/api/v1/api/v1/seller/products/{product_id}/images` | bearer | Step 2: upload an image (multipart) |
-| PUT | `/api/v1/api/v1/seller/products/{product_id}/images/order` | bearer | Step 2: reorder images (first = primary) |
-| DELETE | `/api/v1/api/v1/seller/products/{product_id}/images/{image_id}` | bearer | Image Delete |
-| PUT | `/api/v1/api/v1/seller/products/{product_id}/options` | bearer | Step 3: option types → variants regenerated |
-| POST | `/api/v1/api/v1/seller/products/{product_id}/status` | bearer | Step 5 'Submit for review' / 'Change Status' / Archive |
-| PATCH | `/api/v1/api/v1/seller/products/{product_id}/variants/{variant_id}` | bearer | Step 3: SKU / price / stock per variant |
+| GET | `/api/v1/seller/products` | bearer | Products table (tabs, filters, sort) |
+| POST | `/api/v1/seller/products` | bearer | '+ Add New Product' → step 1 'Save & Continue' (creates a draft) |
+| GET | `/api/v1/seller/products/kpis` | bearer | Products KPI cards + tab counts |
+| DELETE | `/api/v1/seller/products/{product_id}` | bearer | 'Delete Product' (soft; active products must be archived first) |
+| GET | `/api/v1/seller/products/{product_id}` | bearer | Everything the wizard/edit screen needs |
+| PATCH | `/api/v1/seller/products/{product_id}` | bearer | Autosave any wizard step (basic info, pricing, shipping…) |
+| GET | `/api/v1/seller/products/{product_id}/analytics` | bearer | 'View Analytics' |
+| PUT | `/api/v1/seller/products/{product_id}/content` | bearer | Key Benefits / How to Use sections (PDP tabs) |
+| PUT | `/api/v1/seller/products/{product_id}/delivery-options` | bearer | Wizard step 4: which delivery options this product supports (empty = all) |
+| POST | `/api/v1/seller/products/{product_id}/duplicate` | bearer | 'Duplicate Product' → new draft |
+| POST | `/api/v1/seller/products/{product_id}/images` | bearer | Step 2: upload an image (multipart) |
+| PUT | `/api/v1/seller/products/{product_id}/images/order` | bearer | Step 2: reorder images (first = primary) |
+| DELETE | `/api/v1/seller/products/{product_id}/images/{image_id}` | bearer | Image Delete |
+| PUT | `/api/v1/seller/products/{product_id}/options` | bearer | Step 3: option types → variants regenerated |
+| POST | `/api/v1/seller/products/{product_id}/status` | bearer | Step 5 'Submit for review' / 'Change Status' / Archive |
+| PATCH | `/api/v1/seller/products/{product_id}/variants/{variant_id}` | bearer | Step 3: SKU / price / stock per variant |
 
 #### seller: returns
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/returns` | bearer | Returns for this store (tabs: all, open, requested, approved, rejected, escalated, received, refunded, cancelled, overdue) |
-| GET | `/api/v1/api/v1/seller/returns/summary` | bearer | Counts for the tabs |
-| GET | `/api/v1/api/v1/seller/returns/{return_id}` | bearer | Seller Return |
-| POST | `/api/v1/api/v1/seller/returns/{return_id}/approve` | bearer | Approve: the buyer may send it back |
-| POST | `/api/v1/api/v1/seller/returns/{return_id}/received` | bearer | The parcel arrived: good = refund now, damaged = staff decide |
-| POST | `/api/v1/api/v1/seller/returns/{return_id}/reject` | bearer | Reject with a reason the buyer sees |
+| GET | `/api/v1/seller/returns` | bearer | Returns for this store (tabs: all, open, requested, approved, rejected, escalated, received, refunded, cancelled, overdue) |
+| GET | `/api/v1/seller/returns/summary` | bearer | Counts for the tabs |
+| GET | `/api/v1/seller/returns/{return_id}` | bearer | Seller Return |
+| POST | `/api/v1/seller/returns/{return_id}/approve` | bearer | Approve: the buyer may send it back |
+| POST | `/api/v1/seller/returns/{return_id}/received` | bearer | The parcel arrived: good = refund now, damaged = staff decide |
+| POST | `/api/v1/seller/returns/{return_id}/reject` | bearer | Reject with a reason the buyer sees |
 
 #### seller: team
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/me` | bearer | Who is working here and what may they see (drives the sidebar) |
-| GET | `/api/v1/api/v1/seller/team` | bearer | Team Members table (owner first) |
-| POST | `/api/v1/api/v1/seller/team/invites` | bearer | '+ Invite Member' |
-| GET | `/api/v1/api/v1/seller/team/roles` | bearer | Role presets (for the invite form and the filter) |
-| GET | `/api/v1/api/v1/seller/team/summary` | bearer | The four KPI cards |
-| DELETE | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Remove a member or cancel an invitation |
-| GET | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Member Details (`owner` is a valid id) |
-| PATCH | `/api/v1/api/v1/seller/team/{member_id}` | bearer | Edit Permissions popup / change role / suspend |
-| GET | `/api/v1/api/v1/seller/team/{member_id}/activity` | bearer | Everything this person did (newest first) |
-| POST | `/api/v1/api/v1/seller/team/{member_id}/resend` | bearer | Send a pending invitation again (new link, new expiry) |
+| GET | `/api/v1/seller/me` | bearer | Who is working here and what may they see (drives the sidebar) |
+| GET | `/api/v1/seller/team` | bearer | Team Members table (owner first) |
+| POST | `/api/v1/seller/team/invites` | bearer | '+ Invite Member' |
+| GET | `/api/v1/seller/team/roles` | bearer | Role presets (for the invite form and the filter) |
+| GET | `/api/v1/seller/team/summary` | bearer | The four KPI cards |
+| DELETE | `/api/v1/seller/team/{member_id}` | bearer | Remove a member or cancel an invitation |
+| GET | `/api/v1/seller/team/{member_id}` | bearer | Member Details (`owner` is a valid id) |
+| PATCH | `/api/v1/seller/team/{member_id}` | bearer | Edit Permissions popup / change role / suspend |
+| GET | `/api/v1/seller/team/{member_id}/activity` | bearer | Everything this person did (newest first) |
+| POST | `/api/v1/seller/team/{member_id}/resend` | bearer | Send a pending invitation again (new link, new expiry) |
 
 #### seller: transactions
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/seller/transactions` | bearer | All Transactions (tabs, search, filters) |
-| GET | `/api/v1/api/v1/seller/transactions/export.csv` | bearer | 'Export Transactions' — CSV of the current filters |
-| GET | `/api/v1/api/v1/seller/transactions/overview` | bearer | Transactions Overview: cards, recent transactions, summary |
-| GET | `/api/v1/api/v1/seller/transactions/tabs` | bearer | Counts for the tab labels: Sales (1,102), Payouts (24)… |
-| GET | `/api/v1/api/v1/seller/transactions/{reference}` | bearer | Transaction Details |
+| GET | `/api/v1/seller/transactions` | bearer | All Transactions (tabs, search, filters) |
+| GET | `/api/v1/seller/transactions/export.csv` | bearer | 'Export Transactions' — CSV of the current filters |
+| GET | `/api/v1/seller/transactions/overview` | bearer | Transactions Overview: cards, recent transactions, summary |
+| GET | `/api/v1/seller/transactions/tabs` | bearer | Counts for the tab labels: Sales (1,102), Payouts (24)… |
+| GET | `/api/v1/seller/transactions/{reference}` | bearer | Transaction Details |
 
 #### admin · orders
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/admin/orders` | bearer | Admin Orders |
-| GET | `/api/v1/api/v1/admin/orders/{order_id}` | bearer | Admin Order Detail |
-| POST | `/api/v1/api/v1/admin/orders/{order_id}/status` | bearer | Advance an order (writes the tracking timeline) |
+| GET | `/api/v1/admin/orders` | bearer | Admin Orders |
+| GET | `/api/v1/admin/orders/{order_id}` | bearer | Admin Order Detail |
+| POST | `/api/v1/admin/orders/{order_id}/status` | bearer | Advance an order (writes the tracking timeline) |
 
 #### admin · returns
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/admin/returns` | bearer | All returns (default: escalated and damaged first) |
-| GET | `/api/v1/api/v1/admin/returns/policies` | bearer | Every market's return policy |
-| PUT | `/api/v1/api/v1/admin/returns/policies/{code}` | bearer | Set a market's return policy (creates it if the market has none) |
-| GET | `/api/v1/api/v1/admin/returns/reasons` | bearer | Admin Reasons |
-| POST | `/api/v1/api/v1/admin/returns/reasons` | bearer | Admin Reason Create |
-| PATCH | `/api/v1/api/v1/admin/returns/reasons/{reason_id}` | bearer | Admin Reason Patch |
-| GET | `/api/v1/api/v1/admin/returns/rules` | bearer | Per-category overrides of the market policy |
-| POST | `/api/v1/api/v1/admin/returns/rules` | bearer | Admin Rule Create |
-| DELETE | `/api/v1/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Delete |
-| PATCH | `/api/v1/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Patch |
-| GET | `/api/v1/api/v1/admin/returns/summary` | bearer | Admin Returns Summary |
-| GET | `/api/v1/api/v1/admin/returns/{return_id}` | bearer | Admin Return |
-| POST | `/api/v1/api/v1/admin/returns/{return_id}/decide` | bearer | Settle an escalated rejection or a damaged parcel (final) |
-| POST | `/api/v1/api/v1/admin/returns/{return_id}/refund-paid` | bearer | Staff paid the buyer |
+| GET | `/api/v1/admin/returns` | bearer | All returns (default: escalated and damaged first) |
+| GET | `/api/v1/admin/returns/policies` | bearer | Every market's return policy |
+| PUT | `/api/v1/admin/returns/policies/{code}` | bearer | Set a market's return policy (creates it if the market has none) |
+| GET | `/api/v1/admin/returns/reasons` | bearer | Admin Reasons |
+| POST | `/api/v1/admin/returns/reasons` | bearer | Admin Reason Create |
+| PATCH | `/api/v1/admin/returns/reasons/{reason_id}` | bearer | Admin Reason Patch |
+| GET | `/api/v1/admin/returns/rules` | bearer | Per-category overrides of the market policy |
+| POST | `/api/v1/admin/returns/rules` | bearer | Admin Rule Create |
+| DELETE | `/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Delete |
+| PATCH | `/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Patch |
+| GET | `/api/v1/admin/returns/summary` | bearer | Admin Returns Summary |
+| GET | `/api/v1/admin/returns/{return_id}` | bearer | Admin Return |
+| POST | `/api/v1/admin/returns/{return_id}/decide` | bearer | Settle an escalated rejection or a damaged parcel (final) |
+| POST | `/api/v1/admin/returns/{return_id}/refund-paid` | bearer | Staff paid the buyer |
 
 #### admin · sellers
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/admin/seller-applications` | bearer | Review queue |
-| GET | `/api/v1/api/v1/admin/seller-applications/{application_id}` | bearer | Admin Detail |
-| POST | `/api/v1/api/v1/admin/seller-applications/{application_id}/approve` | bearer | Admin Approve |
-| POST | `/api/v1/api/v1/admin/seller-applications/{application_id}/documents/{document_id}/review` | bearer | Admin Review Document |
-| POST | `/api/v1/api/v1/admin/seller-applications/{application_id}/reject` | bearer | Admin Reject |
-| POST | `/api/v1/api/v1/admin/seller-applications/{application_id}/request-info` | bearer | 'We Need More Information' |
-| POST | `/api/v1/api/v1/admin/seller-applications/{application_id}/start-review` | bearer | Admin Start Review |
+| GET | `/api/v1/admin/seller-applications` | bearer | Review queue |
+| GET | `/api/v1/admin/seller-applications/{application_id}` | bearer | Admin Detail |
+| POST | `/api/v1/admin/seller-applications/{application_id}/approve` | bearer | Admin Approve |
+| POST | `/api/v1/admin/seller-applications/{application_id}/documents/{document_id}/review` | bearer | Admin Review Document |
+| POST | `/api/v1/admin/seller-applications/{application_id}/reject` | bearer | Admin Reject |
+| POST | `/api/v1/admin/seller-applications/{application_id}/request-info` | bearer | 'We Need More Information' |
+| POST | `/api/v1/admin/seller-applications/{application_id}/start-review` | bearer | Admin Start Review |
 
 #### admin: chat
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/admin/chat/flagged` | bearer | Messages that look like off-platform contact details |
+| GET | `/api/v1/admin/chat/flagged` | bearer | Messages that look like off-platform contact details |
 
 #### admin: ledger
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/admin/ledger/adjustments` | bearer | Staff: credit or debit a store, with a reason |
-| GET | `/api/v1/api/v1/admin/ledger/stores/{store_id}` | bearer | Staff: a store's balances (what a payout can be) |
-| GET | `/api/v1/api/v1/admin/payouts` | bearer | Staff: payouts, newest first |
-| POST | `/api/v1/api/v1/admin/payouts` | bearer | Staff: pay a store out of its available balance |
-| PATCH | `/api/v1/api/v1/admin/payouts/{payout_id}/status` | bearer | Staff: mark a payout completed or failed |
+| POST | `/api/v1/admin/ledger/adjustments` | bearer | Staff: credit or debit a store, with a reason |
+| GET | `/api/v1/admin/ledger/stores/{store_id}` | bearer | Staff: a store's balances (what a payout can be) |
+| GET | `/api/v1/admin/payouts` | bearer | Staff: payouts, newest first |
+| POST | `/api/v1/admin/payouts` | bearer | Staff: pay a store out of its available balance |
+| PATCH | `/api/v1/admin/payouts/{payout_id}/status` | bearer | Staff: mark a payout completed or failed |
 
 #### admin: products
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/v1/api/v1/admin/products` | bearer | Review queue (default: pending) |
-| POST | `/api/v1/api/v1/admin/products/{product_id}/approve` | bearer | Admin Product Approve |
-| POST | `/api/v1/api/v1/admin/products/{product_id}/reject` | bearer | Admin Product Reject |
+| GET | `/api/v1/admin/products` | bearer | Review queue (default: pending) |
+| POST | `/api/v1/admin/products/{product_id}/approve` | bearer | Admin Product Approve |
+| POST | `/api/v1/admin/products/{product_id}/reject` | bearer | Admin Product Reject |
 
 #### admin: stores
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| POST | `/api/v1/api/v1/admin/stores/{store_id}/plan` | bearer | Staff: put a store on the premium plan (same as the admin toggle) |
+| POST | `/api/v1/admin/stores/{store_id}/plan` | bearer | Staff: put a store on the premium plan (same as the admin toggle) |

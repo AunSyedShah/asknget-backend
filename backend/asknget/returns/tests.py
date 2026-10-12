@@ -10,11 +10,13 @@ from io import BytesIO
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.test import Client, TestCase
 from django.utils import timezone
+from ninja.errors import HttpError
 from PIL import Image
 
 from catalog.models import StockMovement
-from config.models import Setting
+from config.models import CommissionRule, Setting
 from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user
 from ledger import services as ledger
 from ledger.models import LedgerEntry
@@ -42,7 +44,17 @@ def png(name="p.png"):
     return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
 
 
+class CommitClient(Client):
+    """Runs the work a request schedules for after its commit (courier booking, e-mails), as production does. Django's
+    TestCase otherwise never commits, so those callbacks would never run."""
+
+    def request(self, **request):
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            return super().request(**request)
+
+
 class ReturnsTestCase(ApiTestCase):
+    client_class = CommitClient
     @classmethod
     def setUpTestData(cls):
         cls.owner_a, cls.owner_b = make_user(is_seller=True), make_user(is_seller=True)
@@ -233,10 +245,50 @@ class EligibilityTests(ReturnsTestCase):
         self.assertEqual(self.post(f"{ME}/returns/{req.pk}/cancel", None, self.buyer_token).status_code, 200)
         self.assertEqual(self.returnable(order)["lines"][0]["eligible"], True)
 
+    def test_a_final_refusal_of_change_of_mind_still_allows_a_defect_claim(self):
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)], "changed_mind")
+        self.seller_post(req, "reject", {"reason": "Opened"})
+        self.assertEqual(self.returnable(order)["lines"][0]["why_not"], "already_requested")    # not final yet: dispute instead
+        self.post(f"{ME}/returns/{req.pk}/escalate", None, self.buyer_token)
+        self.staff_post(req, "decide", {"outcome": "reject", "note": "Opened cosmetics"})
+        self.assertEqual(self.returnable(order, "changed_mind")["lines"][0]["why_not"], "already_requested")
+        line = self.returnable(order)["lines"][0]
+        self.assertTrue(line["eligible"], line)                                                 # the defect window is still open
+        self.assertEqual(line["deadline"], line["defect_until"])
+        self.assertEqual(self.ask(order, [self.item(order, self.bb)], "changed_mind").status_code, 409)
+        self.assertEqual(self.ask(order, [self.item(order, self.bb)], "damaged", photos=[png()]).status_code, 201)
+
+    def test_goods_the_seller_received_cannot_be_claimed_again(self):
+        order = self.delivered((self.bb, 1))
+        req = self.returned_to_seller(self.request(order, [self.item(order, self.bb)], "changed_mind"), "damaged")
+        self.staff_post(req, "decide", {"outcome": "reject", "note": "Damaged by the buyer"})
+        self.assertEqual(self.returnable(order)["lines"][0]["why_not"], "already_requested")
+        self.assertEqual(self.ask(order, [self.item(order, self.bb)], "damaged", photos=[png()]).status_code, 409)
+
+    def test_an_unknown_reason_on_the_returnable_page_is_refused(self):
+        order = self.delivered((self.bb, 1))
+        self.assertEqual(self.get(f"{ME}/orders/{order.pk}/returnable", self.buyer_token, reason="nope").status_code, 422)
+
+    def test_the_orders_return_deadline_follows_the_line_terms(self):
+        ReturnPolicy.objects.filter(country_id="ZA").update(window_days=30, defect_days=180)
+        ReturnRule.objects.create(category=self.beauty, change_of_mind_days=0)
+        order = self.delivered((self.bb, 1))
+        until = self.get(f"{ME}/orders/{order.pk}", self.buyer_token).json()["return_eligible_until"]
+        delivered = OrderStatusEvent.objects.filter(order=order, status="delivered").latest("created_at").created_at
+        self.assertEqual(until[:16], (delivered + timedelta(days=180)).isoformat()[:16])
+
     def test_a_goodwill_returned_line_reads_already_returned(self):
         order = self.delivered((self.bb, 1))
         self.assertEqual(self.post(f"/api/v1/seller/orders/{order.pk}/status", {"status": "returned"}, self.token_a).status_code, 200)
         self.assertEqual(self.returnable(order)["lines"][0]["why_not"], "already_returned")
+
+    def test_an_order_staff_refunded_by_hand_cannot_be_returned_for_money_again(self):
+        order = self.delivered((self.bb, 1))
+        self.assertEqual(self.post(f"/api/v1/admin/orders/{order.pk}/status", {"status": "refunded"}, self.staff_token).status_code, 200)
+        self.assertEqual(self.returnable(order)["lines"][0]["why_not"], "already_refunded")
+        res = self.ask(order, [self.item(order, self.bb)], "damaged", photos=[png()])
+        self.assertEqual((res.status_code, res.json()["detail"]), (409, "already_refunded"))
 
     def test_someone_elses_order_is_not_found(self):
         order = self.delivered((self.bb, 1))
@@ -255,6 +307,9 @@ class EligibilityTests(ReturnsTestCase):
 
 
 class RequestTests(ReturnsTestCase):
+    def returnable(self, order):
+        return self.get(f"{ME}/orders/{order.pk}/returnable", self.buyer_token).json()
+
     def test_the_happy_path_creates_a_request_with_a_reference_and_a_response_deadline(self):
         order = self.delivered((self.bb, 1), (self.lip, 1))
         res = self.ask(order, [self.item(order, self.bb)], note="Not for me")
@@ -304,6 +359,15 @@ class RequestTests(ReturnsTestCase):
         self.assertEqual(res.status_code, 201, res.content)
         self.assertEqual(len(res.json()["photos"]), 1)
 
+    def test_a_photo_is_stored_under_a_name_we_choose(self):
+        order = self.delivered((self.bb, 1))
+        buf = BytesIO()
+        Image.new("RGB", (4, 4), "red").save(buf, format="PNG")
+        page = SimpleUploadedFile("evil.html", buf.getvalue() + b"<script>alert(1)</script>", content_type="text/html")
+        req = self.request(order, [self.item(order, self.bb)], "damaged", photos=[page])
+        name = req.photos.get().image.name
+        self.assertTrue(name.endswith(".png") and "evil" not in name, name)
+
     def test_the_photo_limit_is_an_admin_setting(self):
         Setting.objects.create(scope="global", key="returns.max_photos", value=1)
         order = self.delivered((self.bb, 1))
@@ -336,6 +400,14 @@ class RequestTests(ReturnsTestCase):
         self.assertEqual(first.delivery_refund_cents, 0)
         second = self.request(order, [self.item(order, self.lip)], "damaged", photos=[png()])        # the rest of the store's order
         self.assertGreater(second.delivery_refund_cents, 0)
+
+    def test_a_rejected_request_does_not_use_up_the_delivery_refund(self):
+        order = self.delivered((self.bb, 1))
+        first = self.request(order, [self.item(order, self.bb)], "damaged", photos=[png()])
+        self.assertGreater(first.delivery_refund_cents, 0)
+        ReturnRequest.objects.filter(pk=first.pk).update(status="rejected")
+        amounts = services._refund_amounts(order, self.store_a.pk, [self.item(order, self.bb)], self.r_wrong)
+        self.assertEqual(amounts["delivery_refund_cents"], first.delivery_refund_cents)
 
     def test_the_vouchers_share_comes_off_the_refund(self):
         Voucher.objects.create(code="SAVE20", type="percent", value=20)
@@ -428,6 +500,31 @@ class WorkflowTests(ReturnsTestCase):
         self.assertEqual(self.amount(self.store_a, T.FEE_REFUND, order=order), 500)           # two thirds of the commission
         self.assertEqual(req.ledger_entries.count(), 2)
 
+    def test_the_commission_returned_is_the_returned_lines_own_rate(self):
+        CommissionRule.objects.create(scope="category", category=self.beauty, rate_bps=1000)        # 10 % on beauty, 5 % (global) on tech
+        order = self.delivered((self.bb, 1), (self.cable, 1))                                      # 10000 at 10 % + 2000 at 5 % = 1100
+        self.assertEqual(self.amount(self.store_a, T.FEE, order=order), -1100)
+        self.returned_to_seller(self.request(order, [self.item(order, self.cable)]))
+        self.assertEqual(self.amount(self.store_a, T.FEE_REFUND, order=order), 100)               # the cable's 5 %, not 2/12 of 1100
+        self.returned_to_seller(self.request(order, [self.item(order, self.bb)]))
+        self.assertEqual(self.amount(self.store_a, T.FEE_REFUND, order=order), 1100)              # all of it, nothing more
+
+    def test_per_line_rates_still_respect_the_voucher(self):
+        CommissionRule.objects.create(scope="category", category=self.beauty, rate_bps=1000)
+        Voucher.objects.create(code="SAVE20", type="percent", value=20)
+        order = self.delivered((self.bb, 1), (self.cable, 1), voucher="SAVE20")                   # fee 1100 * 0.8 = 880
+        self.assertEqual(self.amount(self.store_a, T.FEE, order=order), -880)
+        self.returned_to_seller(self.request(order, [self.item(order, self.cable)]))
+        self.assertEqual(self.amount(self.store_a, T.FEE_REFUND, order=order), 80)
+
+    def test_a_fee_without_a_breakdown_falls_back_to_a_share_by_value(self):
+        order = self.delivered((self.bb, 1), (self.lip, 1))
+        fee = LedgerEntry.objects.get(order=order, store=self.store_a, type=T.FEE)
+        fee.meta = {}
+        fee.save(update_fields=["meta"])
+        self.returned_to_seller(self.request(order, [self.item(order, self.bb)]))
+        self.assertEqual(self.amount(self.store_a, T.FEE_REFUND, order=order), 500)
+
     def test_a_voucher_is_respected_in_both_the_refund_and_the_commission(self):
         Voucher.objects.create(code="SAVE20", type="percent", value=20)
         order = self.delivered((self.bb, 1), (self.lip, 1), voucher="SAVE20")                 # net 12000, commission 600
@@ -453,6 +550,37 @@ class WorkflowTests(ReturnsTestCase):
         before = LedgerEntry.objects.count()
         ledger.refund(order)
         self.assertEqual(LedgerEntry.objects.count(), before)                                # and never twice
+
+    def test_the_buyer_is_owed_only_what_the_ledger_actually_gave_back(self):
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        ledger.refund(order)                                    # e.g. a refund posted by another path while the return was open
+        req = self.returned_to_seller(req)
+        self.assertEqual((req.refund_cents, req.refund_status), (0, "none"))
+        self.assertEqual(LedgerEntry.objects.filter(return_request=req).count(), 0)
+
+    def test_a_second_click_on_received_does_nothing_twice(self):
+        order = self.delivered((self.bb, 1))
+        bb = self.item(order, self.bb)
+        stock = bb.variant.stock_qty
+        req = self.request(order, [bb])
+        self.seller_post(req, "approve")
+        stale = ReturnRequest.objects.get(pk=req.pk)               # what a second, simultaneous request would still hold
+        services.mark_received(ReturnRequest.objects.get(pk=req.pk), user=self.owner_a, condition="good")
+        with self.assertRaises(HttpError):
+            services.mark_received(stale, user=self.owner_a, condition="good")
+        bb.variant.refresh_from_db()
+        self.assertEqual(bb.variant.stock_qty, stock + 1)
+        self.assertEqual(StockMovement.objects.filter(variant=bb.variant, reason="return").count(), 1)
+
+    def test_a_second_click_on_approve_books_one_pickup(self):
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        stale = ReturnRequest.objects.get(pk=req.pk)
+        services.approve(ReturnRequest.objects.get(pk=req.pk), actor="seller", user=self.owner_a)
+        with self.assertRaises(HttpError):
+            services.approve(stale, actor="seller", user=self.owner_a)
+        self.assertEqual(ReturnShipment.objects.filter(request=req).count(), 1)
 
     def test_one_refund_per_request_even_if_asked_twice(self):
         order = self.delivered((self.bb, 1))
@@ -494,6 +622,32 @@ class WorkflowTests(ReturnsTestCase):
         self.returned_to_seller(req)
         subjects = [m.subject for m in mail.outbox if req.reference in m.subject]
         self.assertTrue(any("approved" in s for s in subjects) and any("refund" in s for s in subjects), subjects)
+
+    # -- bug 12: a refund after the money was paid out ------------------------------------------
+    def test_a_refund_after_payout_leaves_a_debt_and_blocks_payouts_until_repaid(self):
+        Setting.objects.create(scope="global", key="payouts.hold_mode", value="none")          # money available at once
+        order = self.delivered((self.bb, 1))
+        available = ledger.balances(self.store_a)["available_cents"]
+        ledger.set_payout_status(ledger.create_payout(self.store_a, amount_cents=available, note="all", by=self.staff), "completed", self.staff)
+        self.returned_to_seller(self.request(order, [self.item(order, self.bb)], "damaged", photos=[png()]))
+        owed = ledger.balances(self.store_a)["available_cents"]
+        self.assertLess(owed, 0)                                                              # the seller owes it back
+        with self.assertRaises(HttpError) as refused:
+            ledger.create_payout(self.store_a, amount_cents=100, note="more", by=self.staff)
+        self.assertEqual(refused.exception.status_code, 409)
+        self.delivered((self.watch, 1))                                                      # another store's sale does not repay it
+        self.assertEqual(ledger.balances(self.store_a)["available_cents"], owed)
+
+    def test_a_payout_locks_the_store_while_it_checks_the_balance(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        Setting.objects.create(scope="global", key="payouts.hold_mode", value="none")
+        self.delivered((self.bb, 1))
+        with CaptureQueriesContext(connection) as queries:
+            ledger.create_payout(self.store_a, amount_cents=100, note="x", by=self.staff)
+        if connection.features.has_select_for_update:                                        # Postgres; SQLite has no row locks
+            self.assertTrue(any("FOR UPDATE" in q["sql"] and "sellers_store" in q["sql"] for q in queries.captured_queries))
 
     # -- saying no ---------------------------------------------------------------------------
     def test_a_rejection_needs_a_reason_the_buyer_can_see(self):
@@ -560,6 +714,28 @@ class WorkflowTests(ReturnsTestCase):
         self.assertEqual((res.json()["status"], res.json()["is_final"]), ("rejected", True))
         self.assertEqual(self.amount(self.store_a, T.REFUND, order=order), 0)
 
+    def test_a_seller_cannot_overrule_staff(self):
+        order = self.delivered((self.bb, 1), (self.lip, 1))
+        disputed = self.request(order, [self.item(order, self.bb)])
+        self.seller_post(disputed, "reject", {"reason": "Not eligible"})
+        self.post(f"{ME}/returns/{disputed.pk}/escalate", None, self.buyer_token)
+        self.assertEqual(self.seller_post(disputed, "reject", {"reason": "Still no"}).status_code, 409)
+        self.assertEqual(self.seller_post(disputed, "approve").status_code, 409)
+        damaged = self.returned_to_seller(self.request(order, [self.item(order, self.lip)]), "damaged")
+        self.assertEqual(self.seller_post(damaged, "reject", {"reason": "Buyer broke it"}).status_code, 409)
+        self.assertEqual(ReturnRequest.objects.get(pk=damaged.pk).status, "received")       # still waiting for staff
+        self.assertEqual(ReturnRequest.objects.get(pk=disputed.pk).status, "escalated")
+
+    def test_refusing_a_damaged_parcel_tells_everyone_the_item_goes_back(self):
+        order = self.delivered((self.bb, 1))
+        req = self.returned_to_seller(self.request(order, [self.item(order, self.bb)]), "damaged")
+        mail.outbox.clear()
+        self.staff_post(req, "decide", {"outcome": "reject", "note": "Damaged by the buyer"})
+        self.assertTrue(any("send the item back to you" in m.body for m in mail.outbox))
+        self.assertIn("sends the item back to the customer", list(ReturnRequest.objects.get(pk=req.pk).events.values_list("note", flat=True))[-1])
+        feed = self.get("/api/v1/seller/notifications", self.token_a, tab="returns").json()["items"]
+        self.assertIn("please send the item back to the customer", feed[0]["body"])
+
     def test_staff_cannot_decide_a_request_that_needs_no_decision(self):
         order = self.delivered((self.bb, 1))
         req = self.request(order, [self.item(order, self.bb)])
@@ -599,6 +775,28 @@ class WorkflowTests(ReturnsTestCase):
         ship = self.get(f"{ME}/returns/{req.pk}", self.buyer_token).json()["shipment"]
         self.assertEqual((ship["tracking_number"], ship["status"]), ("TCS123456", "in_transit"))
         self.assertEqual(ship["dropoff_address"]["name"], "Huda Beauty")
+
+    # -- one store's lines in different states after a return -------------------------------
+    def test_the_sellers_order_screens_follow_the_lines_still_in_play(self):
+        order = self.delivered((self.bb, 1), (self.lip, 1))          # bb is the store's first line
+        self.returned_to_seller(self.request(order, [self.item(order, self.bb)]))
+        rows = self.get("/api/v1/seller/orders", self.token_a).json()["items"]
+        self.assertEqual([r["status"] for r in rows if r["order_number"] == order.order_number], ["delivered"])
+        detail = self.get(f"/api/v1/seller/orders/{order.pk}", self.token_a).json()
+        self.assertEqual((detail["status"], detail["allowed_next"]), ("delivered", ["returned"]))
+
+    def test_a_goodwill_return_after_a_partial_one_moves_only_the_rest(self):
+        order = self.delivered((self.bb, 1), (self.lip, 1))
+        lip = self.item(order, self.lip)
+        stock = lip.variant.stock_qty
+        self.returned_to_seller(self.request(order, [self.item(order, self.bb)]))
+        sale = self.amount(self.store_a, T.SALE, order=order)
+        res = self.post(f"/api/v1/seller/orders/{order.pk}/status", {"status": "returned"}, self.token_a)
+        self.assertEqual(res.status_code, 200, res.content)
+        lip.variant.refresh_from_db()
+        self.assertEqual(lip.variant.stock_qty, stock + 1)                                   # the lip gloss only; bb was restocked by its return
+        self.assertEqual(self.amount(self.store_a, T.REFUND, order=order), -sale)            # the rest of the sale, once
+        self.assertEqual(set(OrderItem.objects.filter(order=order).values_list("status", flat=True)), {"returned"})
 
     # -- no double payment between the two ways of returning ---------------------------------
     def test_a_goodwill_return_is_blocked_while_a_customer_return_is_open(self):
@@ -765,6 +963,40 @@ class AdminRulesTests(ReturnsTestCase):
         self.assertEqual(self.delete(f"{ADMIN}/rules/{rule_id}", self.staff_token).status_code, 204)
         self.assertEqual(self.delete(f"{ADMIN}/rules/{rule_id}", self.staff_token).status_code, 404)
 
+    def test_one_all_markets_rule_per_category(self):
+        ReturnRule.objects.create(category=self.beauty, change_of_mind_days=0)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ReturnRule.objects.create(category=self.beauty, defect_days=10)
+        ReturnRule.objects.create(category=self.beauty, country_id="ZA", change_of_mind_days=5)      # a market's own rule is still fine
+
+    def test_return_parts_are_read_only_in_django_admin(self):
+        from django.contrib import admin as dj_admin
+        from django.test import RequestFactory
+
+        from .admin import ReturnEventInline, ReturnItemInline, ReturnPhotoInline, ReturnShipmentInline
+
+        http = RequestFactory().get("/")
+        http.user = self.staff
+        for inline in (ReturnItemInline, ReturnEventInline, ReturnPhotoInline, ReturnShipmentInline):
+            instance = inline(ReturnRequest, dj_admin.site)
+            self.assertFalse(instance.has_add_permission(http, None), inline)
+            self.assertFalse(instance.has_change_permission(http, None), inline)
+
+    def test_notification_parameters_are_shown_in_the_readers_language(self):
+        from django.utils import translation
+
+        from notifications import services as notes
+
+        ReturnReason.objects.filter(code="damaged").update(label={"en": "It arrived damaged", "ur": "خراب پہنچا"})
+        order = self.delivered((self.bb, 1))
+        self.request(order, [self.item(order, self.bb)], "damaged", photos=[png()])
+        note = StoreNotification.objects.get(store=self.store_a, kind="return_requested")
+        known = notes.templates()
+        with translation.override("ur"):
+            self.assertIn("خراب پہنچا", notes.render(note, known)[1])
+        with translation.override("en"):
+            self.assertIn("It arrived damaged", notes.render(note, known)[1])
+
     def test_the_rules_need_staff(self):
         for path in ("policies", "reasons", "rules"):
             self.assertEqual(self.get(f"{ADMIN}/{path}", self.buyer_token).status_code, 403, path)
@@ -792,9 +1024,11 @@ class FakeCourier(couriers.Courier):
 
     def __init__(self):
         self.cancelled = []
+        self.booked = 0
         self.fail = False
 
     def book_return(self, request, pickup, dropoff):
+        self.booked += 1
         if self.fail:
             raise RuntimeError("courier is down")
         return couriers.Booking(tracking_number="FS-1001", tracking_url="https://fastship.example/FS-1001", label_url="https://fastship.example/label.pdf",
@@ -809,6 +1043,11 @@ class FakeCourier(couriers.Courier):
     def parse_webhook(self, body, headers):
         if headers.get("X-Signature") != "ok":
             raise NotImplementedError
+        import json
+
+        sent = json.loads(body or b"{}")
+        if isinstance(sent, list):                       # the test chooses what the courier says
+            return [couriers.TrackingUpdate(**u) for u in sent]
         return [couriers.TrackingUpdate(status="in_transit", external_id="BK-77", note="Picked up")]
 
 
@@ -909,6 +1148,79 @@ class CourierSeamTests(ReturnsTestCase):
         services.apply_update(ship, couriers.TrackingUpdate(status="delivered", external_id="BK-77"))
         services.apply_update(ship, couriers.TrackingUpdate(status="in_transit", external_id="BK-77"))
         self.assertEqual(req.shipments.get().status, "delivered")
+
+    # -- bug 7: nothing leaves before the approval is saved ------------------------------------
+    def test_a_rolled_back_approval_books_nothing_and_emails_nobody(self):
+        self.use_fake()
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        mail.outbox.clear()
+        with self.captureOnCommitCallbacks(execute=True):
+            try:
+                with transaction.atomic():
+                    services.approve(req, actor="seller", user=self.owner_a)
+                    raise RuntimeError("something after the approval failed")
+            except RuntimeError:
+                pass
+        self.assertEqual(self.fake.booked, 0)
+        self.assertEqual(mail.outbox, [])
+        self.assertEqual(ReturnRequest.objects.get(pk=req.pk).status, "requested")
+
+    def test_the_approval_email_says_how_to_send_it(self):
+        self.use_fake()
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        mail.outbox.clear()
+        self.seller_post(req, "approve")
+        body = next(m.body for m in mail.outbox if "approved" in m.subject)
+        self.assertIn("label and tracking details", body)
+
+    def test_the_manual_approval_email_gives_the_address_not_tracking(self):
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        mail.outbox.clear()
+        self.seller_post(req, "approve")
+        body = next(m.body for m in mail.outbox if "approved" in m.subject)
+        self.assertIn("Please post it to Huda Beauty", body)
+        self.assertNotIn("label", body)
+
+    def test_a_tracking_number_typed_before_the_booking_finishes_is_kept(self):
+        self.use_fake()
+        order = self.delivered((self.bb, 1))
+        req = self.request(order, [self.item(order, self.bb)])
+        services.approve(req, actor="seller", user=self.owner_a)          # the courier call is still pending (no commit yet)
+        services.add_tracking(ReturnRequest.objects.get(pk=req.pk), user=self.buyer, tracking_number="MY-OWN-1")
+        shipment = ReturnShipment.objects.get(request=req)
+        services._book_and_tell(shipment.pk)                                  # what runs after commit
+        shipment.refresh_from_db()
+        self.assertEqual((shipment.tracking_number, shipment.status), ("MY-OWN-1", "in_transit"))
+        self.assertEqual(self.fake.booked, 0)
+
+    # -- bug 8: never guess which parcel a message is about ------------------------------------
+    def webhook(self, updates):
+        import json
+
+        return self.client.post("/api/v1/couriers/fastship/webhook", data=json.dumps(updates), content_type="application/json", headers={"X-Signature": "ok"})
+
+    def test_a_message_with_no_identifier_is_ignored(self):
+        self.use_fake()
+        req = self.approved()
+        ReturnShipment.objects.filter(request=req).update(tracking_number="", external_id="")
+        res = self.webhook([{"status": "delivered"}])
+        self.assertEqual(res.json()["applied"], 0)
+        self.assertEqual(req.shipments.get().status, "booked")            # untouched
+
+    def test_a_tracking_number_shared_by_two_live_parcels_is_ignored(self):
+        self.use_fake()
+        first = self.approved()
+        order = self.delivered((self.lip, 1))
+        second = self.request(order, [self.item(order, self.lip)])
+        self.seller_post(second, "approve")
+        ReturnShipment.objects.update(tracking_number="SAME-1", external_id="")
+        self.assertEqual(self.webhook([{"status": "in_transit", "tracking_number": "SAME-1"}]).json()["applied"], 0)
+        ReturnShipment.objects.filter(request=second).update(status="cancelled")
+        self.assertEqual(self.webhook([{"status": "in_transit", "tracking_number": "SAME-1"}]).json()["applied"], 1)
+        self.assertEqual(first.shipments.get().status, "in_transit")
 
     def test_a_courier_needs_a_slug(self):
         with self.assertRaises(ValueError):

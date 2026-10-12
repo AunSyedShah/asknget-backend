@@ -61,7 +61,7 @@ class LineCheckOut(Schema):
     qty: int
     line_total_cents: int
     eligible: bool
-    why_not: str = Field(description="not_delivered | window_closed | not_returnable | already_requested | already_returned; empty when eligible")
+    why_not: str = Field(description="not_delivered | window_closed | not_returnable | already_requested | already_returned | already_refunded; empty when eligible")
     deadline: Optional[datetime] = Field(None, description="Last day to ask, for the chosen reason (any reason when none was chosen)")
     change_of_mind_until: Optional[datetime]
     defect_until: Optional[datetime]

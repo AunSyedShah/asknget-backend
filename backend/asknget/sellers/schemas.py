@@ -159,7 +159,9 @@ class DocumentOut(ModelSchema):
 
     @staticmethod
     def resolve_url(obj):
-        return obj.file.url if obj.file else None
+        from .files import document_url
+
+        return document_url(obj) if obj.file else None      # signed and expiring; never the /media/ path
 
 
 class DirectorOut(ModelSchema):

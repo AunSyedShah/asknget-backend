@@ -15,6 +15,7 @@ from ninja.errors import HttpError
 
 from accounts.models import TermsAcceptance
 from core.models import Bank, coerce_nulls
+from core.uploads import safe_image, safe_name
 
 from . import policy, rules
 from .models import (
@@ -320,22 +321,30 @@ def delete_director(app: SellerApplication, director: SellerApplicationDirector)
 def upload_document(app: SellerApplication, *, doc_type: str, file) -> SellerDocument:
     """Upload or replace. A replacement gets version+1 and supersedes the old row."""
     _assert_editable(app)
+    original_name = file.name                 # shown to people; the stored file gets a server-chosen name below
     if file.content_type not in rules.DOCUMENT_ALLOWED_TYPES:
         raise HttpError(422, "Document must be PDF, JPG or PNG")
     if file.size > settings.SELLER_DOCUMENT_MAX_BYTES:
         raise HttpError(422, "Document must be 10 MB or smaller")
+    if file.content_type == "application/pdf":
+        if not file.read(5).startswith(b"%PDF-"):
+            raise HttpError(422, "That file is not a PDF")
+        file.seek(0)
+        content, content.name = file, safe_name("application/pdf", {"application/pdf": "pdf"})
+    else:
+        content = safe_image(file, max_bytes=settings.SELLER_DOCUMENT_MAX_BYTES, formats=("JPEG", "PNG"), label="Document")
 
     with transaction.atomic():
         previous = latest_documents(app).get(doc_type)
         doc = SellerDocument(
             application=app,
             type=doc_type,
-            file_name=file.name[:255],
+            file_name=original_name[:255],
             mime_type=file.content_type,
             size_bytes=file.size,
             version=(previous.version + 1) if previous else 1,
         )
-        doc.file.save(file.name, file, save=True)
+        doc.file.save(content.name, content, save=True)       # server-chosen name; the client's stays in file_name
         if previous:
             previous.superseded_by = doc
             previous.save(update_fields=["superseded_by", "updated_at"])

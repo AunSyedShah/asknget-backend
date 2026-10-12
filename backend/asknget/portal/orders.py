@@ -50,7 +50,11 @@ def store_orders(store):
         .distinct()
         .select_related("user")
         .annotate(
-            store_status=Subquery(mine.order_by("created_at").values("status")[:1]),
+            # the first line still in play (see orders.services.store_status); one expression, no extra query
+            store_status=Coalesce(
+                Subquery(mine.exclude(status__in=order_services.SETTLED).order_by("created_at").values("status")[:1]),
+                Subquery(mine.order_by("created_at").values("status")[:1]),
+            ),
             items_count=Coalesce(Subquery(mine.values("order").annotate(n=Sum("qty")).values("n")[:1]), Value(0)),
             store_total_cents=Coalesce(Subquery(mine.values("order").annotate(s=Sum("line_total_cents")).values("s")[:1]), Value(0)),
         )
@@ -193,8 +197,8 @@ def detail(order: Order, store) -> dict:
     multi = OrderItem.objects.filter(order=order).exclude(store=store).exists()
     total = subtotal if multi else subtotal + order.shipping_cents - order.discount_cents
     return {
-        "id": order.id, "order_number": order.order_number, "placed_at": order.placed_at, "status": items[0].status,
-        "allowed_next": sorted(order_services.FULFILMENT_NEXT[items[0].status]),
+        "id": order.id, "order_number": order.order_number, "placed_at": order.placed_at, "status": order_services.store_status(items),
+        "allowed_next": sorted(order_services.FULFILMENT_NEXT[order_services.store_status(items)]),
         "customer": {"name": customer_name(order), "email": order.contact_email, "phone": order.contact_phone,
                      "customer_key": str(order.user_id) if order.user_id else order.contact_email.lower()},
         "shipping_address": order.shipping_address, "billing_address": order.billing_address,

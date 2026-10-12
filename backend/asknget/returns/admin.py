@@ -21,30 +21,35 @@ class ReturnRuleAdmin(admin.ModelAdmin):
     search_fields = ("category__name", "note")
 
 
-class ReturnItemInline(admin.TabularInline):
+class _ReadOnlyInline:
+    """A return's parts are written by returns.services only (timeline, stock and ledger stay in step): shown, never edited."""
+
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class ReturnItemInline(_ReadOnlyInline, admin.TabularInline):
     model = ReturnItem
-    extra = 0
-    can_delete = False
-    readonly_fields = ("order_item", "qty", "line_total_cents")
 
 
-class ReturnEventInline(admin.TabularInline):
+class ReturnEventInline(_ReadOnlyInline, admin.TabularInline):
     model = ReturnEvent
-    extra = 0
-    can_delete = False
-    readonly_fields = ("created_at", "status", "actor", "actor_user", "note")
+    fields = ("created_at", "status", "actor", "actor_user", "note")
+    readonly_fields = ("created_at",)
 
 
-class ReturnShipmentInline(admin.StackedInline):
+class ReturnShipmentInline(_ReadOnlyInline, admin.StackedInline):
     model = ReturnShipment
-    extra = 0
-    can_delete = False
 
 
-class ReturnPhotoInline(admin.TabularInline):
+class ReturnPhotoInline(_ReadOnlyInline, admin.TabularInline):
     model = ReturnPhoto
-    extra = 0
-    can_delete = False
 
 
 @admin.register(ReturnRequest)

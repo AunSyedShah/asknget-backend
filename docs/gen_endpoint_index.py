@@ -30,7 +30,7 @@ rows = collections.defaultdict(list)
 for path, operations in schema["paths"].items():
     for method, op in operations.items():
         if method in ("get", "post", "put", "patch", "delete"):
-            rows[(op.get("tags") or ["other"])[0]].append(("/api/v1" + path, method.upper(), "bearer" if op.get("security") else "-", (op.get("summary") or "").strip()))
+            rows[(op.get("tags") or ["other"])[0]].append((path if path.startswith("/api/") else "/api/v1" + path, method.upper(), "bearer" if op.get("security") else "-", (op.get("summary") or "").strip()))
 
 total = sum(len(v) for v in rows.values())
 order = sorted(rows, key=lambda t: (t.startswith("admin"), t.startswith("seller"), t))

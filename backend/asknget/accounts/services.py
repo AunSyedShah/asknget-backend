@@ -21,6 +21,7 @@ from ninja.errors import HttpError
 from core import auth as jwt_auth
 
 from core.models import coerce_nulls
+from core.uploads import safe_image
 
 from .models import Address, OtpVerification, PaymentMethod, TermsAcceptance, User
 
@@ -254,9 +255,10 @@ def set_avatar(user: User, file) -> User:
         raise HttpError(422, "Avatar must be PNG, JPG or GIF")
     if file.size > settings.AVATAR_MAX_BYTES:
         raise HttpError(422, "Avatar must be 2 MB or smaller")
+    content = safe_image(file, max_bytes=settings.AVATAR_MAX_BYTES, formats=("PNG", "JPEG", "GIF"), label="Avatar")
     if user.avatar:
         user.avatar.delete(save=False)
-    user.avatar.save(file.name, file, save=True)
+    user.avatar.save(content.name, content, save=True)
     return user
 
 

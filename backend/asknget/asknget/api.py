@@ -32,6 +32,7 @@ from sellers.api import admin_sellers_router, lookups_router, seller_router
 from notifications.api import notifications_router
 from ledger.api import admin_ledger_router, admin_payouts_router, transactions_router
 from returns.api import admin_returns_router, my_returns_router, returns_public_router, seller_returns_router
+from sellers.files import files_router
 from team.api import accept_router, me_router as seller_me_router, team_router
 
 api = NinjaAPI(
@@ -107,3 +108,4 @@ api.add_router("/admin/products", admin_products_router)
 api.add_router("", returns_public_router)
 api.add_router("/seller/returns", seller_returns_router)
 api.add_router("/admin/returns", admin_returns_router)
+api.add_router("/files", files_router)
