@@ -79,11 +79,14 @@ def _hold_available_at(store, now):
 
 
 @transaction.atomic
-def post_sales(order: Order) -> list[LedgerEntry]:
-    """Called once an order's payment is confirmed. Safe to call again."""
-    items = list(
-        OrderItem.objects.filter(order=order).exclude(status__in=["cancelled", "returned"]).select_related("store__country", "product")
-    )
+def post_sales(order: Order, *, include_refunded: bool = False) -> list[LedgerEntry]:
+    """Called once an order's payment is confirmed. Safe to call again.
+
+    `include_refunded` is for history only (`backfill_ledger`): lines already cancelled or returned are
+    posted too, so the caller can post their refund and the books show both halves. A live confirmation
+    never has such lines."""
+    lines = OrderItem.objects.filter(order=order).select_related("store__country", "product")
+    items = list(lines if include_refunded else lines.exclude(status__in=["cancelled", "returned"]))
     by_store = defaultdict(list)
     for item in items:
         by_store[item.store_id].append(item)

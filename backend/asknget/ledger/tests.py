@@ -17,7 +17,7 @@ from config.models import CommissionRule, Setting
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
 from ledger import services
 from ledger.models import LedgerEntry, Payout
-from orders.models import Order, OrderItem, Voucher
+from orders.models import Order, OrderItem, OrderStatusEvent, Voucher
 from team.models import StoreMember
 
 CART = "/api/v1/cart"
@@ -469,7 +469,7 @@ class SellerViewTests(LedgerTestCase):
 
 
 class BackfillTests(LedgerTestCase):
-    def legacy_order(self, status="confirmed"):
+    def legacy_order(self, status="confirmed", item_status=None):
         """An order paid before the ledger existed: written straight to the tables, no hooks."""
         order = Order.objects.create(
             user=self.buyer, status=status, order_number=f"OLD{Order.objects.count() + 1:05d}", country_id=self.store_a.country_id,
@@ -478,7 +478,8 @@ class BackfillTests(LedgerTestCase):
             return_window_days=7,
         )
         OrderItem.objects.create(order=order, store=self.store_a, product=self.bb, variant=self.bb.variants.first(), product_name="BB Cream",
-                                 qty=1, unit_price_cents=10000, line_total_cents=10000, status="delivered" if status == "delivered" else "pending")
+                                 qty=1, unit_price_cents=10000, line_total_cents=10000,
+                                 status=item_status or ("delivered" if status == "delivered" else "pending"))
         return order
 
     def backfill(self, *args):
@@ -503,6 +504,54 @@ class BackfillTests(LedgerTestCase):
         self.legacy_order(status="delivered")
         self.backfill()
         self.assertIsNotNone(LedgerEntry.objects.get(type=T.SALE).available_at)
+
+    def test_history_is_dated_when_it_happened_not_when_the_backfill_ran(self):
+        order = self.legacy_order()
+        long_ago = timezone.now() - timedelta(days=40)
+        Order.objects.filter(pk=order.pk).update(placed_at=long_ago)
+        self.backfill()
+        self.assertEqual({e.created_at for e in LedgerEntry.objects.filter(order=order)}, {long_ago})
+        # so a report for this month does not claim last month's sale
+        from portal.periods import period_range
+        month = period_range("month")
+        self.assertEqual(services.period_totals(self.store_a, month.start, month.end)["sales_cents"], 0)
+
+    def test_a_cancelled_order_keeps_both_halves_of_its_history_and_nets_to_zero(self):
+        order = self.legacy_order(status="cancelled", item_status="cancelled")
+        placed = timezone.now() - timedelta(days=10)
+        Order.objects.filter(pk=order.pk).update(placed_at=placed)
+        cancelled_at = placed + timedelta(days=1)
+        event = OrderStatusEvent.objects.create(order=order, status="cancelled", actor="admin")
+        OrderStatusEvent.objects.filter(pk=event.pk).update(created_at=cancelled_at)
+        self.assertIn("1 refunded", self.backfill())
+        types = sorted(LedgerEntry.objects.filter(order=order).values_list("type", flat=True))
+        self.assertEqual(types, ["fee", "fee_refund", "refund", "sale"])
+        self.assertEqual(sum(e.amount_cents for e in LedgerEntry.objects.filter(order=order)), 0)
+        self.assertEqual(LedgerEntry.objects.get(order=order, type=T.SALE).created_at, placed)
+        self.assertEqual(LedgerEntry.objects.get(order=order, type=T.REFUND).created_at, cancelled_at)    # the refund is dated to the cancellation
+        bal = self.balances(self.store_a)
+        self.assertEqual((bal["available_cents"], bal["held_cents"]), (0, 0))
+
+    def test_a_returned_order_after_delivery_nets_out_too(self):
+        order = self.legacy_order(status="returned", item_status="returned")
+        OrderStatusEvent.objects.create(order=order, store=self.store_a, status="delivered", actor="seller")
+        OrderStatusEvent.objects.create(order=order, store=self.store_a, status="returned", actor="seller")
+        self.backfill()
+        self.assertEqual(sum(e.amount_cents for e in LedgerEntry.objects.filter(order=order)), 0)
+        self.assertEqual(LedgerEntry.objects.filter(order=order, type=T.REFUND).count(), 1)
+
+    def test_it_agrees_with_sales_analytics_about_refunds(self):
+        from portal import analytics
+        from portal.periods import period_range
+
+        self.legacy_order(status="cancelled", item_status="cancelled")
+        self.legacy_order()
+        self.backfill()
+        month = period_range("month")
+        ledger_refunds = -services.period_totals(self.store_a, month.start, month.end)["refunds_cents"]
+        # these legacy orders carry no delivery charge, so the two views must match to the cent
+        self.assertEqual(analytics.sales(self.store_a, "month")["refunds_cents"]["value"], ledger_refunds)
+        self.assertEqual(ledger_refunds, 10000)
 
     def test_unpaid_orders_are_left_alone(self):
         order = self.legacy_order()

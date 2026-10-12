@@ -24,7 +24,7 @@ from catalog.models import Brand, Category, Product, ProductContentSection, Prod
 from catalog.services import refresh_category_counts, refresh_product_rating, refresh_stock_status
 from core.models import SiteSetting
 from orders import services as order_services
-from orders.models import Order, OrderDelivery, OrderItem, Voucher
+from orders.models import Order, OrderDelivery, OrderItem, OrderStatusEvent, Voucher
 from sellers import services as seller_services
 from sellers.models import SellerApplication, Store
 
@@ -139,6 +139,7 @@ class Command(BaseCommand):
         for product in Product.objects.filter(store=store):
             refresh_stock_status(product)
         self._seed_orders(store, seller, customer)
+        self._seed_team_and_money(store, seller, admin)
 
         Voucher.objects.get_or_create(code="SAVE20", defaults=dict(type="percent", value=20, min_subtotal_cents=5000))
         Voucher.objects.get_or_create(code="WELCOME5", defaults=dict(type="fixed", value=500, per_user_limit=1))
@@ -250,6 +251,57 @@ class Command(BaseCommand):
             return
         for role, body in self.DEMO_CHAT:
             send(convo, role=role, sender=member if role == "customer" else seller, body=body)
+
+    def _seed_team_and_money(self, store, owner, staff):
+        """A small team, the ledger for the demo orders (with one payout and one adjustment) and a few
+        notifications, so Team, Transactions and the bell have something to show. Idempotent."""
+        from django.core.management import call_command
+
+        from ledger import services as ledger
+        from ledger.models import LedgerEntry, Payout
+        from notifications import services as notifications
+        from notifications.models import StoreNotification
+        from team.models import StoreMember, TeamRole
+
+        now = timezone.now()
+        for name, email, role_key in (("Sarah Lewis", "sarah.lewis@asknget.demo", "manager"),
+                                      ("James Peters", "james.peters@asknget.demo", "inventory-manager"),
+                                      ("Emma Roberts", "emma.roberts@asknget.demo", "order-manager")):
+            user, _ = User.objects.get_or_create(email=email, defaults={"full_name": name})
+            user.set_password(PASSWORD)
+            user.email_verified_at = user.email_verified_at or now
+            user.save()
+            role = TeamRole.objects.get(key=role_key)
+            StoreMember.objects.get_or_create(store=store, email=email, defaults=dict(
+                user=user, role=role, permissions=role.permissions, status="active", joined_at=now, invited_by=owner))
+        finance = TeamRole.objects.get(key="finance-manager")
+        StoreMember.objects.get_or_create(store=store, email="mia.taylor@asknget.demo", defaults=dict(
+            role=finance, permissions=finance.permissions, status="invited", invited_by=owner, invite_expires_at=now + timedelta(days=7)))
+
+        # Money for the demo orders. They were written straight to the tables, so post them now, and let the
+        # ones delivered long ago have finished their return window, as they would have in real time.
+        call_command("backfill_ledger", verbosity=0)
+        for entry in LedgerEntry.objects.filter(store=store, available_at__gt=now, order__isnull=False).select_related("order"):
+            delivered = OrderStatusEvent.objects.filter(order=entry.order, store=store, status="delivered").order_by("created_at").first()
+            if delivered:
+                entry.available_at = delivered.created_at + timedelta(days=entry.order.return_window_days)
+                entry.save(update_fields=["available_at", "updated_at"])
+        if not LedgerEntry.objects.filter(store=store, type="adjustment").exists():
+            ledger.adjust(store, amount_cents=2500, note="Goodwill credit for a late delivery", by=staff)
+        if not Payout.objects.filter(store=store).exists():
+            available = ledger.balances(store)["available_cents"]
+            if available > 1000:
+                payout = ledger.create_payout(store, amount_cents=available // 2, note="Weekly payout", by=staff)
+                ledger.set_payout_status(payout, "completed", staff)
+        if not StoreNotification.objects.filter(store=store).exists() or not StoreNotification.objects.filter(store=store, kind="low_stock").exists():
+            latest = Order.objects.filter(items__store=store).order_by("-placed_at").first()
+            if latest:
+                notifications.notify(store, "order_received", {"order": latest.order_number, "customer": f"{latest.contact_first_name} {latest.contact_last_name}"},
+                                     link=("order", latest.pk))
+                notifications.notify(store, "new_customer", {"customer": f"{latest.contact_first_name} {latest.contact_last_name}"}, link=("order", latest.pk))
+            product = Product.objects.filter(store=store).first()
+            if product:
+                notifications.notify(store, "low_stock", {"product": product.name, "qty": 8}, link=("product", product.pk))
 
     def _seed_orders(self, store, seller, member):
         if Order.objects.filter(order_number__startswith="ASK-DEMO").exists():
