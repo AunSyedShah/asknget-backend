@@ -23,6 +23,7 @@ backend/
 
 - **Developer guide (PDF)** for frontend/stakeholders: [`../docs/asknget-backend-developer-guide.pdf`](../docs/asknget-backend-developer-guide.pdf) — regenerate after API changes:
   `uv run --with reportlab python ../docs/build_developer_guide.py` (from `backend/`).
+- Working on the frontend repo? Start with [`../docs/frontend-handoff.md`](../docs/frontend-handoff.md): the API contract, the Figma tooling and the endpoint index.
 - Where the backend stands against the current design: [`../docs/design-sync-audit.md`](../docs/design-sync-audit.md).
 - Environment files and every variable: [`../docs/environment.md`](../docs/environment.md).
 - Design drift: `python docs/figma/snapshot.py --check` before touching a screen. If the full snapshot is
