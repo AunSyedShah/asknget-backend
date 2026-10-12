@@ -27,7 +27,7 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 OUT = Path(__file__).parent / "asknget-backend-developer-guide.pdf"
-VERSION = "0.9"
+VERSION = "0.10"
 TODAY = date.today().isoformat()
 
 # --------------------------------------------------------------------------- #
@@ -229,7 +229,9 @@ story += [
         ["Team / Managers: members, per-section permissions, invitations, activity", "Implemented", "/seller/team, /seller/me, /auth/team/accept; X-Store header (sprint 7)"],
         ["Transactions: seller ledger, balances, staff payouts and adjustments", "Implemented", "/seller/transactions, /admin/payouts, /admin/ledger; sellers read, staff move money (sprint 7)"],
         ["Notifications (in-app bell, per person, editable wording per language)", "Implemented", "/seller/notifications (sprint 7)"],
-        ["Admin portal (13 screens), Returns, Category Request", "Planned", "Admin portal is the next sprint - data-model.md Q74-Q83"],
+        ["Customer returns: request, seller approval, staff arbitration, refunds; return rules set by staff per market", "Implemented", "returns app (docs/returns-plan.md); no screens designed yet - Q90"],
+        ["Courier for return pickups", "Slot ready", "returns/couriers: plug the technical lead's API in as a Courier subclass; manual until then - Q92"],
+        ["Admin portal (13 screens), Category Request", "Planned", "Admin portal is the next sprint - data-model.md Q74-Q83"],
         ["Subscriptions / self-serve upgrade to premium", "Planned", "Premium is a staff-flipped flag until the payments sprint - see data-model.md section 10 Q42"],
     ], (62 * mm, 24 * mm, 86 * mm), status_col=1),
 ]
@@ -700,7 +702,31 @@ story += [
         ["Staff: payouts", "POST /admin/payouts, GET /admin/payouts, PATCH /admin/payouts/{id}/status {completed|failed}", "Cannot exceed the available balance or fall below payouts.minimum_cents; a failed payout frees the money"],
     ]),
 
-    P("6.18 Support and marketing", "h2"),
+    P("6.18 Returns", "h2"),
+    P("A buyer can ask to return <b>delivered</b> items from one store's part of an order. What is allowed comes from rules that staff edit "
+      "per market: a <b>policy</b> (days for change of mind, days for defective or wrong items, an optional restocking fee, wording), a list "
+      "of <b>reasons</b>, and per-category <b>rules</b> (for example opened cosmetics: no change-of-mind returns, defects still accepted; "
+      "<font face='Courier'>0</font> days means not accepted). The numbers in force are copied onto each order line at checkout, so editing a "
+      "rule never changes an existing order. The seller approves or rejects (the buyer may dispute a rejection once; staff decide and that is "
+      "final), the buyer sends the parcel back, the seller marks it received: in good condition the refund is posted at once, damaged goes to "
+      "staff. The ledger refunds only the returned value (minus the voucher share and any restocking fee, plus delivery when the seller was at "
+      "fault and everything came back) and returns the matching share of the commission. No payment provider is connected, so the buyer's "
+      "refund shows <font face='Courier'>pending</font> until staff mark it paid. Pickups go through the courier slot "
+      "(<font face='Courier'>returns/couriers</font>): the <font face='Courier'>manual</font> courier means the buyer enters the tracking number; "
+      "a connected courier books the pickup and fills tracking number and label."),
+    flow([
+        ["Return form: rules and reasons", "GET /returns/policy", "Days for change of mind and defects, fee, terms, reasons[], max_photos, courier"],
+        ["Order detail: 'Return item'", "GET /me/orders/{id}/returnable?reason=", "Per line eligible / why_not (not_delivered, window_closed, not_returnable, already_requested, already_returned) and deadlines"],
+        ["Submit", "POST /me/orders/{id}/returns (multipart: reason, note, item_ids x n, photos x n)", "201 ReturnOut; 409 with the reason when a line is not returnable; 422 one_store_per_request / photo_required"],
+        ["My returns, status page", "GET /me/returns?tab=, GET /me/returns/{id}", "Timeline, shipment, money, can_cancel / can_escalate / can_add_tracking"],
+        ["Buyer actions", "POST /me/returns/{id}/cancel | /escalate | /tracking", "Withdraw before it is sent; dispute a rejection; 'I sent it' with a tracking number"],
+        ["Seller: Returns", "GET /seller/returns?tab=&q= (+ /summary, /{id}); POST .../approve | /reject {reason} | /received {condition, restock}", "Section orders; overdue = no answer within returns.seller_response_days"],
+        ["Staff: queue and decisions", "GET /admin/returns (+ /summary, /{id}); POST .../decide {outcome, note} | /refund-paid {reference}", "Disputes and damaged parcels first; the decision is final"],
+        ["Staff: the rules", "GET|PUT /admin/returns/policies[/{code}], /admin/returns/reasons, /admin/returns/rules", "Also editable in Django admin"],
+        ["Courier callbacks", "POST /couriers/{slug}/webhook; manage.py sync_return_tracking", "404 for couriers without a webhook; each courier verifies its own signature"],
+    ]),
+
+    P("6.19 Support and marketing", "h2"),
     flow([
         ["Contact Us 'Send a Message' / 'Contact Seller Support'", "POST /contact {first_name, last_name, email, phone?, subject, message}", "Subjects from GET /site-info; linked to the seller application when subject=seller_support and signed in"],
         ["Footer 'Subscribe Now'", "POST /newsletter/subscribe {email}", "201 new, 200 already subscribed"],
@@ -795,6 +821,12 @@ story += [
         ["GET|POST /seller/notifications...", "any member", "-", "200 NotificationOut | SummaryOut", "404"],
         ["GET /seller/transactions...", "transactions", "?tab=&q=&status=&date_from=&date_to=", "200 EntryOut | OverviewOut | DetailOut", "403, 404"],
         ["POST|GET|PATCH /admin/payouts, /admin/ledger/...", "staff", "PayoutIn, AdjustmentIn", "200 | 201 PayoutOut | EntryOut", "404, 409, 422"],
+        ["GET /returns/policy", "public", "-", "200 PolicyOut", "-"],
+        ["GET /me/orders/{id}/returnable, POST /me/orders/{id}/returns", "member", "multipart ReturnCreateIn + photos", "200 ReturnableOut | 201 ReturnOut", "404, 409, 422"],
+        ["GET /me/returns..., POST /me/returns/{id}/cancel|escalate|tracking", "member", "EscalateIn, TrackingIn", "200 ReturnOut | ShipmentOut", "404, 409"],
+        ["GET /seller/returns..., POST .../approve|reject|received", "orders section", "RejectIn, ReceivedIn", "200 SellerReturnOut", "403, 404, 409, 422"],
+        ["GET /admin/returns..., POST .../decide|refund-paid, /admin/returns/policies|reasons|rules", "staff", "DecideIn, PolicyAdminIn, ReasonAdminIn, RuleAdminIn", "200 | 201 | 204", "404, 409, 422"],
+        ["POST /couriers/{slug}/webhook", "public (courier-signed)", "courier payload", "200 WebhookOut", "404"],
         ["GET|POST /me/conversations", "member", "ConversationOpenIn", "200 page[CustomerConversationOut] / 201 CustomerThreadOut", "404, 422, 429"],
         ["GET /me/conversations/{id}[/messages]", "member", "?after=&limit=", "200 CustomerThreadOut / [MessageOut]", "404, 422"],
         ["POST /me/conversations/{id}/messages|read", "member", "MessageIn", "201 MessageOut / 200", "404, 422, 429"],
@@ -968,7 +1000,7 @@ npx openapi-typescript http://127.0.0.1:8000/api/v1/openapi.json -o src/api/sche
     table([
         ["Order", "Scope", "Depends on"],
         ["1", "Payment provider: client-side tokenisation, POST /checkout/{id}/pay, webhooks -> payment_status/paid, saved cards, refunds on cancel", "Provider decision (see data-model.md section 10)"],
-        ["2", "Seller portal remainder: Returns flow, category requests, invoice PDF, social login", "Design for those screens + answers to Q20-Q34, Q52, Q55"],
+        ["2", "Seller portal remainder: category requests, invoice PDF, social login. Returns screens (backend done), courier integration, card refunds through a payment provider", "Design for those screens + answers to Q20-Q34, Q52, Q55"],
         ["3", "Review moderation UI, category/brand management endpoints (Django admin covers these today)", "-"],
         ["4", "Self-serve premium subscriptions, delivery zones. Next sprint: the Admin portal (13 screens added 2026-10-09)", "Product decisions + design"],
         ["5", "Email/SMS providers; more worker jobs (category counts, rating refresh, cart expiry)", "Worker service exists; add commands"],

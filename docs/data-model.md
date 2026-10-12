@@ -428,7 +428,7 @@ platform defaults in `sellers/rules.py`), `document_labels` i18n json per type, 
 `id_number_regex`, `tax_id_label`, `company_registration_label`, `instructions` i18n json.
 
 ### `markets_returnpolicy` (1:1 country)
-`window_days` (30), `summary` i18n json, `url`, `is_active`. Snapshotted onto `orders.return_window_days`.
+`window_days` (change of mind; 30), `defect_days` (defective / wrong / not as described; 30), `restocking_fee_bps` (change of mind only; 0), `summary` and `terms` i18n json, `url`, `is_active` (off = no returns at all in that market). The change-of-mind window is snapshotted onto `orders.return_window_days`; all three numbers are snapshotted per line (see 7f).
 
 ### Country on existing tables
 `seller_applications.country` (from the sign-up region), `stores.country` (copied on approval, immutable),
@@ -582,6 +582,49 @@ payments → Transactions, inventory → Inventory, customers → Customers; `sy
 
 ---
 
+## 7f. Returns (docs/returns-plan.md)
+
+Rules are data, edited by staff per market (Django admin, or `/admin/returns/{policies,reasons,rules}`); what applied is
+**snapshotted** so editing a rule never rewrites an order or a request.
+
+### `returns_returnreason`
+`code` (unique slug), `label` i18n json, `kind` (change_of_mind | defect | wrong_item | not_as_described | other),
+`requires_photo`, `countries` (M2M; empty = every market), `is_active`, `sort_order`. The kind picks the window (`other` follows
+change of mind) and who bears the cost: defect, wrong item and not-as-described are the seller's fault, change of mind is the buyer's.
+
+### `returns_returnrule`
+`country` (null = every market), `category`, `change_of_mind_days` and `defect_days` (null = follow the market, **0 = not accepted**),
+`note`, `is_active`; unique (country, category). The nearest category (itself, then its parents) with a rule wins; within one category
+the market's own rule beats the all-markets one. Typical use: opened cosmetics not returnable for change of mind, still returnable if defective.
+
+### `orders_orderitem.return_terms`
+JSON `{change_of_mind_days, defect_days, restocking_fee_bps}` written at checkout from the policy and rules. Empty on orders placed before
+returns existed: those fall back to the order's own `return_window_days` for both windows, no fee.
+
+### `returns_returnrequest` (+ `_returnitem`, `_returnphoto`, `_returnevent`)
+One request is for **one store's** lines of one order (each store fulfils, is paid and refunds separately); whole lines only.
+`reference` (RET-00123-1), `status` (requested, approved, rejected, escalated, received, refunded, cancelled), `is_final`,
+`reason` + `reason_kind` snapshot, `note`, `seller_note`, `staff_note`, `terms` (deadlines and fee that applied), `response_due_at`
+(overdue is computed on read, no worker), money: `items_cents`, `discount_cents` (the voucher share), `restocking_fee_cents`,
+`delivery_refund_cents`, `refund_cents`, `refund_status` (none | pending | completed: pending = owed to the buyer, staff pay it until a PSP exists).
+`received_condition`, `restocked`, timestamps, `decided_by`. `ReturnEvent` is the timeline (actor buyer | seller | staff | system).
+
+### `returns_returnshipment` - the courier seam
+`courier` (slug of the integration; `manual` = the buyer posts it), `status` (pending, booked, in_transit, delivered, failed, cancelled),
+`tracking_number`, `tracking_url`, `label_url`, `external_id` (the courier's booking id), `pickup_address` / `dropoff_address` snapshots,
+`raw` (last courier response or webhook), `booked_at`, `delivered_at`. `returns/couriers/` holds the interface (`Courier.book_return / cancel /
+track / parse_webhook`), a registry, and the `manual` courier. Which one a market uses is the admin setting `returns.courier`.
+
+### Ledger
+`ledger_ledgerentry.return_request` (nullable FK). One refund and one commission refund per return (partial unique constraint);
+whole-order refunds still post once per (order, store). `ledger.refund()` now gives back only what has not already gone back, and a store's
+sale is released after a partial return as before.
+
+### Settings (config registry)
+`returns.courier` (manual), `returns.auto_approve` (false), `returns.seller_response_days` (3), `returns.max_photos` (5), `returns.allow_escalation` (true).
+
+---
+
 ## 8. Marketing & support
 
 ### `banners`
@@ -678,6 +721,7 @@ REST-style JSON; auth via access + refresh JWT.
     **Resolved (sprint 6).** Superseded by Q53 — a product now selects from its store's delivery options.
 25. **Product moderation** — the Pending/Rejected tabs imply staff approve listings before they go live. Confirm (alternative: publish immediately, moderate after).
 26. **Returned orders** — a "Returned" tab and a Returns menu exist but no return-request flow. Interim: seller marks a delivered store order returned (stock restored). Refund handling waits for the PSP.
+    **Resolved in the backend (returns sprint).** Customers can request returns; sellers approve, reject and receive; staff arbitrate (7f). No screens are designed yet (Q90).
 27. **Unpaid orders hidden from sellers** — orders still `pending_payment` (bank transfer not yet confirmed, PSP pending) are not shown in the seller portal. Confirm, especially for COD/bank-transfer flows.
 28. **Invoices** — "Print/Download Invoice" drawn as menu items only. Backend exposes invoice data; PDF layout needs a design.
 29. **Inventory "Stock" vs "Available"** — stock is decremented at checkout, so both are equal today. If "Available" should exclude unpaid/unshipped reservations, checkout must reserve instead of decrement.
@@ -696,6 +740,7 @@ REST-style JSON; auth via access + refresh JWT.
 38. **Bare-domain landing** — `asknget.com` without a country resolves to the default market. Should the frontend suggest a region from GeoIP / browser locale and redirect to the subdomain? (Backend does no GeoIP by design.)
 39. **Per-country site settings** — footer contact details, "We Accept" logos and policy blurbs are still global (`site_settings`). Per-country overrides are a small follow-up once the content exists.
 40. **Return-request flow** — the return window is now snapshotted per order and exposed as `return_eligible_until`, but buyers still cannot *request* a return (Q26). Sellers can mark goodwill returns after the window.
+    **Resolved (returns sprint).** The request flow exists; goodwill returns are blocked while a customer's request for the same lines is open.
 41. **One currency per market** — a store prices only in its country's currency. Is a cross-border seller (one business selling in ZA and PK) expected? Today that is two stores / two applications.
 
 **Premium sellers (sprint 5, see `docs/sprint-5-plan.md`)**
@@ -801,7 +846,7 @@ REST-style JSON; auth via access + refresh JWT.
     header row, and Low Performing reuses Product Conversion's placeholder rows. We read "low performing"
     as lowest conversion among products with views, not only zero-sales products. Confirm the columns.
     **Resolved (sprint 7).** Low performers are the lowest conversion among live products with at least `analytics.low_performer_min_views` views (default 20); both that threshold and the list length are admin settings, per market or store.
-73. **Returns** is still a sidebar entry with no screen (Q26, Q40).
+73. **Returns** is still a sidebar entry with no screen (Q26, Q40). The API exists now (7f); the screens do not (Q90).
 
 **Figma 2026-10-09 — the Admin portal (13 new screens; see `docs/sprint-7-plan.md` §8)**
 
@@ -853,3 +898,21 @@ REST-style JSON; auth via access + refresh JWT.
     the order. Only matters for data that existed before the ledger.
 89. **Seller portal address.** Invite e-mails link to `PORTAL_URL`, falling back to `STOREFRONT_URL`; until one is set the
     link has no host. What is the portal's address?
+
+**Returns sprint (2026-10-13; `docs/returns-plan.md`)**
+90. **Return screens are not designed.** Needed: buyer "Return item" entry on View Details, the return form (items, reason, note, photos),
+    return status and timeline, a Returns tab on My Orders and shipping-back instructions; seller Returns list and detail with approve / reject /
+    received; admin Returns queue (disputes, damaged parcels, overdue) and a Settings screen for the return policy, reasons and category rules.
+91. **Real policy numbers.** Seeded values are placeholders: ZA 30 days change of mind and 180 days defects, PK 7 and 14. South African online
+    law is usually a 7-day cooling-off right for change of mind plus a 6-month right for defective goods; Pakistan has no national window we could
+    find (sellers set 7-14 days). Business and legal sign-off needed per market, and which categories are non-returnable (opened cosmetics).
+92. **Courier.** Return pickups go through `returns/couriers`; until the technical lead's courier API arrives every market uses `manual` (the buyer
+    posts it and types the tracking number). Questions for that integration: does it book pickups from the buyer's address, issue a prepaid label,
+    push webhooks or need polling, and does the same API book the seller's outbound shipments (the interface is meant to carry those too)?
+93. **Refund to the card.** No PSP yet: an accepted return posts the ledger refund and marks the buyer's refund `pending`; staff pay it and mark it paid
+    (`/admin/returns/{id}/refund-paid`). Confirm that is acceptable until a provider is chosen.
+94. **Defaults taken, reversible:** whole lines only (no partial quantity); sellers approve every return (auto-approve is a setting); delivery is refunded
+    only when the seller is at fault and every line of that store comes back, once; a restocking fee applies to change of mind only and is 0 until set;
+    a damaged parcel waits for a staff decision; a rejection can be disputed once and staff's decision is final (a setting turns disputes off).
+95. **Buyers have no notification inbox,** so buyer-facing return events are plain e-mails (English). Per-language e-mail templates and an in-app inbox are follow-ups.
+96. **Exchange / replacement** as a resolution is not built (refund only).

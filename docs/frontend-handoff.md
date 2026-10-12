@@ -128,9 +128,29 @@ These screens now have real endpoints; wire them (shapes are in the index below 
 - **Invitation link**: `<portal>/accept-invite?token=…` calls `POST /auth/team/accept {token, full_name?, password?}`. `409 account_exists`
   means that e-mail already has an account: sign in as it, then call again with the bearer token.
 
+## 5a. Returns (built after sprint 7; no screens are designed yet, so the shapes are the backend's proposal)
+
+| Who / where | Endpoints |
+|---|---|
+| Return form: the market's rules and the reasons | `GET /returns/policy` (also on `/regions/current`) |
+| Order detail: "Return item" button | `GET /me/orders/{id}/returnable?reason=` (per line: `eligible`, `why_not`, deadlines) |
+| Submit | `POST /me/orders/{id}/returns` (**multipart**: `reason`, `note`, `item_ids` repeated once per line, `photos` files) |
+| Returns list, status page | `GET /me/returns?tab=`, `GET /me/returns/{id}` (`can_cancel`, `can_escalate`, `can_add_tracking`, `shipment`, `events`) |
+| Buyer actions | `POST /me/returns/{id}/cancel`, `/escalate`, `/tracking {tracking_number, carrier?}` |
+| Seller Returns | `GET /seller/returns?tab=&q=` (+ `/summary`, `/{id}`), `POST .../approve`, `/reject {reason}`, `/received {condition, restock}`; needs the `orders` section |
+| Admin Returns | `GET /admin/returns` (+ `/summary`, `/{id}`), `POST .../decide {outcome, note}`, `/refund-paid {reference}` |
+| Admin Settings | `GET/PUT /admin/returns/policies[/{code}]`, `/admin/returns/reasons`, `/admin/returns/rules` |
+
+Rules to know: one request covers **one store's** lines (`422 one_store_per_request`); an ineligible line is `409` with the reason as the detail
+(`not_delivered`, `window_closed`, `not_returnable`, `already_requested`, `already_returned`); `422 photo_required` when the reason needs a photo;
+a goodwill "returned" on the seller or admin order screen is `409 return_in_progress` while a request for those lines is open. A refund is
+`refund_status: pending` until staff pay it (no payment provider yet). Notifications have a new tab `returns`. Pickups use a courier
+integration that is not connected yet: `shipment.courier` is `manual`, the buyer enters the tracking number; when a courier is connected the
+same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them, so render them when present.
+
 ## 5b. Still not in the backend
 
-Do not wire these (render static or empty states, or leave out, as the owner decides): **Returns**, **Category Request**,
+Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
 and the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders, products), planned as the
 next sprint (`docs/data-model.md` Q74–Q83). Report what you need instead of assuming a shape.
 
@@ -165,7 +185,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-190 operations in 30 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+219 operations in 33 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -269,11 +289,18 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/api/v1/me/orders/{order_id}` | bearer | 'View Detail' / 'Track Order' |
 | POST | `/api/v1/api/v1/me/orders/{order_id}/cancel` | bearer | My Order Cancel |
 | POST | `/api/v1/api/v1/me/orders/{order_id}/reorder` | bearer | 'Re-Order' → items back in the cart |
+| GET | `/api/v1/api/v1/me/orders/{order_id}/returnable` | bearer | Which lines can be returned (optionally for a reason) |
+| POST | `/api/v1/api/v1/me/orders/{order_id}/returns` | bearer | Ask to return items (multipart: reason, note, item_ids[], photos[]) |
 | POST | `/api/v1/api/v1/me/password` | bearer | Change password (Password Manager) |
 | GET | `/api/v1/api/v1/me/payment-methods` | bearer | Payment Method List |
 | POST | `/api/v1/api/v1/me/payment-methods` | bearer | Payment Method Create |
 | DELETE | `/api/v1/api/v1/me/payment-methods/{pm_id}` | bearer | Payment Method Delete |
 | POST | `/api/v1/api/v1/me/payment-methods/{pm_id}/default` | bearer | Payment Method Set Default |
+| GET | `/api/v1/api/v1/me/returns` | bearer | My returns (tabs: all, open, requested, approved, rejected, refunded, cancelled) |
+| GET | `/api/v1/api/v1/me/returns/{return_id}` | bearer | Return status and timeline |
+| POST | `/api/v1/api/v1/me/returns/{return_id}/cancel` | bearer | Withdraw before it is sent |
+| POST | `/api/v1/api/v1/me/returns/{return_id}/escalate` | bearer | Dispute a rejection: staff decide |
+| POST | `/api/v1/api/v1/me/returns/{return_id}/tracking` | bearer | 'I sent it': add the tracking number |
 | POST | `/api/v1/api/v1/me/terms` | bearer | Me Accept Terms |
 | GET | `/api/v1/api/v1/me/wishlist` | bearer | My Account – Wishlist |
 | DELETE | `/api/v1/api/v1/me/wishlist/{product_id}` | bearer | Wishlist Remove |
@@ -297,6 +324,13 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 |---|---|---|---|
 | GET | `/api/v1/api/v1/regions` | - | Active countries (country switcher) |
 | GET | `/api/v1/api/v1/regions/current` | - | Market, language and timezone resolved for this request |
+
+#### returns
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| POST | `/api/v1/api/v1/couriers/{slug}/webhook` | - | Courier callback (404 for couriers without one) |
+| GET | `/api/v1/api/v1/returns/policy` | - | The market's return rules and the reasons on the form |
 
 #### seller
 
@@ -432,6 +466,17 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/api/v1/seller/products/{product_id}/status` | bearer | Step 5 'Submit for review' / 'Change Status' / Archive |
 | PATCH | `/api/v1/api/v1/seller/products/{product_id}/variants/{variant_id}` | bearer | Step 3: SKU / price / stock per variant |
 
+#### seller: returns
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/api/v1/seller/returns` | bearer | Returns for this store (tabs: all, open, requested, approved, rejected, escalated, received, refunded, cancelled, overdue) |
+| GET | `/api/v1/api/v1/seller/returns/summary` | bearer | Counts for the tabs |
+| GET | `/api/v1/api/v1/seller/returns/{return_id}` | bearer | Seller Return |
+| POST | `/api/v1/api/v1/seller/returns/{return_id}/approve` | bearer | Approve: the buyer may send it back |
+| POST | `/api/v1/api/v1/seller/returns/{return_id}/received` | bearer | The parcel arrived: good = refund now, damaged = staff decide |
+| POST | `/api/v1/api/v1/seller/returns/{return_id}/reject` | bearer | Reject with a reason the buyer sees |
+
 #### seller: team
 
 | Method | Path | Auth | What it does |
@@ -464,6 +509,25 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/api/v1/admin/orders` | bearer | Admin Orders |
 | GET | `/api/v1/api/v1/admin/orders/{order_id}` | bearer | Admin Order Detail |
 | POST | `/api/v1/api/v1/admin/orders/{order_id}/status` | bearer | Advance an order (writes the tracking timeline) |
+
+#### admin · returns
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/api/v1/admin/returns` | bearer | All returns (default: escalated and damaged first) |
+| GET | `/api/v1/api/v1/admin/returns/policies` | bearer | Every market's return policy |
+| PUT | `/api/v1/api/v1/admin/returns/policies/{code}` | bearer | Set a market's return policy (creates it if the market has none) |
+| GET | `/api/v1/api/v1/admin/returns/reasons` | bearer | Admin Reasons |
+| POST | `/api/v1/api/v1/admin/returns/reasons` | bearer | Admin Reason Create |
+| PATCH | `/api/v1/api/v1/admin/returns/reasons/{reason_id}` | bearer | Admin Reason Patch |
+| GET | `/api/v1/api/v1/admin/returns/rules` | bearer | Per-category overrides of the market policy |
+| POST | `/api/v1/api/v1/admin/returns/rules` | bearer | Admin Rule Create |
+| DELETE | `/api/v1/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Delete |
+| PATCH | `/api/v1/api/v1/admin/returns/rules/{rule_id}` | bearer | Admin Rule Patch |
+| GET | `/api/v1/api/v1/admin/returns/summary` | bearer | Admin Returns Summary |
+| GET | `/api/v1/api/v1/admin/returns/{return_id}` | bearer | Admin Return |
+| POST | `/api/v1/api/v1/admin/returns/{return_id}/decide` | bearer | Settle an escalated rejection or a damaged parcel (final) |
+| POST | `/api/v1/api/v1/admin/returns/{return_id}/refund-paid` | bearer | Staff paid the buyer |
 
 #### admin · sellers
 
