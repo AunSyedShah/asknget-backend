@@ -788,10 +788,19 @@ class AnalyticsProductRowOut(Schema):
     status: str
     stock_status: str
     views: int
+    add_to_cart: int = 0
     units: int
     orders: int
     revenue_cents: int
     conversion_rate: float
+
+
+class ProductDailyOut(Schema):
+    date: date
+    orders: int
+    units: int
+    revenue_cents: int
+    views: int
 
 
 class AnalyticsProductsOut(Schema):
@@ -799,6 +808,11 @@ class AnalyticsProductsOut(Schema):
     sort: str
     top: list[AnalyticsProductRowOut]
     slow_movers: list[AnalyticsProductRowOut] = Field(description="Live, in stock, nothing sold this period")
+    low_performers: list[AnalyticsProductRowOut] = Field(
+        description="Lowest conversion among live products with at least `low_performer_min_views` views. Both numbers are admin settings")
+    conversion_leaders: list[AnalyticsProductRowOut] = Field(description="'Product Conversion': the best converters, judged on the same minimum views")
+    low_performer_min_views: int = Field(description="The effective threshold for this store, so the UI can say 'judged on 20+ views'")
+    daily: list[ProductDailyOut] = Field(description="'Product Performance' chart: one point per day up to today, quiet days as zeros")
     products_with_no_sales: int
     products_total: int
     top_selling_count: int

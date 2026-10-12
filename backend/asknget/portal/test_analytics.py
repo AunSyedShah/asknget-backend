@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from catalog.models import Product
+from config.models import Setting
 from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
@@ -297,3 +298,77 @@ class SalesAnalyticsTests(AnalyticsTestCase):
         self.assertIn("gross_sales_cents,2500", rows)
         self.assertIn("breakdown_Net Sales", rows)
         self.assertIn("channel_web", rows)
+
+
+class ProductPerformanceTests(AnalyticsTestCase):
+    """The Product Analytics screen: a daily chart, the best and worst converters, judged on a threshold the admin sets.
+
+    Fixture views: BB Cream 10, Lip Gloss 4, Nail File 3. Orders that count: BB Cream 1 (10 % conversion),
+    Lip Gloss 1 (25 %), Nail File 0.
+    """
+
+    def products(self, **params):
+        res = self.get(f"{A}/products", self.token, **params)
+        self.assertEqual(res.status_code, 200, res.content)
+        return res.json()
+
+    def names(self, rows):
+        return [r["name"] for r in rows]
+
+    def test_the_default_threshold_is_twenty_views_so_a_young_store_judges_nobody(self):
+        body = self.products()
+        self.assertEqual((body["low_performer_min_views"], body["low_performers"], body["conversion_leaders"]), (20, [], []))
+
+    def test_the_admin_sets_how_many_views_count_as_enough(self):
+        Setting.objects.create(key="analytics.low_performer_min_views", value=4)
+        body = self.products()
+        self.assertEqual(body["low_performer_min_views"], 4)
+        self.assertEqual(self.names(body["low_performers"]), ["BB Cream", "Lip Gloss"])          # 10 % before 25 %
+        self.assertEqual(self.names(body["conversion_leaders"]), ["Lip Gloss", "BB Cream"])
+        self.assertNotIn("Nail File", self.names(body["low_performers"]))                         # 3 views: too little data to judge
+
+    def test_a_store_can_have_its_own_threshold(self):
+        Setting.objects.create(key="analytics.low_performer_min_views", value=4)
+        Setting.objects.create(key="analytics.low_performer_min_views", scope="store", store=self.store, value=10)
+        self.assertEqual(self.names(self.products()["low_performers"]), ["BB Cream"])
+
+    def test_the_admin_sets_the_length_of_the_list(self):
+        Setting.objects.create(key="analytics.low_performer_min_views", value=3)
+        Setting.objects.create(key="analytics.low_performer_limit", value=1)
+        body = self.products()
+        self.assertEqual(self.names(body["low_performers"]), ["Nail File"])                       # 0 % is the worst
+        self.assertEqual(self.names(body["conversion_leaders"]), ["Lip Gloss"])
+
+    def test_only_live_products_are_judged(self):
+        Setting.objects.create(key="analytics.low_performer_min_views", value=3)
+        Product.objects.filter(name="Nail File").update(status="archived")
+        Product.objects.filter(name="Lip Gloss").update(status="draft")
+        self.assertEqual(self.names(self.products()["low_performers"]), ["BB Cream"])
+
+    def test_cart_adds_are_counted_per_product(self):
+        rows = {r["name"]: r for r in self.products()["top"]}
+        self.assertEqual((rows["BB Cream"]["add_to_cart"], rows["Lip Gloss"]["add_to_cart"]), (3, 0))
+
+    def test_the_daily_chart_has_a_point_for_every_day_up_to_today_and_adds_up(self):
+        body = self.products()
+        daily = body["daily"]
+        today = timezone.localdate()
+        self.assertEqual(len(daily), today.day)                                                    # the 1st through today, quiet days included
+        self.assertEqual([d["date"] for d in daily], sorted(d["date"] for d in daily))
+        self.assertEqual(daily[-1]["date"], today.isoformat())
+        self.assertEqual(sum(d["revenue_cents"] for d in daily), sum(r["revenue_cents"] for r in body["top"]))
+        self.assertEqual(sum(d["units"] for d in daily), sum(r["units"] for r in body["top"]))
+        self.assertEqual(sum(d["views"] for d in daily), 17)                                       # 10 + 4 + 3, all recorded today
+        self.assertEqual(daily[-1]["views"], 17)
+        self.assertGreater(sum(d["orders"] for d in daily), 0)
+
+    def test_the_chart_follows_the_period(self):
+        week = self.products(period="week")["daily"]
+        self.assertLessEqual(len(week), 7)
+        self.assertEqual(week[-1]["date"], timezone.localdate().isoformat())
+
+    def test_the_csv_export_includes_the_new_lists(self):
+        Setting.objects.create(key="analytics.low_performer_min_views", value=4)
+        res = self.get(f"{A}/export.csv", self.token, report="products")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("low_performer", b"".join(res.streaming_content).decode())

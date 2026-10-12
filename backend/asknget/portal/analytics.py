@@ -22,6 +22,7 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from catalog.models import Product, ProductImage
+from config import services as config
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
 from orders.services import store_discount_cents
@@ -254,6 +255,10 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
         ProductEvent.objects.filter(product__store=store, kind=Kind.VIEW, created_at__gte=p.start, created_at__lt=p.end)
         .values_list("product_id").annotate(n=Count("id")).values_list("product_id", "n")
     )
+    carts = dict(
+        ProductEvent.objects.filter(product__store=store, kind=Kind.ADD_TO_CART, created_at__gte=p.start, created_at__lt=p.end)
+        .values_list("product_id").annotate(n=Count("id")).values_list("product_id", "n")
+    )
     live = Product.objects.filter(store=store).exclude(status=Product.ProductStatus.ARCHIVED).select_related("brand", "category")
     images = dict(
         ProductImage.objects.filter(product__store=store).order_by("product_id", "-is_primary", "sort_order")
@@ -269,7 +274,7 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
             "product_id": product.id, "name": product.name, "slug": product.slug,
             "status": product.status, "stock_status": product.stock_status,
             "image_url": (settings.MEDIA_URL + images[product.id]) if images.get(product.id) else None,
-            "views": seen, "units": units, "revenue_cents": revenue,
+            "views": seen, "add_to_cart": carts.get(product.id, 0), "units": units, "revenue_cents": revenue,
             "orders": stats.get("orders", 0),
             "conversion_rate": _ratio(stats.get("orders", 0), seen),
         })
@@ -286,10 +291,48 @@ def products(store, period_name: str, *, sort: str = "revenue", limit: int = 10)
     slow.sort(key=lambda r: (-r["views"], r["name"]))
     earned = sum(r["revenue_cents"] for r in rows)
     selling = [r for r in rows if r["units"]]
+
+    # Conversion is only meaningful with enough views behind it. How many is "enough", and how long the
+    # list is, are the admin's call (analytics.low_performer_*), per market or per store.
+    policy = config.get_many(["analytics.low_performer_min_views", "analytics.low_performer_limit"], store=store)
+    min_views, list_size = policy["analytics.low_performer_min_views"], policy["analytics.low_performer_limit"]
+    judged = [r for r in rows if r["status"] == Product.ProductStatus.ACTIVE and r["views"] >= min_views]
+    low_performers = sorted(judged, key=lambda r: (r["conversion_rate"], -r["views"], r["name"]))[:list_size]
+    conversion_leaders = sorted(judged, key=lambda r: (-r["conversion_rate"], -r["views"], r["name"]))[:list_size]
+
     return {"period": period_name, "sort": sort, "top": top, "slow_movers": slow[:limit],
             "products_with_no_sales": len(slow), "products_total": len(rows),
             "top_selling_count": len(selling),
-            "avg_product_revenue_cents": round(earned / len(rows)) if rows else 0}
+            "avg_product_revenue_cents": round(earned / len(rows)) if rows else 0,
+            "low_performers": low_performers, "conversion_leaders": conversion_leaders, "low_performer_min_views": min_views,
+            "daily": _product_daily(store, p)}
+
+
+def _product_daily(store, p) -> list[dict]:
+    """One point per day of the period, up to today: the Product Performance chart's four tabs
+    (Orders / Units Sold / Revenue / Views). Quiet days are present as zeros so the line is continuous."""
+    today = timezone.localdate()
+    first = timezone.localtime(p.start).date()
+    last = min(timezone.localtime(p.end - timedelta(microseconds=1)).date(), today)
+    days = {first + timedelta(days=i): {"date": first + timedelta(days=i), "orders": 0, "units": 0, "revenue_cents": 0, "views": 0}
+            for i in range((last - first).days + 1)}
+    seen_orders: dict = defaultdict(set)
+    for placed, order_id, qty, cents in (
+        _sold_items(store).filter(order__placed_at__gte=p.start, order__placed_at__lt=p.end)
+        .values_list("order__placed_at", "order_id", "qty", "line_total_cents")
+    ):
+        day = days.get(timezone.localtime(placed).date())
+        if day is not None:
+            seen_orders[day["date"]].add(order_id)
+            day["units"] += qty
+            day["revenue_cents"] += cents
+    for day, ids in seen_orders.items():
+        days[day]["orders"] = len(ids)
+    for (created,) in ProductEvent.objects.filter(product__store=store, kind=Kind.VIEW, created_at__gte=p.start, created_at__lt=p.end).values_list("created_at"):
+        day = days.get(timezone.localtime(created).date())
+        if day is not None:
+            day["views"] += 1
+    return list(days.values())
 
 
 # --------------------------------------------------------------------------- #
@@ -547,7 +590,7 @@ def export(store, report: str, period_name: str):
         header = ["section", "product", "status", "stock_status", "views", "units", "orders", "revenue", "conversion_%"]
         rows = [
             [section, r["name"], r["status"], r["stock_status"], r["views"], r["units"], r["orders"], r["revenue_cents"] / 100, r["conversion_rate"]]
-            for section, key in (("top", "top"), ("slow_mover", "slow_movers")) for r in data[key]
+            for section, key in (("top", "top"), ("slow_mover", "slow_movers"), ("low_performer", "low_performers")) for r in data[key]
         ]
     elif report == "funnel":
         header = ["step", "count", "previous", "change_%", "from_previous_%", "drop_off_%"]
