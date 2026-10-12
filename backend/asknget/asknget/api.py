@@ -29,6 +29,7 @@ from portal.api import (
 )
 from orders.api import admin_orders_router, cart_router, checkout_router, my_orders_router, orders_public_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
+from notifications.api import notifications_router
 from ledger.api import admin_ledger_router, admin_payouts_router, transactions_router
 from team.api import accept_router, me_router as seller_me_router, team_router
 
@@ -94,6 +95,7 @@ api.add_router("/seller/chat", seller_chat_router)
 api.add_router("/admin/chat", admin_chat_router)
 api.add_router("/seller/search", search_router)
 api.add_router("/seller/team", team_router)
+api.add_router("/seller/notifications", notifications_router)
 api.add_router("/seller/transactions", transactions_router)
 api.add_router("/admin/ledger", admin_ledger_router)
 api.add_router("/admin/payouts", admin_payouts_router)

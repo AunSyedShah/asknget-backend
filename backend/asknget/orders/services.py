@@ -589,6 +589,7 @@ def cancel(order: Order, *, user, reason: str) -> Order:
     order.items.update(status=Fulfilment.CANCELLED)
     _record_event(order, Status.CANCELLED, actor="buyer", actor_user=user, note=reason or "Cancelled by customer")
     on_order_money_returned(order)
+    on_order_cancelled(order, by="customer")
     return order
 
 
@@ -626,8 +627,17 @@ def track(*, order_number: str, email: str) -> Order:
 
 def on_payment_confirmed(order: Order) -> None:
     from ledger import services as ledger
+    from notifications import services as notifications
 
     ledger.post_sales(order)
+    notifications.order_paid(order)
+
+
+def on_order_cancelled(order: Order, *, by: str) -> None:
+    """Tell the sellers who had already seen this order that it is gone."""
+    from notifications import services as notifications
+
+    notifications.order_cancelled(order, by=by)
 
 
 def on_goods_delivered(order: Order, store_id=None) -> None:
@@ -715,6 +725,8 @@ def set_status(order: Order, *, status: str, actor_user, note: str = "", locatio
         on_goods_delivered(order)
     elif status in (Status.CANCELLED, Status.RETURNED, Status.REFUNDED):
         on_order_money_returned(order)
+        if status == Status.CANCELLED:
+            on_order_cancelled(order, by="staff")
     return order
 
 

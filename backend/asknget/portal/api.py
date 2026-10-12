@@ -26,6 +26,7 @@ from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
 from core.schemas import ErrorOut, MessageOut
 
 from . import analytics, customers, dashboard, entitlements, inventory, orders, products
+from notifications import services as notifications
 from team import services as team
 
 from .auth import StoreAuth
@@ -226,6 +227,7 @@ def admin_product_approve(request, product_id: UUID):
     if product is None:
         return 404, {"detail": "Product not found"}
     products.approve(product)
+    notifications.product_reviewed(product, approved=True)
     return {"detail": f"{product.name} is now live"}
 
 
@@ -235,6 +237,7 @@ def admin_product_reject(request, product_id: UUID, payload: RejectIn):
     if product is None:
         return 404, {"detail": "Product not found"}
     products.reject(product, payload.reason)
+    notifications.product_reviewed(product, approved=False, reason=payload.reason)
     return {"detail": f"{product.name} rejected"}
 
 
@@ -489,6 +492,7 @@ def admin_set_plan(request, store_id: UUID, payload: PlanSetIn):
     if store.is_premium != payload.is_premium:
         store.is_premium = payload.is_premium
         store.save(update_fields=["is_premium", "updated_at"])
+        notifications.plan_changed(store)
     return entitlements.payload(store)
 
 

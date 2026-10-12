@@ -338,4 +338,8 @@ def set_payout_status(payout: Payout, status: str, by) -> Payout:
     payout.save(update_fields=["status", "completed_at", "updated_at"])
     # A failed payout drops out of every balance (its entry is excluded), so the money is available again.
     payout.entries.update(status=status)
+    if status == Payout.Status.COMPLETED:
+        from notifications import services as notifications
+
+        notifications.payout_processed(payout)
     return payout

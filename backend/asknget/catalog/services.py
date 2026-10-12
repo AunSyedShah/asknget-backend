@@ -239,8 +239,16 @@ def refresh_stock_status(product: Product) -> str:
     else:
         status = Product.StockStatus.IN_STOCK
     if status != product.stock_status:
+        previous = product.stock_status
         Product.objects.filter(pk=product.pk).update(stock_status=status)
         product.stock_status = status
+        # Tell the seller once, when stock *crosses* into low or out - not on every sale below the line, and not
+        # for a draft that was never in stock or a restock on the way back up.
+        if (product.status == Product.ProductStatus.ACTIVE and status in (Product.StockStatus.LOW_STOCK, Product.StockStatus.OUT_OF_STOCK)
+                and previous in (Product.StockStatus.IN_STOCK, Product.StockStatus.LOW_STOCK)):
+            from notifications import services as notifications
+
+            notifications.stock_alert(product, status, qty)
     return status
 
 

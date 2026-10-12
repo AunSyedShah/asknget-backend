@@ -119,6 +119,7 @@ INSTALLED_APPS = [
     'config',
     'team',
     'ledger',
+    'notifications',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
