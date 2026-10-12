@@ -115,6 +115,7 @@ INSTALLED_APPS = [
     'portal',
     'markets',
     'chat',
+    'config',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
