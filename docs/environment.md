@@ -259,3 +259,26 @@ DATABASE_URL=<hosted url> uv run python manage.py seed_lookups
 - A leading double slash (`https://api//api/v1/...`, from a frontend base URL ending in `/`) is served as
   `/api/v1/...`. `APPEND_SLASH` does nothing for it: `//api/...` is a 404 with the setting on or off.
 
+
+### 6a. Two environments on Vercel: Production and Preview
+
+| | Production (`main`) | Preview (`develop`, pull requests) |
+|---|---|---|
+| Neon branch | `main` | `staging` (own role password) |
+| Variables | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY` | the same four, with the staging database and different keys |
+| Data | real | demo data from `seed_demo` (fake accounts, shared with QA) |
+
+- Create the two databases in the **Neon console** (a project with a `main` branch and a `staging` branch, auto-delete **Never**), not through
+  Vercel's Storage integration: the integration offers one database to every environment and keeps the same login on every branch it copies.
+  Reset the `neondb_owner` password on `staging` (a branch copies the parent's role).
+- Set each variable for **one** environment only (`vercel env add NAME production|preview`, as Sensitive). `ALLOWED_HOSTS` is not needed
+  for `*.vercel.app` (see `settings.VERCEL_HOSTS`); `CORS_ALLOWED_ORIGINS` is set per environment to that environment's frontend.
+- `SECRET_KEY` and `FIELD_ENCRYPTION_KEY` differ per environment. Keep a copy of each outside Vercel (a Sensitive value cannot be read back, and
+  losing the encryption key makes encrypted columns unreadable).
+- A deployment missing any of the first three variables answers every request with `503 server_not_configured` naming what is missing.
+- The database is not touched by a deploy: run `migrate` and `seed_lookups` yourself against the **direct** URL (`DATABASE_URL_UNPOOLED`)
+  of each database. On the free tier a long run can lose its connection (the compute scales to zero); run `migrate` again, it resumes.
+  `seed_demo` refuses `DEBUG=0`; run it against staging only, and wrap it in a transaction so a dropped connection leaves nothing half-seeded.
+- Preview deployments sit behind Vercel Authentication by default. For a QA team without Vercel seats, set Settings > Deployment Protection >
+  Vercel Authentication to **Only Production Deployments**; the `develop` branch then has a stable URL
+  (`asknget-backend-git-develop-<team>.vercel.app`) to share.
