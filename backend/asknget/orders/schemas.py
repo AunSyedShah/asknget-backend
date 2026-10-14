@@ -91,7 +91,19 @@ class DeliveryOptionOut(Schema):
     name: str
     eta_label: str
     kind: str = Field(description="delivery | pickup")
-    price_cents: int
+    price_cents: int = Field(description="What it costs for this cart now (0 when the free-delivery threshold is met)")
+    waived: bool = Field(False, description="The free-delivery threshold removed the fee")
+    follows_rule: bool = Field(False, description="The price comes from the seller's or the platform's free-over / fee rule, not a fixed price")
+
+
+class DeliveryRuleOut(Schema):
+    """Free delivery over an amount, otherwise a fee: show 'Add R120 more for free delivery' when remaining_cents > 0."""
+
+    free_over_cents: int = Field(description="0 = this seller has no free-delivery threshold")
+    fee_cents: int
+    store_subtotal_cents: int = Field(description="This seller's items in the cart, before any voucher")
+    remaining_cents: int = Field(description="How much more of this seller's items for free delivery; 0 when met or no threshold")
+    free: bool
 
 
 class CartDeliveryOut(Schema):
@@ -102,6 +114,7 @@ class CartDeliveryOut(Schema):
     options: list[DeliveryOptionOut] = Field(description="Only options every item from this store supports")
     selected_option_id: Optional[UUID]
     price_cents: int
+    rule: DeliveryRuleOut
 
 
 class DeliveryChoiceIn(Schema):

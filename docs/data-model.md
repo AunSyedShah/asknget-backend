@@ -923,3 +923,10 @@ REST-style JSON; auth via access + refresh JWT.
     refund may take the balance below zero, payouts are refused until later sales cover it. Confirm.
 98. **Seller documents are private.** They are served only through signed links that expire (`SIGNED_FILE_TTL_SECONDS`, 1 hour); nginx refuses
     `/media/seller_documents/`. Documents uploaded before keep their old file names on disk but are reachable only the same way.
+99. **Delivery fee rule (`docs/sprint-8-plan.md`).** Free delivery from a threshold, otherwise a fee, both set by the admin (platform or market) and by the seller
+    (`shipping.*` settings, most specific wins, admin can lock a market). It applies to delivery options with no price; an option with a price is fixed. Judged per
+    seller. **Defaults taken, reversible: confirm.** A waived fee is the seller's cost (shipping stays the seller's income, Q63).
+100. **Which options follow the rule:** only those with a blank price (default), or every delivery option including Express?
+101. **Rule basis:** the seller's items **before** the voucher (default). A voucher is cart-level, so counting it per seller needs an allocation rule; using the whole
+     cart instead would make the platform pay the shipping.
+102. **Admin API for the rule:** Django admin only for now; a dashboard screen would need `/admin/...` endpoints.

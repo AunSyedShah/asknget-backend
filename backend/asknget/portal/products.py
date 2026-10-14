@@ -441,6 +441,7 @@ def create_delivery_option(store, data: dict):
 
     if StoreDeliveryOption.objects.filter(store=store, name__iexact=data["name"]).exists():
         raise HttpError(409, "You already have an option with that name")
+    _check_rule_price(data)
     return StoreDeliveryOption.objects.create(store=store, **data)
 
 
@@ -450,8 +451,14 @@ def patch_delivery_option(store, option_id, data: dict):
         raise HttpError(404, "Delivery option not found")
     for field, value in data.items():
         setattr(option, field, value)
+    _check_rule_price({"kind": option.kind, "price_cents": option.price_cents})
     option.save()
     return option
+
+
+def _check_rule_price(data: dict) -> None:
+    if data.get("price_cents", 0) is None and data.get("kind", "delivery") == "pickup":
+        raise HttpError(422, "Pickup needs a price; only delivery can follow the delivery rule")
 
 
 def delete_delivery_option(store, option_id) -> None:

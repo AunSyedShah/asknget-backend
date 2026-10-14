@@ -27,6 +27,7 @@ from core.schemas import ErrorOut, MessageOut
 
 from . import analytics, customers, dashboard, entitlements, inventory, orders, products
 from notifications import services as notifications
+from orders import shipping
 from team import services as team
 
 from .auth import StoreAuth
@@ -58,6 +59,8 @@ from .schemas import (
     ContentIn,
     DeliveryOptionIn,
     DeliveryOptionOut,
+    DeliveryRuleIn,
+    DeliveryRuleOut,
     DeliveryOptionPatchIn,
     ImageOrderIn,
     ProductDeliveryIn,
@@ -392,6 +395,30 @@ def dashboard_summary(request, period: PeriodLit = "month"):
 @delivery_router.get("", response=list[DeliveryOptionOut], summary="My delivery options")
 def delivery_list(request):
     return [products.option_out(o) for o in products.delivery_options(request.store)]
+
+
+@delivery_router.get("/rule", response=DeliveryRuleOut, summary="Free delivery over an amount, otherwise a fee: what applies to my store")
+def delivery_rule(request):
+    return shipping.store_rule(request.store)
+
+
+@delivery_router.put("/rule", response={200: DeliveryRuleOut, 409: ErrorOut, 422: ErrorOut},
+                     summary="Set my own threshold and/or fee (409 rule_locked when the admin fixed them)")
+def delivery_rule_set(request, payload: DeliveryRuleIn):
+    values = payload.dict(exclude_unset=True)
+    values = {k: v for k, v in values.items() if v is not None}
+    if not values:
+        raise HttpError(422, "Send free_over_cents and/or fee_cents")
+    shipping.set_store_rule(request.store, request.auth, values)
+    team.log(request.store, request.auth, "update_delivery_rule", "Changed the free-delivery rule")
+    return shipping.store_rule(request.store)
+
+
+@delivery_router.delete("/rule", response={200: DeliveryRuleOut, 409: ErrorOut}, summary="Back to the platform's numbers")
+def delivery_rule_clear(request):
+    shipping.clear_store_rule(request.store)
+    team.log(request.store, request.auth, "update_delivery_rule", "Went back to the platform's free-delivery rule")
+    return shipping.store_rule(request.store)
 
 
 @delivery_router.post("", response={201: DeliveryOptionOut, 409: ErrorOut, 422: ErrorOut}, summary="Add a delivery option")

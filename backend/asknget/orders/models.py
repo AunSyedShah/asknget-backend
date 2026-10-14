@@ -221,7 +221,9 @@ class OrderDelivery(TimeStampedModel):
     name = models.CharField(max_length=60)
     eta_label = models.CharField(max_length=60, blank=True)
     kind = models.CharField(max_length=10, default="delivery")
-    price_cents = models.PositiveIntegerField(default=0)
+    price_cents = models.PositiveIntegerField(default=0, help_text="What the buyer was charged for this store")
+    waived = models.BooleanField(default=False, help_text="The free-delivery threshold removed the fee")
+    free_over_cents = models.PositiveIntegerField(null=True, blank=True, help_text="The threshold that applied, when the option followed the rule")
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["created_at"]

@@ -22,6 +22,7 @@ from markets import services as markets
 from markets.context import get_country
 from sellers.models import Store
 
+from . import shipping as shipping_rule
 from .models import Cart, CartItem, Order, OrderDelivery, OrderItem, OrderStatusEvent, Voucher, VoucherRedemption
 
 CART_TOKEN_HEADER = "X-Cart-Token"
@@ -132,7 +133,7 @@ def _default_option(options: list):
     """Cheapest *delivery* option, not simply the cheapest: pickup is usually free
     and silently defaulting a buyer to collecting in person would be wrong."""
     shipped = [o for o in options if o.kind != "pickup"]
-    return min(shipped or options, key=lambda o: o.price_cents, default=None)
+    return min(shipped or options, key=lambda o: o.effective_price_cents, default=None)
 
 
 def cart_delivery_groups(cart: Cart) -> list[dict]:
@@ -147,7 +148,8 @@ def cart_delivery_groups(cart: Cart) -> list[dict]:
     by_store: dict = {}
     for item in cart.items.all():
         product = item.variant.product
-        group = by_store.setdefault(product.store_id, {"store": product.store, "supported": None})
+        group = by_store.setdefault(product.store_id, {"store": product.store, "supported": None, "subtotal": 0})
+        group["subtotal"] += item.variant.effective_price_cents * item.qty
         supported = _product_options(product)
         group["supported"] = supported if group["supported"] is None else (group["supported"] & supported)
 
@@ -157,11 +159,17 @@ def cart_delivery_groups(cart: Cart) -> list[dict]:
         o.id: o for o in StoreDeliveryOption.objects.filter(store_id__in=by_store, is_active=True)
     }
     selections = cart.delivery_selections or {}
+    country_id = next(iter(by_store.values()))["store"].country_id
+    rules = shipping_rule.rules_for(by_store, country_id)
     groups = []
     for store_id, group in by_store.items():
+        rule = rules[store_id]
+        for option in everything.values():
+            if option.store_id == store_id:
+                option.effective_price_cents, option.waived, option.follows_rule = shipping_rule.price_for(option, rule, group["subtotal"])
         options = sorted(
             (everything[oid] for oid in (group["supported"] or set()) if oid in everything),
-            key=lambda o: (o.sort_order, o.price_cents, o.name),
+            key=lambda o: (o.sort_order, o.effective_price_cents, o.name),
         )
         chosen_id = selections.get(str(store_id))
         chosen = next((o for o in options if str(o.id) == str(chosen_id)), None) or _default_option(options)
@@ -170,6 +178,8 @@ def cart_delivery_groups(cart: Cart) -> list[dict]:
             "store_name": group["store"].display_name,
             "options": options,
             "selected": chosen,
+            "rule": rule,
+            "subtotal": group["subtotal"],
         })
     return groups
 
@@ -194,7 +204,8 @@ def _variant_purchasable(variant: ProductVariant) -> bool:
 def _option_out(option) -> dict:
     return {
         "id": option.id, "name": option.name, "eta_label": option.eta_label,
-        "kind": option.kind, "price_cents": option.price_cents,
+        "kind": option.kind, "price_cents": option.effective_price_cents,
+        "waived": option.waived, "follows_rule": option.follows_rule,
     }
 
 
@@ -292,7 +303,7 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
     country_id = _cart_target_country(cart)
     subtotal = sum(l["line_total_cents"] for l in lines)
     groups = cart_delivery_groups(cart)
-    shipping = sum(g["selected"].price_cents for g in groups if g["selected"])
+    shipping_total = sum(g["selected"].effective_price_cents for g in groups if g["selected"])
     problems: list[str] = []
     if not lines:
         problems.append("Your cart is empty")
@@ -319,15 +330,20 @@ def cart_out(cart: Cart, token: str | None = None) -> dict:
                 "store_name": g["store_name"],
                 "options": [_option_out(o) for o in g["options"]],
                 "selected_option_id": g["selected"].id if g["selected"] else None,
-                "price_cents": g["selected"].price_cents if g["selected"] else 0,
+                "price_cents": g["selected"].effective_price_cents if g["selected"] else 0,
+                "rule": {
+                    "free_over_cents": g["rule"].free_over_cents, "fee_cents": g["rule"].fee_cents,
+                    "store_subtotal_cents": g["subtotal"], "remaining_cents": g["rule"].remaining_cents(g["subtotal"]),
+                    "free": bool(g["selected"] and g["selected"].waived),
+                },
             }
             for g in groups
         ],
         "summary": {
             "subtotal_cents": subtotal,
-            "shipping_cents": shipping,
+            "shipping_cents": shipping_total,
             "discount_cents": discount,
-            "total_cents": max(subtotal + shipping - discount, 0),
+            "total_cents": max(subtotal + shipping_total - discount, 0),
             "currency": currency,
             "item_count": sum(l["qty"] for l in lines),
         },
@@ -481,7 +497,7 @@ def checkout(request, cart: Cart, payload) -> Order:
 
     subtotal = view["summary"]["subtotal_cents"]
     discount = view["summary"]["discount_cents"]
-    shipping_cents = sum(g["selected"].price_cents for g in groups)
+    shipping_cents = sum(g["selected"].effective_price_cents for g in groups)
     total = max(subtotal + shipping_cents - discount, 0)
 
     order = Order.objects.create(
@@ -498,7 +514,7 @@ def checkout(request, cart: Cart, payload) -> Order:
         delivery_method_snapshot={
             "per_store": [
                 {"store": g["store_name"], "name": g["selected"].name, "eta_label": g["selected"].eta_label,
-                 "price_cents": g["selected"].price_cents}
+                 "price_cents": g["selected"].effective_price_cents, "waived": g["selected"].waived}
                 for g in groups
             ],
         },
@@ -516,7 +532,8 @@ def checkout(request, cart: Cart, payload) -> Order:
         option = g["selected"]
         OrderDelivery.objects.create(
             order=order, store_id=g["store_id"], option=option, name=option.name,
-            eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents,
+            eta_label=option.eta_label, kind=option.kind, price_cents=option.effective_price_cents,
+            waived=option.waived, free_over_cents=g["rule"].free_over_cents if option.follows_rule else None,
         )
     from returns.policy import terms_for     # local: returns reads orders
 

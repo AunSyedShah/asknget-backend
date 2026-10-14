@@ -171,6 +171,21 @@ same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them
    Email OTP is unchanged and still available.
 - Sandbox only: each tester first sends `join <word>` to the sandbox number once.
 
+**Delivery fee rule: free over an amount, otherwise a fee (built after the WhatsApp verification):**
+- The **admin** sets a free-delivery threshold and a fee for the whole platform or per market (Django admin, settings `shipping.free_over_cents` and
+  `shipping.fee_cents`); the **seller** sets their own for their store. Both are in the market's currency, in cents. `0` as the threshold means "no free delivery".
+- It applies to a delivery option **with no price** (`price_cents: null` in the seller's options, shown as `follows_rule: true` to buyers). An option with a price
+  (Express R25) is a fixed price and never changes. Pickup is always fixed. Existing options are unchanged until a seller blanks a price.
+- It is judged **per seller**, on that seller's items in the cart before any voucher.
+- **Cart:** each `deliveries[]` line has `rule: {free_over_cents, fee_cents, store_subtotal_cents, remaining_cents, free}`. Show "Add R{remaining_cents/100} more for free
+  delivery" when `free_over_cents > 0` and `remaining_cents > 0`, and "Free delivery" when `free`. Each option has `price_cents` (already the price for this cart),
+  `waived` and `follows_rule`.
+- **Seller portal** (next to Delivery options): `GET /seller/delivery-options/rule` returns what applies now (`free_over_cents`, `fee_cents`), where each came from
+  (`source`: `store` / `country` / `global` / `default`), `own` (the store's own values, `null` when unset), `currency` and `locked`. `PUT` sets `free_over_cents` and/or
+  `fee_cents` (send one or both); `DELETE` goes back to the platform's numbers. `409 rule_locked` on `PUT` while the admin has locked the market: show the values read-only.
+  Creating or editing an option accepts `price_cents: null` (not for pickup, `422`); list responses return `null` for those.
+- An order keeps what it was charged (`waived`, the threshold) and is never recalculated.
+
 ## 5b. Still not in the backend
 
 Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
@@ -208,7 +223,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-222 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+225 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -435,6 +450,9 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 |---|---|---|---|
 | GET | `/api/v1/seller/delivery-options` | bearer | My delivery options |
 | POST | `/api/v1/seller/delivery-options` | bearer | Add a delivery option |
+| DELETE | `/api/v1/seller/delivery-options/rule` | bearer | Back to the platform's numbers |
+| GET | `/api/v1/seller/delivery-options/rule` | bearer | Free delivery over an amount, otherwise a fee: what applies to my store |
+| PUT | `/api/v1/seller/delivery-options/rule` | bearer | Set my own threshold and/or fee (409 rule_locked when the admin fixed them) |
 | DELETE | `/api/v1/seller/delivery-options/{option_id}` | bearer | Remove one (deactivated instead when orders or products reference it) |
 | PATCH | `/api/v1/seller/delivery-options/{option_id}` | bearer | Delivery Patch |
 

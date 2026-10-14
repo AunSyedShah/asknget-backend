@@ -641,7 +641,7 @@ class DeliveryOptionIn(Schema):
 
     name: NonEmptyStr = Field(max_length=60, description='e.g. "Express Delivery"')
     eta_label: str = Field("", max_length=60, description='Free text, e.g. "1-3 business days"')
-    price_cents: int = Field(0, ge=0)
+    price_cents: Optional[int] = Field(0, ge=0, description="A fixed price. null = follow the delivery rule (free over a threshold, otherwise a fee); not for pickup")
     kind: Literal["delivery", "pickup"] = "delivery"
     is_active: bool = True
     sort_order: int = Field(0, ge=0)
@@ -650,7 +650,7 @@ class DeliveryOptionIn(Schema):
 class DeliveryOptionPatchIn(Schema):
     name: Optional[NonEmptyStr] = Field(None, max_length=60)
     eta_label: Optional[str] = Field(None, max_length=60)
-    price_cents: Optional[int] = Field(None, ge=0)
+    price_cents: Optional[int] = Field(None, ge=0, description="Send null to follow the delivery rule")
     kind: Optional[Literal["delivery", "pickup"]] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = Field(None, ge=0)
@@ -660,11 +660,35 @@ class DeliveryOptionOut(Schema):
     id: UUID
     name: str
     eta_label: str
-    price_cents: int
+    price_cents: Optional[int] = Field(description="null = follows the delivery rule")
     kind: str
     is_active: bool
     sort_order: int
     products_count: int = Field(0, description="Products that explicitly selected this option")
+
+
+class DeliveryRuleSourceOut(Schema):
+    free_over: str = Field(description="store | country | global | default")
+    fee: str
+
+
+class DeliveryRuleOwnOut(Schema):
+    free_over_cents: Optional[int] = Field(description="This store's own value; null = not set")
+    fee_cents: Optional[int]
+
+
+class DeliveryRuleOut(Schema):
+    free_over_cents: int = Field(description="Free at or above this (0 = no threshold), what applies now")
+    fee_cents: int = Field(description="Charged below the threshold, what applies now")
+    locked: bool = Field(description="The admin fixed the numbers for this market; the store's own values are ignored")
+    source: DeliveryRuleSourceOut
+    own: DeliveryRuleOwnOut
+    currency: str
+
+
+class DeliveryRuleIn(Schema):
+    free_over_cents: Optional[int] = Field(None, ge=0, description="0 = no free-delivery threshold")
+    fee_cents: Optional[int] = Field(None, ge=0)
 
 
 class ProductDeliveryIn(Schema):
