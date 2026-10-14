@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -80,6 +81,12 @@ JWT_REFRESH_TTL_DAYS = int(os.environ.get('JWT_REFRESH_TTL_DAYS', 30))
 OTP_TTL_MINUTES = int(os.environ.get('OTP_TTL_MINUTES', 10))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('OTP_RESEND_COOLDOWN_SECONDS', 45))  # design: "Resend code in 00:45"
 OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
+
+# WhatsApp verification through Twilio (accounts.whatsapp). The user messages the number below; Twilio calls our webhook.
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')   # checks the webhook signature; without it the webhook answers 503
+TWILIO_WHATSAPP_NUMBER = re.sub(r'\D', '', os.environ.get('TWILIO_WHATSAPP_NUMBER', ''))   # the number people message, digits only
+TWILIO_WEBHOOK_URL = os.environ.get('TWILIO_WEBHOOK_URL', '')   # only if the URL Twilio calls differs from the one Django sees
+WHATSAPP_CHALLENGE_TTL_MINUTES = int(os.environ.get('WHATSAPP_CHALLENGE_TTL_MINUTES', 10))
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
 SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
 REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'

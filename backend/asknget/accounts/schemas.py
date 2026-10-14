@@ -168,6 +168,27 @@ class OtpSendOut(Schema):
     resend_available_at: datetime
 
 
+class WhatsappStartIn(Schema):
+    purpose: Literal["signup_phone"] = "signup_phone"
+    phone: Optional[PhoneStr] = Field(None, description="E.164. Optional when authenticated (defaults to the number on the account).")
+
+
+class WhatsappStartOut(Schema):
+    id: UUID = Field(description="Poll GET /auth/whatsapp/{id} with this")
+    link: str = Field(description="https://wa.me/... with the message typed in. Draw it as a QR on desktop; open it from a button on a phone.")
+    message: str = Field(description="The text in that link, for the screen")
+    whatsapp_number: str = Field(description="Digits only, e.g. 14155238886; show it as +14155238886")
+    expires_at: datetime
+
+
+class WhatsappStatusOut(Schema):
+    id: UUID
+    status: Literal["pending", "verified", "failed", "expired"]
+    failure: str = Field("", description="phone_mismatch | phone_in_use when status is failed")
+    phone_masked: str = Field("", description="Set once verified")
+    expires_at: datetime
+
+
 class OtpVerifyIn(Schema):
     channel: OtpVerification.OtpChannel
     purpose: OtpVerification.OtpPurpose

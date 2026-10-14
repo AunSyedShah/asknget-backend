@@ -271,3 +271,127 @@ class PaymentMethodTests(ApiTestCase):
         res = self.post(f"{ME}/payment-methods", {**self.card, "card_number": "4111111111111111", "cvv": "123"}, token=self.token)
         self.assertEqual(res.status_code, 201)
         self.assertFalse(hasattr(PaymentMethod.objects.get(), "card_number"))
+
+
+HOOK_URL = "https://testserver/api/v1/auth/whatsapp/webhook"
+
+
+@override_settings(TWILIO_AUTH_TOKEN="test-token", TWILIO_WHATSAPP_NUMBER="14155238886", TWILIO_WEBHOOK_URL=HOOK_URL)
+class WhatsappVerificationTests(ApiTestCase):
+    PHONE = "+923082219027"
+
+    def setUp(self):
+        self.token = self.register(phone=self.PHONE)["tokens"]["access_token"]
+
+    def start(self, token="__user__", **body):
+        return self.post(f"{AUTH}/whatsapp/start", body, token=self.token if token == "__user__" else token)
+
+    def token_from(self, started):
+        return re.search(r": ([A-Z2-9]{8})$", started.json()["message"]).group(1)
+
+    def message(self, token_text, sender=None, sign=True, body_prefix="Verify your OTP for asknget: "):
+        import base64, hashlib, hmac
+        from urllib.parse import urlencode
+
+        params = {"From": f"whatsapp:{sender or self.PHONE}", "Body": body_prefix + token_text, "To": "whatsapp:+14155238886"}
+        signed = HOOK_URL + "".join(k + params[k] for k in sorted(params))
+        sig = base64.b64encode(hmac.new(b"test-token", signed.encode(), hashlib.sha1).digest()).decode()
+        headers = {"X-Twilio-Signature": sig} if sign else {}
+        return self.client.post(f"{AUTH}/whatsapp/webhook", data=urlencode(params), content_type="application/x-www-form-urlencoded", headers=headers)
+
+    def status(self, started):
+        return self.client.get(f"{AUTH}/whatsapp/{started.json()['id']}").json()
+
+    def test_start_gives_a_whatsapp_link_with_the_message_typed_in(self):
+        res = self.start()
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        self.assertTrue(body["link"].startswith("https://wa.me/14155238886?text=Verify%20your%20OTP%20for%20asknget%3A%20"))
+        self.assertEqual(body["whatsapp_number"], "14155238886")
+        self.assertEqual(self.status(res)["status"], "pending")
+
+    def test_a_message_from_the_accounts_number_verifies_the_phone(self):
+        started = self.start()
+        reply = self.message(self.token_from(started))
+        self.assertEqual(reply.status_code, 200)
+        self.assertIn("<Message>Verified.", reply.content.decode())
+        user = User.objects.get(email="john@example.com")
+        self.assertTrue(user.phone_verified)
+        self.assertEqual(self.status(started)["status"], "verified")
+        self.assertEqual(self.status(started)["phone_masked"], "+92*******027")
+
+    def test_a_message_from_another_number_is_refused_for_good(self):
+        started = self.start()
+        token = self.token_from(started)
+        self.assertIn("not the number", self.message(token, sender="+923001111111").content.decode())
+        self.assertFalse(User.objects.get(email="john@example.com").phone_verified)
+        self.assertEqual(self.status(started)["status"], "failed")
+        self.assertEqual(self.status(started)["failure"], "phone_mismatch")
+        self.assertIn("expired", self.message(token).content.decode())                   # the right phone cannot reuse a burnt token
+
+    def test_the_same_message_twice_is_harmless(self):
+        token = self.token_from(self.start())
+        self.message(token)
+        self.assertIn("Already verified", self.message(token).content.decode())
+
+    def test_an_expired_challenge_is_not_verified(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .models import WhatsappChallenge
+
+        started = self.start()
+        WhatsappChallenge.objects.update(expires_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self.status(started)["status"], "expired")
+        self.assertIn("expired", self.message(self.token_from(started)).content.decode())
+        self.assertFalse(User.objects.get(email="john@example.com").phone_verified)
+
+    def test_the_webhook_needs_a_valid_signature(self):
+        token = self.token_from(self.start())
+        self.assertEqual(self.message(token, sign=False).status_code, 403)
+        with override_settings(TWILIO_WEBHOOK_URL="https://elsewhere.example/hook"):
+            self.assertEqual(self.message(token).status_code, 403)
+        self.assertFalse(User.objects.get(email="john@example.com").phone_verified)
+
+    @override_settings(TWILIO_AUTH_TOKEN="")
+    def test_the_webhook_is_off_without_the_twilio_token(self):
+        self.assertEqual(self.message("ABCDEFGH").status_code, 503)
+
+    def test_a_message_that_is_not_ours_gets_no_reply(self):
+        reply = self.message("hello there", body_prefix="")
+        self.assertEqual(reply.status_code, 200)
+        self.assertNotIn("<Message>", reply.content.decode())
+        self.assertNotIn("<Message>", self.message("ABCDEFGH").content.decode())        # well-formed but unknown token
+
+    def test_a_phone_that_is_not_on_the_account_is_refused_at_start(self):
+        self.assertEqual(self.start(phone="+923001111111").status_code, 422)
+
+    def test_an_anonymous_visitor_can_prove_a_number_without_an_account(self):
+        started = self.start(token=None, phone="+27821234567")
+        self.assertEqual(started.status_code, 200, started.content)
+        self.message(self.token_from(started), sender="+27821234567")
+        self.assertEqual(self.status(started)["status"], "verified")
+
+    def test_an_account_without_a_phone_takes_the_senders_number(self):
+        token = self.register(email="jane@example.com")["tokens"]["access_token"]
+        started = self.start(token=token)
+        self.message(self.token_from(started), sender="+27821234567")
+        jane = User.objects.get(email="jane@example.com")
+        self.assertEqual((jane.phone, jane.phone_verified), ("+27821234567", True))
+
+    def test_a_number_that_belongs_to_another_account_is_refused(self):
+        token = self.register(email="jane@example.com")["tokens"]["access_token"]
+        started = self.start(token=token)
+        self.message(self.token_from(started), sender=self.PHONE)
+        self.assertEqual(self.status(started)["failure"], "phone_in_use")
+        self.assertIsNone(User.objects.get(email="jane@example.com").phone)
+
+    def test_starting_is_rate_limited(self):
+        for _ in range(5):
+            self.assertEqual(self.start().status_code, 200)
+        self.assertEqual(self.start().status_code, 429)
+
+    @override_settings(TWILIO_WHATSAPP_NUMBER="")
+    def test_start_says_so_when_whatsapp_is_not_configured(self):
+        self.assertEqual(self.start().status_code, 503)

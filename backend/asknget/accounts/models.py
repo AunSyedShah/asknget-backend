@@ -126,6 +126,26 @@ class OtpVerification(TimeStampedModel):
         indexes = [models.Index(fields=["target", "purpose", "verified_at"])]
 
 
+class WhatsappChallenge(TimeStampedModel):
+    """A phone number proved by the user sending us a WhatsApp message that carries a token (accounts.whatsapp). Token stored hashed."""
+
+    class Purpose(models.TextChoices):
+        SIGNUP_PHONE = "signup_phone", "Signup – phone"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="whatsapp_challenges")
+    purpose = models.CharField(max_length=20, choices=Purpose.choices)
+    expected_phone = models.CharField(max_length=20, blank=True, help_text="E.164; the message must come from this number when set")
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    verified_phone = models.CharField(max_length=20, blank=True, help_text="The number the message came from")
+    verified_at = models.DateTimeField(null=True, blank=True)
+    failure = models.CharField(max_length=20, blank=True, help_text="phone_mismatch | phone_in_use")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta(TimeStampedModel.Meta):
+        indexes = [models.Index(fields=["created_at"])]
+
+
 class RefreshToken(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="refresh_tokens")
     token_hash = models.CharField(max_length=128, unique=True)

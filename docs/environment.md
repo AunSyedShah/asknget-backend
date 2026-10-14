@@ -121,6 +121,10 @@ that default does not apply.
 | `OTP_RESEND_COOLDOWN_SECONDS` | `45` (the design's "Resend code in 00:45") |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | empty | SMTP login (Gmail: the address and an **App Password**). Empty means mail is printed to the log, not sent. Read into Django's `MAILERS`. |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` | `smtp.gmail.com`, `587`, `1` | SMTP server. |
+| `TWILIO_AUTH_TOKEN` | empty | Checks the signature on Twilio's WhatsApp webhook. Empty: the webhook answers 503 and nothing can be verified that way. |
+| `TWILIO_WHATSAPP_NUMBER` | empty | The WhatsApp number people message (sandbox or your own sender); digits are kept, so `+1 415 523 8886` is fine. Empty: `/auth/whatsapp/start` answers 503. |
+| `TWILIO_WEBHOOK_URL` | empty | Only when the URL Twilio calls differs from the one Django sees (a proxy or a rewritten host). It must equal what is set in the Twilio console. |
+| `WHATSAPP_CHALLENGE_TTL_MINUTES` | `10` | How long the QR / link works. |
 | `DEFAULT_FROM_EMAIL` | `asknget <EMAIL_HOST_USER>` | Gmail rewrites the sender to the logged-in account whatever this says. |
 | `OTP_MAX_ATTEMPTS` | `5` |
 

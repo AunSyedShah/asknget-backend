@@ -6,6 +6,7 @@
 
 from uuid import UUID
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from ninja import File, Router
 from ninja.files import UploadedFile
@@ -13,8 +14,8 @@ from ninja.files import UploadedFile
 from core.auth import JWTAuth, OptionalJWTAuth
 from core.schemas import ErrorOut, MessageOut
 
-from . import services
-from .models import Address, PaymentMethod, User
+from . import services, whatsapp
+from .models import Address, PaymentMethod, User, WhatsappChallenge
 from .schemas import (
     AddressIn,
     AddressOut,
@@ -37,6 +38,9 @@ from .schemas import (
     TokenOut,
     UserOut,
     UserPatchIn,
+    WhatsappStartIn,
+    WhatsappStartOut,
+    WhatsappStatusOut,
 )
 
 auth_router = Router(tags=["auth"])
@@ -104,6 +108,32 @@ def otp_send(request, payload: OtpSendIn):
         "expires_at": otp.expires_at,
         "resend_available_at": otp.resend_available_at,
     }
+
+
+@auth_router.post(
+    "/whatsapp/start",
+    response={200: WhatsappStartOut, 422: ErrorOut, 429: ErrorOut, 503: ErrorOut},
+    auth=OptionalJWTAuth(),
+    summary="Verify a phone number by WhatsApp: the user sends us a message (QR or button)",
+)
+def whatsapp_start(request, payload: WhatsappStartIn):
+    user = request.auth if isinstance(request.auth, User) else None
+    challenge, link, message = whatsapp.start(request=request, user=user, purpose=payload.purpose, phone=payload.phone)
+    return {"id": challenge.id, "link": link, "message": message, "whatsapp_number": settings.TWILIO_WHATSAPP_NUMBER,
+            "expires_at": challenge.expires_at}
+
+
+@auth_router.post("/whatsapp/webhook", auth=None, include_in_schema=False)
+def whatsapp_webhook(request):
+    """Twilio calls this when someone messages the WhatsApp number. Not for the frontend; the signature is checked."""
+    return whatsapp.receive(request)
+
+
+@auth_router.get("/whatsapp/{challenge_id}", response={200: WhatsappStatusOut, 404: ErrorOut}, summary="Has the WhatsApp message arrived? (poll every 2-3 s)")
+def whatsapp_status(request, challenge_id: UUID):
+    challenge = get_object_or_404(WhatsappChallenge, pk=challenge_id)
+    return {"id": challenge.id, "status": whatsapp.state(challenge), "failure": challenge.failure,
+            "phone_masked": whatsapp.masked(challenge), "expires_at": challenge.expires_at}
 
 
 @auth_router.post("/otp/verify", response={200: MessageOut, 400: ErrorOut, 429: ErrorOut})

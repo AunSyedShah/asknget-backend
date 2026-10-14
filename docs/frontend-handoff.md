@@ -160,6 +160,17 @@ same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them
   count), so it can be later than placed date + the market's change-of-mind days.
 - **Endpoint index paths** below were printed as `/api/v1/api/v1/…` before; they are right now.
 
+**Phone verification by WhatsApp (QR or button), built after the email OTP:**
+1. `POST /auth/whatsapp/start` `{"purpose":"signup_phone","phone":"+92..."}` (the bearer token is optional; `phone` can be left out when signed in and the account has one) returns
+   `{id, link, message, whatsapp_number, expires_at}`. `429` after 5 tries an hour, `503` when WhatsApp is not configured, `422` when `phone` is not the account's.
+2. Draw `link` as a **QR code** on desktop and open it from a **button** on a phone (a phone cannot scan its own screen). It opens WhatsApp with
+   "Verify your OTP for asknget: XXXXXXXX" already typed; the user only presses Send.
+3. Poll `GET /auth/whatsapp/{id}` every 2-3 s: `status` is `pending`, `verified` (then `phone_masked`), `failed` (`failure`: `phone_mismatch` when it was sent from another number,
+   `phone_in_use` when another account owns that number) or `expired` (10 minutes). Stop polling on anything but `pending`.
+4. There is no code to type: the number the message came from is the proof. When it succeeds the account's `phone_verified_at` is set; an account without a phone takes that number.
+   Email OTP is unchanged and still available.
+- Sandbox only: each tester first sends `join <word>` to the sandbox number once.
+
 ## 5b. Still not in the backend
 
 Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
@@ -197,7 +208,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-220 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+222 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -213,6 +224,8 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/auth/register` | - | Register as a customer |
 | POST | `/api/v1/auth/seller/register` | - | Register as a seller ('Create your seller account') |
 | POST | `/api/v1/auth/team/accept` | bearer | Accept an invitation (sign in first if the e-mail already has an account) |
+| POST | `/api/v1/auth/whatsapp/start` | bearer | Verify a phone number by WhatsApp: the user sends us a message (QR or button) |
+| GET | `/api/v1/auth/whatsapp/{challenge_id}` | - | Has the WhatsApp message arrived? (poll every 2-3 s) |
 
 #### cart
 
