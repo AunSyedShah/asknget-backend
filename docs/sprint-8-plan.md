@@ -110,3 +110,22 @@ Built as drafted, with the draft's defaults (decisions 1-3 in §6 stay open and 
 * The cart's `deliveries[]` carries `rule {free_over_cents, fee_cents, store_subtotal_cents, remaining_cents, free}`; options carry `waived` and `follows_rule`.
 * 24 tests in `orders/test_delivery_rule.py`; the full suite is green (595). A flaky analytics test found on the way was fixed: search attribution now breaks timestamp ties by the event id.
 * Questions Q99-Q102 are in `docs/data-model.md` §10.
+
+## 8. Category requests (owner's request, 2026-10-15): built
+
+A seller cannot add a category: they ask (the design's Category Request Popup: parent, name, reason up to 250 characters, an optional PNG/JPG up to 1 MB) and staff
+decide. Built with these defaults (Q103): approval makes the category live for everyone; the parent is optional but must be top-level; the seller is told in the
+portal; a store has at most 5 waiting requests.
+
+* `catalog.CategoryRequest` (`catalog/0007`): status `pending` / `approved` / `rejected` / `withdrawn`, the reviewer, the note, and the category the seller got
+  (`created_category` says whether the approval created it or pointed at an existing one). A partial unique constraint stops one store asking twice for the same
+  name while waiting.
+* `catalog/category_requests.py`: submit (refuses a name that already exists, `409 category_exists` with the category to use), withdraw, approve (as asked, renamed or
+  moved, or onto an existing category), reject (with a reason), and the signed-link file view. Rows are locked while deciding; notifications go out after commit.
+* `catalog/request_api.py`: `/seller/category-requests` (section `products`) and `/admin/category-requests` (staff). Django admin lists them read-only.
+* Notifications `category_request_approved` / `category_request_rejected` (System tab), seeded by `notifications/0005`.
+* The supporting image is private like seller documents: `/api/v1/files/category-requests/{id}?t=…`, refused under `/media/` by nginx and the dev server.
+* 18 tests in `catalog/test_category_requests.py`.
+
+**Known limit:** uploads are stored on the local disk (`MEDIA_ROOT`). A Vercel deployment's files are read-only (only `/tmp` is writable, and it is wiped), so
+saving the supporting image, like every other upload, fails there until object storage is set up; a request without a file works.

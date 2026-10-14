@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     Brand,
     Category,
+    CategoryRequest,
     Product,
     ProductContentSection,
     ProductImage,
@@ -89,3 +90,16 @@ class ReviewAdmin(admin.ModelAdmin):
 class WishlistItemAdmin(admin.ModelAdmin):
     list_display = ("user", "product", "created_at")
     search_fields = ("user__email", "product__name")
+
+
+@admin.register(CategoryRequest)
+class CategoryRequestAdmin(admin.ModelAdmin):
+    """Read here; decide through the admin API (it creates the category and tells the seller)."""
+
+    list_display = ("name", "parent", "store", "status", "created_at", "reviewed_at")
+    list_filter = ("status",)
+    search_fields = ("name", "store__display_name")
+    readonly_fields = [f.name for f in CategoryRequest._meta.fields]
+
+    def has_add_permission(self, request):
+        return False

@@ -26,6 +26,8 @@ TEMPLATES = {
     "return_escalated": ("returns", {"en": "Return Disputed"}, {"en": "{customer} disputed your rejection of the return for order #{order}. asknget will decide."}, "order, customer"),
     "return_decided": ("returns", {"en": "Return Decision"}, {"en": "asknget decided the return for order #{order}: {outcome}."}, "order, outcome"),
     "plan_changed": ("system", {"en": "Plan Updated"}, {"en": "Your store is now on the {plan} plan."}, "plan"),
+    "category_request_approved": ("system", {"en": "Category Approved"}, {"en": "Your request for the category {name} was approved: you can now list products in {category}."}, "name, category"),
+    "category_request_rejected": ("system", {"en": "Category Request Declined"}, {"en": "Your request for the category {name} was declined: {reason}"}, "name, reason"),
 }
 
 # Which part of the portal a category belongs to. A team member sees a category only if they can

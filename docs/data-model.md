@@ -930,3 +930,8 @@ REST-style JSON; auth via access + refresh JWT.
 101. **Rule basis:** the seller's items **before** the voucher (default). A voucher is cart-level, so counting it per seller needs an allocation rule; using the whole
      cart instead would make the platform pay the shipping.
 102. **Admin API for the rule:** Django admin only for now; a dashboard screen would need `/admin/...` endpoints.
+103. **Category requests (`catalog.CategoryRequest`, `docs/sprint-8-plan.md` §8).** Sellers ask, staff approve or reject. **Defaults taken, reversible: confirm.**
+     An approved category is live for every seller at once; the parent is optional (a new top-level category can be asked for) and must be top-level (the tree is
+     two levels); the seller is told in the portal only (no e-mail); nothing can be listed under a category until it is approved; at most 5 waiting requests per store.
+104. **The admin portal has no screen for category requests** in the 2026-10-14 design (Category Management, Add Category, Category Details and Subcategories only):
+     where should the queue live (a tab on Category Management?), and should it show how many stores asked for the same name?

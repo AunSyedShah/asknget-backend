@@ -9,6 +9,7 @@ Money is stored as integer minor units (`*_cents`) with a currency code.
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Lower
 
 from core.models import SoftDeleteModel, TimeStampedModel
 
@@ -319,3 +320,40 @@ class WishlistItem(TimeStampedModel):
 
     class Meta(TimeStampedModel.Meta):
         constraints = [models.UniqueConstraint(fields=["user", "product"], name="uniq_wishlist_item")]
+
+
+class CategoryRequest(TimeStampedModel):
+    """A seller asking for a category that does not exist (Category Request Popup). Staff approve or reject it
+    (catalog.category_requests); a seller never creates a category."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting for review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    store = models.ForeignKey("sellers.Store", on_delete=models.CASCADE, related_name="category_requests")
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    parent = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                               help_text="Empty: the seller asks for a new top-level category")
+    name = models.CharField(max_length=100)
+    reason = models.CharField(max_length=250, help_text='"Why do you need this category?"')
+    document = models.FileField(upload_to="category_requests/", null=True, blank=True,
+                                help_text="Optional supporting image; private, served only through a signed link")
+    document_name = models.CharField(max_length=255, blank=True, help_text="The file name the seller uploaded, for display")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=500, blank=True, help_text="Why it was rejected, or a note with the approval")
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests",
+                                 help_text="The category the approval gave the seller")
+    created_category = models.BooleanField(default=False, help_text="The approval created it (rather than pointing at an existing one)")
+
+    class Meta(TimeStampedModel.Meta):
+        indexes = [models.Index(fields=["status", "-created_at"])]
+        constraints = [
+            models.UniqueConstraint(Lower("name"), "store", condition=Q(status="pending"), name="uniq_pending_category_request_per_store"),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"

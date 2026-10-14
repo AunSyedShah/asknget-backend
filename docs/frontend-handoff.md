@@ -186,6 +186,21 @@ same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them
   Creating or editing an option accepts `price_cents: null` (not for pickup, `422`); list responses return `null` for those.
 - An order keeps what it was charged (`waived`, the threshold) and is never recalculated.
 
+**Category requests (Category Request Popup): a seller asks, staff decide.** A seller cannot create a category.
+- `POST /seller/category-requests` (multipart): `name` ("Category Name"), `reason` ("Why do you need this category?", 3-250 characters), `parent_id`
+  ("Parent Category", a **top-level** one; leave it out to ask for a new top-level category), `document` (optional, PNG or JPG up to 1 MB). `201` returns the request
+  (`status: pending`). Errors: **`409 category_exists`** with `category {id, name, slug}` and `is_active` when that name already exists: offer "Use {name}" instead;
+  `409 already_requested` (this store already asked); `422 parent_must_be_top_level`, `unknown_parent`, or a file that is not a real PNG/JPG or is over 1 MB; `429` with 5
+  requests already waiting.
+- `GET /seller/category-requests?status=` (paginated) and `GET /seller/category-requests/{id}`; `DELETE` withdraws one still `pending`.
+- When staff decide, the seller gets a portal notification (`category_request_approved` / `category_request_rejected`, tab **System**) and the request shows `status`,
+  `review_note` (the rejection reason) and, once approved, `category {id, name, slug}`: that is the category to pick in the product form (it may have a different
+  name or parent than asked, or be one that already existed).
+- `document_url` is a signed link that expires; fetch the request again for a fresh one.
+- **Admin portal** (no screen designed yet): `GET /admin/category-requests` (default `pending`, oldest first; `?status=`, `?q=` name or store), `GET /{id}` (with
+  `store`, `requested_by` and `existing_category` when the name now exists), `POST /{id}/approve` with `{}` to create it as asked, or `{name, parent_id, note}` to rename
+  or move it, or `{use_category_id}` to give the seller an existing category; `POST /{id}/reject` with `{reason}`. A decided request answers `409 not_pending`.
+
 ## 5b. Still not in the backend
 
 Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
@@ -223,7 +238,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-225 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+234 operations in 36 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -293,6 +308,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
+| GET | `/api/v1/files/category-requests/{request_id}` | - | A category request's supporting image, through a signed link (expires) |
 | GET | `/api/v1/files/seller-documents/{doc_id}` | - | A seller document, through a signed link from the API (expires) |
 
 #### lookups
@@ -411,6 +427,15 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/seller/analytics/products` | bearer | Best sellers and slow movers |
 | GET | `/api/v1/seller/analytics/sales` | bearer | Sales Analytics: gross vs net, discounts, refunds, revenue over time, channel and category mix |
 | GET | `/api/v1/seller/analytics/search` | bearer | What shoppers typed; market searches that found nothing |
+
+#### seller: category requests
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/seller/category-requests` | bearer | My category requests |
+| POST | `/api/v1/seller/category-requests` | bearer | Ask for a category (Category Request Popup). 409 category_exists names the one to use instead |
+| DELETE | `/api/v1/seller/category-requests/{request_id}` | bearer | Withdraw a request still waiting for review |
+| GET | `/api/v1/seller/category-requests/{request_id}` | bearer | My Category Request |
 
 #### seller: chat
 
@@ -550,6 +575,15 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/seller/transactions/overview` | bearer | Transactions Overview: cards, recent transactions, summary |
 | GET | `/api/v1/seller/transactions/tabs` | bearer | Counts for the tab labels: Sales (1,102), Payouts (24)… |
 | GET | `/api/v1/seller/transactions/{reference}` | bearer | Transaction Details |
+
+#### admin · category requests
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/admin/category-requests` | bearer | Category requests (default: waiting for review, oldest first) |
+| GET | `/api/v1/admin/category-requests/{request_id}` | bearer | Category Request Detail |
+| POST | `/api/v1/admin/category-requests/{request_id}/approve` | bearer | Approve: create the category (optionally renamed or moved), or give the seller an existing one (use_category_id) |
+| POST | `/api/v1/admin/category-requests/{request_id}/reject` | bearer | Reject, with a reason the seller sees |
 
 #### admin · orders
 
