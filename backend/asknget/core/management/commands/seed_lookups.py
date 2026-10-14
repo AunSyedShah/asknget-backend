@@ -65,15 +65,23 @@ COUNTRIES = {
 
 # (name, [children]) — top-level list is the union of the seller form,
 # buyer filter sidebar and landing "Shop by Categories". TODO(design): confirm canonical tree.
+# Rows are matched by slug and slugs are unique across the whole tree, so a name must appear once:
+# reusing one (a child "Accessories" under Fashion) would move the existing category. Append; do not rename
+# (products point at these rows). core/test_seed_lookups.py guards both.
 CATEGORIES = [
-    ("Fashion", ["Shoes", "Bags"]),
-    ("Beauty", ["Makeup", "Skincare", "Fragrance"]),
-    ("Electronics", []),
-    ("Groceries", ["Food", "Chocolate"]),
-    ("Jewellery", []),
-    ("Sports", []),
-    ("Home & Lifestyle", ["Crockery", "Furniture", "Essentials"]),
-    ("Accessories", ["Mobile Accessories", "Digital Accessories"]),
+    ("Fashion", ["Shoes", "Bags", "Women's Clothing", "Men's Clothing", "Kids' Clothing", "Eyewear"]),
+    ("Beauty", ["Makeup", "Skincare", "Fragrance", "Hair Care", "Bath & Body", "Nail Care", "Men's Grooming"]),
+    ("Electronics", ["Mobile Phones", "Laptops & Computers", "Audio & Headphones", "Cameras", "TV & Home Entertainment", "Wearables"]),
+    ("Groceries", ["Food", "Chocolate", "Beverages", "Snacks", "Pantry Staples"]),
+    ("Jewellery", ["Watches", "Rings", "Necklaces", "Earrings"]),
+    ("Sports", ["Fitness Equipment", "Activewear", "Outdoor & Camping", "Cycling"]),
+    ("Home & Lifestyle", ["Crockery", "Furniture", "Essentials", "Home Decor", "Bedding & Bath", "Lighting"]),
+    ("Accessories", ["Mobile Accessories", "Digital Accessories", "Belts & Wallets"]),
+    ("Health & Wellness", ["Vitamins & Supplements", "Personal Care Devices", "Medical Supplies"]),
+    ("Baby & Kids", ["Baby Care", "Toys & Games", "School Supplies"]),
+    ("Books & Stationery", ["Books", "Stationery", "Art Supplies"]),
+    ("Pet Supplies", ["Pet Food", "Pet Accessories"]),
+    ("Automotive", ["Car Accessories", "Car Care"]),
     ("Other", []),
 ]
 
