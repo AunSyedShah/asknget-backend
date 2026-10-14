@@ -108,5 +108,5 @@ Built as drafted, with the draft's defaults (decisions 1-3 in §6 stay open and 
 * `StoreDeliveryOption.price_cents` is nullable (`sellers/0009`); `OrderDelivery` gained `waived` and `free_over_cents` (`orders/0009`). Nothing changes until someone sets the rule and blanks a price.
 * The option API takes `price_cents: null` (not for pickup: `422`). The rule endpoints are `GET` / `PUT` / `DELETE /seller/delivery-options/rule`, with `409 rule_locked` while the admin has locked the market.
 * The cart's `deliveries[]` carries `rule {free_over_cents, fee_cents, store_subtotal_cents, remaining_cents, free}`; options carry `waived` and `follows_rule`.
-* 24 tests in `orders/test_delivery_rule.py`; the full suite is green apart from one flaky analytics test that fails about one run in three without this change (`portal.test_analytics`: `test_search_attributes_queries_that_led_to_the_store`).
+* 24 tests in `orders/test_delivery_rule.py`; the full suite is green (595). A flaky analytics test found on the way was fixed: search attribution now breaks timestamp ties by the event id.
 * Questions Q99-Q102 are in `docs/data-model.md` §10.

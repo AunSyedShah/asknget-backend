@@ -161,6 +161,14 @@ class ReportTests(AnalyticsTestCase):
         self.assertEqual([r["query"] for r in body["market_zero_result_queries"]], ["unicorn serum"])
         self.assertFalse(body["truncated"])
 
+    def test_events_with_the_same_timestamp_keep_the_order_they_were_recorded_in(self):
+        ProductEvent.objects.create(kind=ProductEvent.Kind.SEARCH, query="bb cream", result_count=3, user=self.sam)
+        ProductEvent.objects.create(kind=ProductEvent.Kind.VIEW, product=self.bb, user=self.sam)
+        ProductEvent.objects.create(kind=ProductEvent.Kind.SEARCH, query="unicorn serum", result_count=0, user=self.sam)
+        ProductEvent.objects.filter(user=self.sam).update(created_at=timezone.now())     # a coarse clock: all three in one tick
+        body = self.get(f"{A}/search", self.token).json()
+        self.assertEqual([r["query"] for r in body["store_queries"]], ["bb cream"])      # the search before the view, not the one after
+
     def test_search_ignores_a_view_that_is_too_late(self):
         old = timezone.now() - timedelta(hours=2)
         e = ProductEvent.objects.create(kind=ProductEvent.Kind.SEARCH, query="late", result_count=2, user=self.sam)

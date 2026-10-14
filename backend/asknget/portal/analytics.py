@@ -361,10 +361,12 @@ def search_terms(store, period_name: str, *, limit: int = 10) -> dict:
     events = list(
         ProductEvent.objects.filter(created_at__gte=p.start, created_at__lt=p.end)
         .filter(Q(kind=Kind.SEARCH) | Q(kind=Kind.VIEW, product_id__in=store_products))
-        .order_by("-created_at")
-        .values("kind", "query", "result_count", "product_id", "user_id", "cart_token", "created_at")[:limit_rows]
+        .order_by("-created_at", "-id")
+        .values("id", "kind", "query", "result_count", "product_id", "user_id", "cart_token", "created_at")[:limit_rows]
     )
-    events.reverse()  # oldest first: a search precedes the view it caused
+    # Oldest first: a search precedes the view it caused. Two events can share a timestamp (some clocks tick
+    # coarser than a request), so the id, which only grows, keeps the order they were recorded in.
+    events.sort(key=lambda e: (e["created_at"], e["id"]))
 
     pending: dict[tuple, list] = defaultdict(list)
     hits: dict[str, dict] = {}
