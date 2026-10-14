@@ -119,6 +119,9 @@ that default does not apply.
 | `JWT_REFRESH_TTL_DAYS` | `30` |
 | `OTP_TTL_MINUTES` | `10` |
 | `OTP_RESEND_COOLDOWN_SECONDS` | `45` (the design's "Resend code in 00:45") |
+| `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | empty | SMTP login (Gmail: the address and an **App Password**). Empty means mail is printed to the log, not sent. Read into Django's `MAILERS`. |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` | `smtp.gmail.com`, `587`, `1` | SMTP server. |
+| `DEFAULT_FROM_EMAIL` | `asknget <EMAIL_HOST_USER>` | Gmail rewrites the sender to the logged-in account whatever this says. |
 | `OTP_MAX_ATTEMPTS` | `5` |
 
 ### Performance and serving

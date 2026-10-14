@@ -319,8 +319,24 @@ CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+# Outgoing mail (OTP codes, order and return e-mails), Django 6.1 MAILERS (the EMAIL_* settings are deprecated and refused
+# next to it). With EMAIL_HOST_USER set it goes out over SMTP, Gmail by default: use an App Password, never the account
+# password. Without it nothing is sent: the message is printed to the log, so a preview without credentials still shows the code
+# in its logs. Tests always use the in-memory backend.
+_EMAIL_USER = os.environ.get('EMAIL_HOST_USER', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or (f'asknget <{_EMAIL_USER}>' if _EMAIL_USER else 'asknget <noreply@asknget.local>')
 MAILERS = {
     'default': {
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
+            'port': int(os.environ.get('EMAIL_PORT', 587)),
+            'username': _EMAIL_USER,
+            'password': os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', ''),   # Google shows app passwords in groups of four
+            'use_tls': os.environ.get('EMAIL_USE_TLS', '1') == '1',
+            'timeout': 10,   # never hold a serverless request on a mail server
+        },
+    } if _EMAIL_USER else {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
