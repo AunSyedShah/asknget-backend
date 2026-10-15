@@ -83,15 +83,17 @@ a seller cannot create categories, they request them; an order keeps a snapshot 
 One Figma file, three surfaces, **desktop frames only** (no mobile design; see handoff section 1 for the responsive defaults).
 
 **The frontend is built from pictures, so pictures come first. The frontend session never calls Figma itself.** The pictures live in
-**`Figma/frames/`** at the root of the backend repository (git-ignored; the owner's export, catalogued): one PNG per frame, named
-`<Frame-name>__<node-id>.png`, and **`Figma/frames/manifest.json`** listing every frame (node id, name, file, size, where it came from) and any frame still missing.
+**`Figma/frames/`** at the root of the backend repository (git-ignored; the owner's export, catalogued), **split by audience into `customer/` (28 screens), `seller/` (41) and `admin/` (22)**: one PNG per frame, named
+`<Frame-name>__<node-id>.png`, and **`Figma/frames/manifest.json`** listing every frame (node id, name, audience, file, size, where it came from) and any frame still missing; **`Figma/frames/INDEX.md`** is the same as one readable table per audience.
 The frontend session reads that folder read-only (or the owner copies it into the frontend repo's git-ignored `design/`). The text outlines in
 `docs/figma/screens/` give exact copy, labels and component states next to each picture. **Start from `manifest.json`, not from the file names.**
 
-**State on 2026-10-16: 89 of the 91 frames are in `Figma/frames/`** (all 1x, 1920 px wide, desktop only). Missing: **Account Information** and **Recent Activity**
+**State on 2026-10-16: 89 of the 91 frames are in `Figma/frames/`** (customer 28 of 28, seller 41 of 41, admin 20 of 22) (all 1x, 1920 px wide, desktop only). Missing: **Account Information** and **Recent Activity**
 (new admin screens; export them, or the backend session renders them once the Figma image limit resets, about 26 hours after 2026-10-16). Two frames are not what
 their Figma name says: `312:3402` is named "My Account - Payments Methods" in Figma but shows the **Password Manager** screen (catalogued as that), and the design
 has two frames each called "Products", "Orders", "Customers" and "Customer Detail" (a seller one and an admin one); trust the node id, which the manifest has.
+
+The Figma file has two pages: **"Web UI Design"** (the 91 screens, all three audiences mixed) and **"Components"** (the design system: buttons, inputs, cards, icons). **The Components page has not been exported yet**; it is what the frontend's shared component library should be built from, so ask the owner to export it the same way (open that page, Ctrl+A, Export PNG at 1x) and put the files in `Figma/components/`.
 
 **How the pictures are produced, in order of preference. The first that works wins; none depends on the others.**
 
