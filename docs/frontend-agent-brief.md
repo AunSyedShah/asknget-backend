@@ -93,7 +93,7 @@ The frontend session reads that folder read-only (or the owner copies it into th
 their Figma name says: `312:3402` is named "My Account - Payments Methods" in Figma but shows the **Password Manager** screen (catalogued as that), and the design
 has two frames each called "Products", "Orders", "Customers" and "Customer Detail" (a seller one and an admin one); trust the node id, which the manifest has.
 
-The Figma file has two pages: **"Web UI Design"** (the 91 screens, all three audiences mixed) and **"Components"** (the design system: buttons, inputs, cards, icons). **The Components page has not been exported yet**; it is what the frontend's shared component library should be built from, so ask the owner to export it the same way (open that page, Ctrl+A, Export PNG at 1x) and put the files in `Figma/components/`.
+The Figma file has two pages: "Web UI Design" (the 91 screens, all three audiences mixed) and "Components". **The owner checked the Components page on 2026-10-16: it holds nothing usable (random pictures, no design system).** So there is **no component library in the design**: derive the shared components (buttons, inputs, cards, tables, modals, navigation, form fields, status pills) **from the screens themselves**, once, in a `components/` folder of the frontend, and reuse them. Where two screens draw the same thing differently, pick one, use it everywhere, and note the inconsistency in `DESIGN_NOTES.md`. The icon sheet the designer exported lives at `Figma/Icons.png` (not in `frames/`).
 
 **How the pictures are produced, in order of preference. The first that works wins; none depends on the others.**
 
@@ -144,7 +144,7 @@ Two sessions, two repositories, one owner who brings them together. The rules th
 ## 7. Suggested first moves
 
 1. Read the settled decisions in section 8; ask the owner only about what it lists as still open.
-2. Scaffold the app and the generated API client; read `GET /regions`, `GET /categories` and `GET /products` from Preview to prove the loop works (CORS permitting, otherwise through a local proxy).
+2. Scaffold the app and the generated API client; read `GET /regions`, `GET /categories` and `GET /products` from Preview to prove the loop works. **CORS is not set for any origin yet**, so do not call Preview from the browser directly: add a Next.js `rewrites()` entry in `next.config` that forwards `/api/v1/:path*` to the Preview base URL and have the app call its own origin. That works today, needs nothing from the backend, and can stay in development after CORS is set.
 3. Build the **storefront** first, in this order: layout and navigation, landing, category and product listing with filters, product details, cart and checkout, My Account (orders, returns, addresses, wishlist). Compare each against its Figma render at 360, 768, 1024 and 1280 px.
 4. Then the seller portal, then the admin portal as its API fills in.
 5. Keep a short `DESIGN_NOTES.md` and `BACKEND_ASKS.md` from the first day.
@@ -161,4 +161,4 @@ Two sessions, two repositories, one owner who brings them together. The rules th
 | 6 | Figma access | The frontend session does **not** call Figma or need a token. It reads pictures from `Figma/frames/` (the owner's export, catalogued; manifest included) and text outlines from `docs/figma/screens/`. The owner re-exports whenever the design changes. |
 | 7 | Definition of done | **Screenshots** of each screen at 360, 768, 1024 and 1280 px next to its Figma frame image from `Figma/frames/`. |
 
-Still open: the localhost port; the two missing frames (Account Information, Recent Activity); where the frontend repo keeps the pictures (suggestion: a git-ignored `design/` folder copied from `Figma/frames/`).
+Still open: the localhost port (not blocking: use the rewrites proxy above); the two missing frames (**Account Information** and **Recent Activity**, admin; skip those two screens until `Figma/frames/manifest.json` lists them); where the frontend repo keeps the pictures (suggestion: a git-ignored `design/` folder copied from `Figma/frames/`).
