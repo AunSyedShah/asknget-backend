@@ -4,6 +4,11 @@
 > code, not from memory: the endpoint index at the end is generated from the OpenAPI schema. If this file and the
 > running API disagree, the API wins; `GET /api/v1/openapi.json` is the contract and `/api/v1/docs` is its UI.
 > Backend repo: `github.com/AunSyedShah/asknget-backend` (renamed from `asknget`; the old URL redirects).
+>
+> **Starting a new frontend from scratch? Read [`frontend-agent-brief.md`](frontend-agent-brief.md) first** (product, environments, the Figma
+> tooling, how the two sessions work in parallel, the owner's decisions). Backend changes after 2026-10-12 are logged in
+> [`api-changes.md`](api-changes.md), newest first. Sections 1 and 2 below describe an older situation (an existing frontend to make
+> responsive; the Vercel host as it was); the brief's section 3 has the current environments.
 
 ## 1. The task, and what is still undecided
 
