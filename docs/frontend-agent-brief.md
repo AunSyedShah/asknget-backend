@@ -144,10 +144,33 @@ Two sessions, two repositories, one owner who brings them together. The rules th
 ## 7. Suggested first moves
 
 1. Read the settled decisions in section 8; ask the owner only about what it lists as still open.
-2. Scaffold the app and the generated API client; read `GET /regions`, `GET /categories` and `GET /products` from Preview to prove the loop works. **CORS is not set for any origin yet**, so do not call Preview from the browser directly: add a Next.js `rewrites()` entry in `next.config` that forwards `/api/v1/:path*` to the Preview base URL and have the app call its own origin. That works today, needs nothing from the backend, and can stay in development after CORS is set.
+2. Scaffold the app and the generated API client; read `GET /regions`, `GET /categories` and `GET /products` from Preview to prove the loop works. **CORS is not set for any origin, and with the proxy it never needs to be** (section 7a), so do not call Preview from the browser directly: add a Next.js `rewrites()` entry in `next.config` that forwards `/api/v1/:path*` to the Preview base URL and have the app call its own origin. That works today, needs nothing from the backend, and can stay in development after CORS is set.
 3. Build the **storefront** first, in this order: layout and navigation, landing, category and product listing with filters, product details, cart and checkout, My Account (orders, returns, addresses, wishlist). Compare each against its Figma render at 360, 768, 1024 and 1280 px.
 4. Then the seller portal, then the admin portal as its API fills in.
 5. Keep a short `DESIGN_NOTES.md` and `BACKEND_ASKS.md` from the first day.
+
+## 7a. Deploying the frontend: two environments that mirror the backend's
+
+The frontend gets its own GitHub repository and its own Vercel project, wired to the backend's environments like this:
+
+| Frontend branch | Frontend site | Talks to | `API_BASE_URL` (server-side env var in the frontend's Vercel project) |
+|---|---|---|---|
+| `develop` | pre-production (Vercel Preview, stable `...-git-develop-...vercel.app` URL) | **backend Preview** (staging data) | `https://asknget-backend-git-develop-aun-syed-shahs-projects.vercel.app/api/v1` |
+| `main` | production | **backend Production** | `https://asknget-backend.vercel.app/api/v1` |
+| your machine | `http://localhost:<port>` | **backend Preview** | the same Preview URL, in the git-ignored `.env.local` |
+
+**The pairing rule: a frontend environment only ever talks to the backend environment next to it in this table.** Production never points at Preview and the other way round, so
+staging data and demo accounts can never reach real customers.
+
+- **No CORS is needed, anywhere.** The browser calls the frontend's own origin (`/api/v1/...`); a Next.js `rewrites()` entry (or route handler) forwards it to `API_BASE_URL` on the server. Keep
+  `API_BASE_URL` a plain server variable (no `NEXT_PUBLIC_` prefix) so the backend address is not baked into the browser bundle. Pre-production, production and localhost all work the same way.
+- **The proxy changes what the backend sees**: the `Host` is the backend's, so the market is **not** inferred from a `za.` / `pk.` subdomain. **Always send `X-Region`** (and `X-Language`,
+  `X-Timezone`, `X-Store`, `X-Cart-Token`; the proxy must forward them, and `Authorization`). The brief's section 3 explains each header.
+- **Set up in Vercel** (the owner clicks, the agent tells them what): import the frontend repo as a new project; Production Branch `main`; add `API_BASE_URL` once for *Production* and once for *Preview*
+  with the values above (a different value per environment, never "All environments"). No secret is involved: the backend URL is public, and the frontend holds no key.
+- **Sharing the pre-production site with the team without Vercel seats**: the same one-time choice as for the backend (Settings, Deployment Protection, turn Vercel Authentication off for that project).
+- If the browser ever has to call the backend **directly** (it should not), CORS must list the frontend's origins on the backend: tell the owner, who sets `CORS_ALLOWED_ORIGINS` (and
+  `CORS_ALLOWED_ORIGIN_REGEXES` for the changing preview URLs) through the backend session; never edit it yourself.
 
 ## 8. Decisions (settled by the owner, 2026-10-16)
 
