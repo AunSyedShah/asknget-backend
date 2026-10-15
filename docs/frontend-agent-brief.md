@@ -82,30 +82,35 @@ a seller cannot create categories, they request them; an order keeps a snapshot 
 
 One Figma file, three surfaces, **desktop frames only** (no mobile design; see handoff section 1 for the responsive defaults).
 
-**The frontend is built from pictures, so pictures come first. The frontend session never calls Figma itself.** The backend session keeps a folder of
-frame images, `docs/figma/renders/` in the backend repo (git-ignored; `manifest.json` records every frame, its version and scale; files are
-`<Frame-name>__<node-id>.png`), and the frontend session reads it read-only (or the owner copies it into the frontend repo's git-ignored `design/`).
-The text outlines in `docs/figma/screens/` give exact copy, labels and component states next to the picture.
+**The frontend is built from pictures, so pictures come first. The frontend session never calls Figma itself.** The pictures live in
+**`Figma/frames/`** at the root of the backend repository (git-ignored; the owner's export, catalogued): one PNG per frame, named
+`<Frame-name>__<node-id>.png`, and **`Figma/frames/manifest.json`** listing every frame (node id, name, file, size, where it came from) and any frame still missing.
+The frontend session reads that folder read-only (or the owner copies it into the frontend repo's git-ignored `design/`). The text outlines in
+`docs/figma/screens/` give exact copy, labels and component states next to each picture. **Start from `manifest.json`, not from the file names.**
+
+**State on 2026-10-16: 89 of the 91 frames are in `Figma/frames/`** (all 1x, 1920 px wide, desktop only). Missing: **Account Information** and **Recent Activity**
+(new admin screens; export them, or the backend session renders them once the Figma image limit resets, about 26 hours after 2026-10-16). Two frames are not what
+their Figma name says: `312:3402` is named "My Account - Payments Methods" in Figma but shows the **Password Manager** screen (catalogued as that), and the design
+has two frames each called "Products", "Orders", "Customers" and "Customer Detail" (a seller one and an admin one); trust the node id, which the manifest has.
 
 **How the pictures are produced, in order of preference. The first that works wins; none depends on the others.**
 
-1. **API renders from the owner's FRESH DUPLICATE (the normal way).** `python docs/figma/snapshot.py --file <duplicate url> --index`, then `--render-all`.
-   The tool fetches 25 frames per call, skips frames already rendered for the current version, and is resumable. Why a duplicate: the original lives on someone
-   else's Starter plan and locks after a few calls (observed 2026-10-16: a 429 on the second image call; earlier a 429 on the text API for about 62 hours). A copy on
-   the owner's own plan has its own budget (verified 2026-10-16: it rendered while the original was locked). **Node ids survive duplication**, so everything stays
-   comparable. Every time the designer changes the file, the owner makes a new duplicate (right-click the original in Figma, Duplicate) and pastes its URL; the
-   old duplicate goes stale (the current one was last saved 2026-09-23 and has none of the October screens).
-2. **Manual export by the owner (always works, no API, no token, no limit).** In the Figma desktop app: open the file, click the canvas, select the frames
-   (Ctrl+A on the page, or just the ones being built), in the right panel under **Export** add **PNG at 1x**, click **Export N layers**, and save into the folder
-   named in the owner's instructions. Files are named after the frames. Use this when the API is locked and a screen is needed today.
+1. **The owner exports from the Figma desktop app, then the catalog tool names them (the normal way; no API, no token, no limit, tested 2026-10-16).**
+   In Figma: open the file, click the canvas, Ctrl+A, in the right panel under **Export** add **PNG at 1x**, click **Export N layers**, save into `Figma/` at the
+   repo root. Then, from the backend repo, `backend/.venv/Scripts/python docs/figma/catalog_exports.py Figma` (or `uv run --with pillow python docs/figma/catalog_exports.py Figma`). It matches each file to
+   its frame by name, cuts any section that Figma exported as **one huge image** (the "Seller Portal" section arrives as a single 29,660 x 8,078 picture of 41 screens)
+   into its screens at exact 1x pixels, and writes `Figma/frames/` and the manifest. Do it again after every design change. If the designer adds or moves screens inside
+   that section the tool says the count no longer matches and refuses to guess: then `docs/figma/seller-portal-order.json` has to be re-checked.
+2. **API renders from the owner's FRESH DUPLICATE (for a few frames, or when a re-export is inconvenient).** `python docs/figma/snapshot.py --file <duplicate url> --index`,
+   then `--render-all` or `--render <frame>`. The tool fetches 25 frames per call, skips frames already rendered for the current version, and is resumable. Why a
+   duplicate: the original lives on someone else's Starter plan and locks after a few calls (2026-10-16: the image API returned 429 on the second call and again about
+   a day's worth of waiting later; the text API earlier for about 62 hours). A copy on the owner's own plan has its own budget (verified 2026-10-16). **Node ids survive
+   duplication.** The existing duplicate was last saved 2026-09-23 and has none of the October screens; make a new one (right-click the original, Duplicate) when needed.
 3. **Browser capture of a single frame (emergency only).** The backend session can open the file in the owner's own logged-in browser and screenshot one frame.
-   Slower and lower fidelity than 1 or 2; do not use it for bulk.
-4. **`.fig` export (structure only, complementary).** `uv run --with zstandard python docs/figma/snapshot.py --from-fig <file>.fig` decodes the scene graph into
-   the same text outlines: no token, no rate limit. **It has no pictures, colours, fonts or spacing, so it is never the way to see a screen.** Use it only to
-   refresh the text outlines while the text API is locked. (A decoder that also exports design tokens is a possible backend task; ask.)
-
-**Text outlines without the API.** `docs/figma/screens/<Screen name>__<node id>.txt` already exist for the screens synced so far; `docs/figma/manifest.json` lists them.
-They say *what* is on a screen, not how it looks.
+   Slower and lower fidelity than 1 or 2; not for bulk.
+4. **`.fig` export (structure only, complementary).** `uv run --with zstandard python docs/figma/snapshot.py --from-fig <file>.fig` decodes the scene graph into the text
+   outlines: no token, no rate limit. **It has no pictures, colours, fonts or spacing, so it is never the way to see a screen.** Use it only to refresh the text outlines
+   while the text API is locked.
 
 **The token.** `FIGMA_TOKEN` is the owner's personal access token. The tool reads the backend repo's root `.env` (git-ignored), then the environment. **Never print it, paste it into a file, or commit it.** If it returns `401`, the token expired (they last up to 90 days): ask the owner to make a new one and put it in `.env` themselves.
 
@@ -151,7 +156,7 @@ Two sessions, two repositories, one owner who brings them together. The rules th
 | 3 | Order of work | Storefront, then seller portal, then admin portal (section 7). The agent follows this order. |
 | 4 | Mobile | The responsive defaults in `frontend-handoff.md` section 1 (360 / 768 / 1024 / 1280, drawer navigation, cards instead of wide tables, full-screen sheets for popups), built flexibly so a mobile design can replace them. Replace them when the designer delivers mobile frames. |
 | 5 | Hosting and CORS | Runs on **localhost** for now. **The port is still to be confirmed by the owner** (Next.js defaults to `3000`); until then the backend session has not added any origin. When the port is confirmed, the backend session adds `http://localhost:<port>` to `CORS_ALLOWED_ORIGINS` on Preview and logs it in `api-changes.md`. |
-| 6 | Figma access | The frontend session does **not** call Figma or need a token. It reads pictures from `docs/figma/renders/` (made by the backend session from the owner's fresh duplicate, or exported manually by the owner) and text outlines from `docs/figma/screens/`. The owner makes a fresh duplicate whenever the design changes. |
-| 7 | Definition of done | **Screenshots** of each screen at 360, 768, 1024 and 1280 px next to its Figma frame image from `renders/`. |
+| 6 | Figma access | The frontend session does **not** call Figma or need a token. It reads pictures from `Figma/frames/` (the owner's export, catalogued; manifest included) and text outlines from `docs/figma/screens/`. The owner re-exports whenever the design changes. |
+| 7 | Definition of done | **Screenshots** of each screen at 360, 768, 1024 and 1280 px next to its Figma frame image from `Figma/frames/`. |
 
-Still open: the localhost port; the owner's fresh Figma duplicate (URL) so the backend session can render every frame; where the frontend repo keeps the pictures (suggestion: a git-ignored `design/` folder copied from `renders/`).
+Still open: the localhost port; the two missing frames (Account Information, Recent Activity); where the frontend repo keeps the pictures (suggestion: a git-ignored `design/` folder copied from `Figma/frames/`).

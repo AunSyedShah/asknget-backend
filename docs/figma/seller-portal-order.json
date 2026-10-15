@@ -1,0 +1,13 @@
+{
+  "_about": "The Figma section 'Seller Portal' exported as ONE image lays its 41 screens out in a grid. This lists their node ids in reading order (rows top to bottom, left to right), checked against the pictures on 2026-10-16. catalog_exports.py needs it to name the slices; if the designer adds, removes or moves screens in that section, the count stops matching and the tool refuses to guess: re-check the order and update this file.",
+  "section_image": "Seller Portal",
+  "order": [
+    "447:7950", "466:8619", "466:8885", "467:8904", "474:6463", "482:6727", "482:6910", "482:7047", "491:7302",
+    "497:6677", "506:6921", "515:7161", "519:7432", "519:7681", "519:7537",
+    "570:4992", "573:5141", "626:5220", "664:8452", "664:9125", "682:5667", "688:6034", "688:6221", "688:5844",
+    "689:6222",
+    "697:8989", "704:9564", "736:7069", "743:6101", "755:7590", "768:6318",
+    "779:6848", "840:10677", "872:11940", "825:10206", "930:7240", "930:8751",
+    "930:9225", "943:9696", "957:7822", "987:8392"
+  ]
+}
