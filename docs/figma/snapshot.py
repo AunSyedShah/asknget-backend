@@ -35,6 +35,11 @@ and `docs/figma/kiwi.py` decodes its scene graph straight to the same screens/*.
 No token, no rate limit, no plan tier. The catch is that an export is a point-in-time
 copy — `--check` still needs the API to notice that the live file has moved on.
 
+`--render-all` renders every frame in page-index.json (run `--index` first) into renders/, batched (25 per call: the
+/images budget counts calls), resumable and recorded in renders/manifest.json; it is how a frontend session gets pictures
+without calling Figma itself. Run it against the owner's FRESH DUPLICATE (`--file <duplicate url>`): the original sits on
+someone else's Starter plan and locks after a few calls, while a copy on the owner's own plan has its own budget.
+
 `--render` is the last resort: `/images` is a **third** budget and has kept working
 while both of the others were locked. It gives a picture, not text — but a picture
 of a screen is enough to plan against, and it is the only way in when the JSON
@@ -48,6 +53,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -446,6 +452,73 @@ def render(targets: list[str], scale: float = 1.0) -> int:
     return 0
 
 
+RENDER_BATCH = 25          # frames per /images call. The budget counts CALLS, not frames (Starter: a 429 came on the second call of a
+                           # sweep with batches of 8), so batch big; the pictures themselves come from Figma's file store, which is not metered
+RENDER_MANIFEST = RENDERS_DIR / "manifest.json"
+
+
+def _safe(name: str) -> str:
+    return re.sub(r"[^\w]+", "-", name.strip()).strip("-") or "frame"
+
+
+def render_all(scale: float = 1.0, force: bool = False, only: list[str] | None = None) -> int:
+    """PNG of EVERY frame in page-index.json (or just `only`), in batches, resumable.
+
+    Files are `renders/<Frame-name>__<node-id>.png` and `renders/manifest.json` records what was rendered, at which
+    scale and for which version of the design. A frame already rendered for the live version at this scale is skipped,
+    so a re-run after a 429 (or after the designer changes the file) only fetches what is missing or stale.
+    Run `--index` first so the frame list is current. This is what lets a frontend session work from pictures
+    without calling Figma at all: hand it the `renders/` folder.
+    """
+    frames = json.loads(PAGE_INDEX.read_text(encoding="utf-8"))["frames"] if PAGE_INDEX.exists() else []
+    if not frames:
+        sys.exit("No frame list: run `--index` first.")
+    if only:
+        wanted = {o.lower() for o in only}
+        frames = [f for f in frames if f["node_id"] in only or f["name"].strip().lower() in wanted]
+    version = current_version()["version"]
+    RENDERS_DIR.mkdir(parents=True, exist_ok=True)
+    done = json.loads(RENDER_MANIFEST.read_text(encoding="utf-8")) if RENDER_MANIFEST.exists() else {}
+    todo = [f for f in frames if force or not (
+        (entry := done.get(f["node_id"])) and entry["version"] == version and entry["scale"] == scale and (RENDERS_DIR / entry["file"]).exists())]
+    print(f"{len(frames)} frames, {len(frames) - len(todo)} already rendered for this version, {len(todo)} to fetch (scale {scale}).")
+
+    def save() -> None:
+        RENDER_MANIFEST.write_text(json.dumps(done, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    failed = []
+    try:
+        for start in range(0, len(todo), RENDER_BATCH):
+            batch = todo[start:start + RENDER_BATCH]
+            data = _get(f"/images/{FILE_KEY}?ids={','.join(f['node_id'] for f in batch)}&format=png&scale={scale}")
+            if data.get("err"):
+                print(f"  ! batch {start // RENDER_BATCH + 1}: {data['err']}")
+                failed += [f["name"] for f in batch]
+                continue
+            for frame in batch:
+                url = (data.get("images") or {}).get(frame["node_id"])
+                if not url:
+                    print(f"  ! {frame['name'].strip()} ({frame['node_id']}): no image returned (too large?)")
+                    failed.append(frame["name"])
+                    continue
+                file = f"{_safe(frame['name'])}__{frame['node_id'].replace(':', '-')}.png"
+                urllib.request.urlretrieve(url, RENDERS_DIR / file)
+                done[frame["node_id"]] = {"name": frame["name"].strip(), "file": file, "scale": scale, "version": version}
+                print(f"  {frame['name'].strip()} -> {file} ({(RENDERS_DIR / file).stat().st_size / 1024:.0f} KiB)")
+            save()
+            time.sleep(2)
+    except RateLimited as limited:
+        save()
+        print(f"\n{limited}\nStopped; progress is saved. Run the same command again later and it resumes.")
+        return 2
+    save()
+    if failed:
+        print(f"\n{len(failed)} frame(s) not rendered: {', '.join(n.strip() for n in failed)}")
+        return 1
+    print(f"\nDone: {len([f for f in frames if f['node_id'] in done])} frames in {RENDERS_DIR.name}/ (manifest.json lists them).")
+    return 0
+
+
 def snapshot() -> int:
     """Prefer the single-call path; fall back to per-node when it is rate-limited."""
     try:
@@ -486,7 +559,9 @@ if __name__ == "__main__":
     ap.add_argument("--index", action="store_true", help="only refresh page-index.json: which frames exist, what is new or renamed")
     ap.add_argument("--only", nargs="+", metavar="FRAME", help="with --nodes: snapshot just these frames (name or node id)")
     ap.add_argument("--render", nargs="+", metavar="FRAME", help="save a PNG of these frames (separate rate limit — works when the rest is locked)")
-    ap.add_argument("--scale", type=float, default=1.0, help="with --render: image scale (0.2 for an overview, 1 to read text)")
+    ap.add_argument("--scale", type=float, default=1.0, help="with --render / --render-all: image scale (0.2 for an overview, 1 to read text)")
+    ap.add_argument("--render-all", action="store_true", help="PNG of every frame in page-index.json, batched and resumable (renders/manifest.json); re-run to fetch only what is missing or changed")
+    ap.add_argument("--force", action="store_true", help="with --render-all: fetch again even when already rendered for this version")
     ap.add_argument("--file", metavar="KEY_OR_URL", help="snapshot a different file (paste its Figma URL); also FIGMA_FILE_KEY")
     ap.add_argument("--from-fig", metavar="PATH", help="add screens from a local .fig export (no token, no rate limit)")
     ap.add_argument("--replace", action="store_true", help="with --from-fig: overwrite existing screen files too (the API versions are usually richer)")
@@ -498,6 +573,8 @@ if __name__ == "__main__":
         print(f"file: {FILE_KEY}")
     if args.check:
         sys.exit(check())
+    if args.render_all:
+        sys.exit(render_all(args.scale, args.force, args.only))
     if args.render:
         sys.exit(render(args.render, args.scale))
     if args.index:
