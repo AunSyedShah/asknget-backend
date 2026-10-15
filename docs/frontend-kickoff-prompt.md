@@ -17,7 +17,7 @@ Read these, in this order, before doing anything else (they are in the backend r
 4. <BACKEND>/Figma/frames/INDEX.md           (the 89 design screens as pictures, split into customer/, seller/ and admin/)
 
 Decisions already made by the owner (do not reopen them): Next.js (App Router) + TypeScript + Tailwind; a typed API client generated from
-the OpenAPI schema at <preview base>/openapi.json; TanStack Query; Playwright for screenshots. Build order: storefront first, then
+the OpenAPI document at https://asknget-backend-git-develop-aun-syed-shahs-projects.vercel.app/api/v1/openapi.json (read the brief's section 0 about its pitfalls first: paths already start with /api/v1, so the client's base URL is the origin only); TanStack Query; Playwright for screenshots. Build order: storefront first, then
 seller portal, then admin portal. Responsive defaults are in the handoff, section 1 (360 / 768 / 1024 / 1280 px). The definition of done is
 a screenshot of each screen at those four widths next to its Figma picture.
 
