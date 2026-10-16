@@ -6,6 +6,9 @@ carries messages between you. **Everything you need about the backend is in this
 **Before anything else, read `docs/backend/README.md`** (the project brief: product, environments, what is built, the design material, how to work with the backend session, the owner's decisions),
 then `docs/backend/api-contract.md` and `docs/backend/api-changes.md`. The design is in `design/` (start from `design/frames/INDEX.md`).
 
+**Also read `AGENTS.md`** (written by Next.js itself): this is Next.js 16, not the version you know; read the guides in `node_modules/next/dist/docs/` before writing Next code, and let them win over memory.
+The repository is a fresh `create-next-app` scaffold in JavaScript on branch `master`: convert it to TypeScript, rename the branch to `main`, and do not re-scaffold (brief, section 8a).
+
 Hard rules:
 - Stack and order of work are decided (brief, section 8): Next.js (App Router) + TypeScript + Tailwind, a client generated from the live OpenAPI document, TanStack Query, Playwright; storefront, then seller portal, then admin portal.
 - Build against the **backend Preview** only; never Production. Do not call the backend from the browser: proxy through a Next.js rewrite and always send `X-Region` (brief, section 3).

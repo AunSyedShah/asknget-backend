@@ -75,7 +75,7 @@ The Figma file has **desktop frames only** (1920 px wide). Until the designer de
   all fail. Build the upload UI, but expect an error there and note it in `BACKEND_ASKS.md`.
 - **Never** put credentials, tokens or `.env` contents in code, logs, commits or chat.
 
-**Do not call the backend straight from the browser.** CORS is not set for any origin, and with the proxy below it never needs to be. In `next.config` add a `rewrites()` entry that forwards
+**Do not call the backend straight from the browser.** CORS is not set for any origin, and with the proxy below it never needs to be. In `next.config.mjs` add a `rewrites()` entry (check the bundled Next docs for its current form) that forwards
 `/api/v1/:path*` to `${API_ORIGIN}/api/v1/:path*` and have the app call its own origin. Consequences: the backend sees the backend's host, so the market is **not** inferred from a `za.` or `pk.`
 subdomain: **always send `X-Region`**, and forward `X-Language`, `X-Timezone`, `X-Store`, `X-Cart-Token` and `Authorization`. Do not use `credentials: 'include'`.
 
@@ -142,7 +142,7 @@ To let the team open the pre-production site without Vercel seats, turn Vercel A
 
 ## 8. Decisions the owner has made (do not reopen)
 
-1. **Stack:** Next.js (App Router) + TypeScript + Tailwind; a typed client generated from `openapi.json`; TanStack Query for server state; Playwright for the screenshots. Server rendering for the storefront. A separate Vite SPA for the portals is allowed only if the owner agrees later.
+1. **Stack:** Next.js (App Router) + **TypeScript** + Tailwind (the repository already has Next.js 16, Tailwind 4 and bun, in JavaScript: convert it, section 8a); a typed client generated from `openapi.json`; TanStack Query for server state; Playwright for the screenshots. Server rendering for the storefront. A separate Vite SPA for the portals is allowed only if the owner agrees later.
 2. **Separate repository** for the frontend, with its own session.
 3. **Order of work:** storefront, then seller portal, then admin portal. Follow it.
 4. **Mobile:** the responsive defaults in section 2.
@@ -150,9 +150,20 @@ To let the team open the pre-production site without Vercel seats, turn Vercel A
 6. **Figma:** you read the pictures in `design/`; the owner re-exports when the design changes.
 7. **Definition of done:** screenshots at 360, 768, 1024 and 1280 px next to the design picture.
 
+## 8a. The repository you start from
+
+This repository was created with `create-next-app` and **nothing has been built in it yet**: one commit ("Initial commit from Create Next App"), branch `master`, Next.js 16.4.1, React 19.3, Tailwind CSS 4,
+React Compiler on, `cacheComponents` and `partialPrefetching` on in `next.config.mjs`, **plain JavaScript** (`jsconfig.json`), **bun** as the package manager. Do not re-scaffold it. What follows from that:
+
+- **This is not the Next.js you know.** `AGENTS.md` (written by Next itself) says this version has breaking changes and tells you to read the guides bundled in `node_modules/next/dist/docs/` before writing code. Do that, and do not rely on memory:
+  routing, data fetching, caching (`cacheComponents` changes how dynamic data such as headers and cookies is read), `rewrites()` and the React Compiler may all differ. Where this brief and the bundled docs disagree on *how* to use Next, the bundled docs win.
+- **Convert it to TypeScript first** (decision 1): add `typescript` and the types, a `tsconfig.json`, replace `jsconfig.json`, rename files to `.ts`/`.tsx`. Keep bun and Tailwind 4 as they are. A generated API client is only worth having in TypeScript.
+- **Rename the branch `master` to `main`** (`git branch -m main`) before the first push, and create `develop`; section 7 depends on those two names.
+- `.env*` is already git-ignored; keep it that way. `design/.gitignore` keeps the 38 MB of pictures out of git; leave it.
+
 ## 9. Suggested first moves
 
-1. Confirm you have read sections 0 to 8, then scaffold the project and `API_ORIGIN` proxy, generate the API client, and show `GET /regions`, `GET /categories` and `GET /products` working through the proxy.
+1. Confirm you have read sections 0 to 8a. Read `AGENTS.md` and the bundled Next docs it points to, convert the project to TypeScript, then set up the `API_ORIGIN` proxy, generate the API client, and show `GET /regions`, `GET /categories` and `GET /products` working through the proxy.
 2. Build the **storefront** in this order: layout and navigation, landing, category and product listing with filters, product details, cart and checkout, My Account (orders, returns, addresses, wishlist).
 3. Then the seller portal, then the admin portal as its API fills in.
 4. Keep `DESIGN_NOTES.md` and `BACKEND_ASKS.md` from the first day. Ask the owner which screen to build first.

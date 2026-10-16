@@ -6,7 +6,9 @@ The frontend session then needs no access to the backend repository at all. It w
 
     CLAUDE.md                 standing instructions (written only if it does not exist yet; never overwritten)
     docs/backend/             README.md (the brief), api-contract.md, api-changes.md, PACK_VERSION.txt   (replaced on every run)
-    design/                   frames/ (customer, seller, admin, INDEX.md, manifest.json), outlines/, Icons.png (replaced on every run)
+    design/                   frames/ (customer, seller, admin, INDEX.md, manifest.json), outlines/, Icons.png, .gitignore (replaced on every run)
+
+`--force-claude` also replaces an existing CLAUDE.md (only when the template changed and the frontend session has not customised it).
 
 Re-run it whenever the backend session says the docs changed, or after a new Figma export has been catalogued
 (`docs/figma/catalog_exports.py`). Everything the frontend session writes itself (code, BACKEND_ASKS.md, DESIGN_NOTES.md, api/) is left alone.
@@ -103,10 +105,12 @@ def scan(documents: dict) -> list[str]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    force_claude = "--force-claude" in sys.argv
+    if len(args) != 1:
         print(__doc__)
         return 2
-    target = Path(sys.argv[1]).resolve()
+    target = Path(args[0]).resolve()
     if ROOT in target.parents or target == ROOT:
         print("The frontend folder must be OUTSIDE the backend repository (that is the point: no shared access).")
         return 2
@@ -146,8 +150,10 @@ def main() -> int:
     if ICONS.exists():
         shutil.copyfile(ICONS, design / "Icons.png")
 
+    (design / ".gitignore").write_text("# 38 MB of pictures the owner regenerates; delete this line to commit them\nframes/\n", encoding="utf-8")
+
     claude_md = target / "CLAUDE.md"
-    wrote_claude = not claude_md.exists()
+    wrote_claude = force_claude or not claude_md.exists()
     if wrote_claude:
         claude_md.write_text(documents["CLAUDE.md"], encoding="utf-8")
 
@@ -156,8 +162,8 @@ def main() -> int:
     print(f"Pack written to {target}")
     print(f"  docs/backend/: README.md, api-contract.md, api-changes.md, PACK_VERSION.txt")
     print(f"  design/: {pictures} pictures, {outlines} text outlines" + (", Icons.png" if ICONS.exists() else ""))
-    print(f"  CLAUDE.md: {'created' if wrote_claude else 'already there, left alone'}")
-    print("  Add `design/frames/` to the frontend's .gitignore if you do not want 38 MB of pictures in git.")
+    print(f"  CLAUDE.md: {'written' if wrote_claude else 'already there, left alone (use --force-claude to replace it)'}")
+    print("  design/.gitignore keeps the 38 MB of pictures out of git; delete it to commit them.")
     return 0
 
 

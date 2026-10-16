@@ -25,9 +25,10 @@ and stops if it finds one. There is nothing secret in the pack: no token, no pas
 ## 2. First message to paste into the new session
 
 ```
-Read CLAUDE.md, then docs/backend/README.md, docs/backend/api-contract.md and docs/backend/api-changes.md, in that order.
-Then do the first task in section 9 of the brief: scaffold the project, set up the API proxy, generate the API client, and show me
-GET /regions, GET /categories and GET /products working through the proxy. After that, ask me which storefront screen to build first.
+Read CLAUDE.md and AGENTS.md, then docs/backend/README.md, docs/backend/api-contract.md and docs/backend/api-changes.md, in that order.
+Then do the first task in section 9 of the brief: convert the existing scaffold to TypeScript (do not re-scaffold), set up the API proxy,
+generate the API client, and show me GET /regions, GET /categories and GET /products working through the proxy.
+After that, ask me which storefront screen to build first.
 ```
 
 ## 3. Keeping the two sessions in step
