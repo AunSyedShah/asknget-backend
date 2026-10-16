@@ -15,7 +15,7 @@ from core.schemas import ErrorOut
 from portal.auth import StoreAuth
 
 from . import services
-from .schemas import MarkedOut, NotificationOut, SummaryOut
+from .schemas import MarkedOut, NotificationOut, NotificationSummaryOut
 
 notifications_router = Router(tags=["seller: notifications"], auth=StoreAuth())
 
@@ -35,7 +35,7 @@ def notification_list(request, tab: str | None = None):
     return rows
 
 
-@notifications_router.get("/summary", response=SummaryOut, summary="Unread badge and the counts on each tab")
+@notifications_router.get("/summary", response=NotificationSummaryOut, summary="Unread badge and the counts on each tab")
 def notification_summary(request):
     return services.summary(request.store, request.auth, request.access)
 

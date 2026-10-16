@@ -228,6 +228,7 @@ class ReviewOut(Schema):
     id: UUID
     reviewer_name: str = Field(description="Abbreviated: 'Ayesha K.'")
     rating: int
+    title: str = Field("", description="Optional headline the reviewer wrote; empty when they wrote none")
     body: str
     is_verified_purchase: bool
     media: list[ReviewMediaOut]
@@ -246,6 +247,7 @@ class ReviewIn(Schema):
     name: Optional[NonEmptyStr] = Field(None, max_length=120, description="Required for guests; defaults to your profile name")
     email: Optional[EmailStr] = Field(None, description="Required for guests; never published")
     rating: int = Field(ge=1, le=5)
+    title: str = Field("", max_length=120, description="'Review Title' (optional)")
     body: NonEmptyStr = Field(max_length=4000)
 
 
@@ -271,7 +273,7 @@ class WishlistItemOut(Schema):
 # --------------------------------------------------------------------------- #
 
 
-class CategoryRefOut(Schema):
+class RequestedParentOut(Schema):
     id: UUID
     name: str
 
@@ -293,7 +295,7 @@ class CategoryRequestOut(Schema):
     name: str
     reason: str
     status: str = Field(description="pending | approved | rejected | withdrawn")
-    parent: Optional[CategoryRefOut]
+    parent: Optional[RequestedParentOut]
     category: Optional[CategoryLinkOut] = Field(description="Once approved: the category to use (new, or one that already existed)")
     created_category: bool
     review_note: str = Field(description="Why it was rejected, or the reviewer's note")

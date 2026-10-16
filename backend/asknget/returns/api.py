@@ -46,7 +46,7 @@ from .schemas import (
     ReasonAdminPatch,
     ReceivedIn,
     RefundPaidIn,
-    RejectIn,
+    ReturnRejectIn,
     ReturnableOut,
     ReturnCreateIn,
     ReturnOut,
@@ -199,7 +199,7 @@ def seller_return_approve(request, return_id: UUID):
 
 
 @seller_returns_router.post("/{return_id}/reject", response={200: SellerReturnOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Reject with a reason the buyer sees")
-def seller_return_reject(request, return_id: UUID, payload: RejectIn):
+def seller_return_reject(request, return_id: UUID, payload: ReturnRejectIn):
     services.reject(services.get_for_store(request.store, return_id), actor="seller", user=request.auth, reason=payload.reason)
     return services.get_for_store(request.store, return_id)
 

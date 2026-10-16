@@ -129,6 +129,23 @@ class ReviewTests(CatalogTestCase):
         self.assertEqual(self.get(self.URL).json()["total"], 0)  # not published yet
         self.assertEqual(self.client.post(self.URL, {"name": "x", "email": "a@x.com", "rating": 6, "body": "Great"}).status_code, 422)
 
+    def test_a_review_may_carry_a_title_that_is_published_with_it(self):
+        user = make_user(full_name="Ayesha Khan")
+        headers = {"Authorization": f"Bearer {self.token_for(user)}"}
+        res = self.client.post(self.URL, {"rating": 5, "title": "  Love it  ", "body": "Great cream"}, headers=headers)
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(Review.objects.get().title, "Love it")                                   # trimmed
+        Review.objects.update(status="approved")
+        shown = self.get(self.URL).json()["items"][0]
+        self.assertEqual((shown["title"], shown["body"]), ("Love it", "Great cream"))
+
+    def test_the_title_is_optional_and_limited_to_120_characters(self):
+        ok = self.client.post(self.URL, {"name": "A B", "email": "a@x.com", "rating": 4, "body": "Fine"})
+        self.assertEqual(ok.status_code, 201, ok.content)
+        self.assertEqual(Review.objects.get().title, "")
+        too_long = self.client.post(self.URL, {"name": "C D", "email": "c@x.com", "rating": 4, "title": "x" * 121, "body": "Fine"})
+        self.assertEqual(too_long.status_code, 422)
+
     def test_member_review_defaults_identity_and_once_per_product(self):
         user = make_user(full_name="Ayesha Khan")
         token = self.token_for(user)

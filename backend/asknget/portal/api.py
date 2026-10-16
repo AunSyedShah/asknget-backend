@@ -81,7 +81,7 @@ from .schemas import (
     ProductAnalyticsOut,
     ProductCreateIn,
     ProductPatchIn,
-    RejectIn,
+    ProductRejectIn,
     SellerImageOut,
     SellerProductKpisOut,
     SellerProductOut,
@@ -235,7 +235,7 @@ def admin_product_approve(request, product_id: UUID):
 
 
 @admin_products_router.post("/{product_id}/reject", response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
-def admin_product_reject(request, product_id: UUID, payload: RejectIn):
+def admin_product_reject(request, product_id: UUID, payload: ProductRejectIn):
     product = products.Product.objects.filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}

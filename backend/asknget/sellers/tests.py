@@ -290,6 +290,17 @@ class ReviewTests(SellerTestCase):
         self.assertEqual(self.get(ADMIN, self.staff_token, status="approved").json()["count"], 0)
         self.assertEqual(self.get(ADMIN, self.staff_token, q="huda").json()["count"], 1)
 
+    def test_the_review_queue_uses_the_standard_list_shape_and_still_answers_limit_offset(self):
+        body = self.get(ADMIN, self.staff_token).json()
+        self.assertEqual(sorted(body), ["count", "items", "page", "pages", "per_page", "total"])
+        self.assertEqual((body["count"], body["page"], body["pages"]), (body["total"], 1, 1))
+        paged = self.get(ADMIN, self.staff_token, page=1, per_page=1).json()
+        self.assertEqual((paged["per_page"], len(paged["items"]), paged["page"]), (1, min(1, body["total"]), 1))
+        old = self.get(ADMIN, self.staff_token, limit=1, offset=0).json()
+        self.assertEqual((old["per_page"], old["page"], old["total"]), (1, 1, body["total"]))
+        self.assertEqual(self.get(ADMIN, self.staff_token, page=0).status_code, 422)
+        self.assertEqual(self.get(ADMIN, self.staff_token, per_page=101).status_code, 422)
+
     def test_admin_sees_decrypted_identifiers(self):
         _, app_id = self.submitted()
         body = self.get(f"{ADMIN}/{app_id}", self.staff_token).json()

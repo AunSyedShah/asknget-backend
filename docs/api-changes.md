@@ -7,6 +7,19 @@
 
 ## 2026-10-16
 
+- **Answers to `BACKEND_ASKS.md`** (ask #5, the admin portal API, is a separate sprint and not in this batch). **Not on Preview yet**: committed on `develop`, live with the next push; this note is then removed.
+  - **BREAKING for generated type names only (ask #2); no response or request body changed.** Fifteen schema classes shared a name with another class, so `openapi.json` merged them and a generated client got one of the two shapes wrong. Each now has its own name, and a test fails if two share one again. Old to new (wire format identical):
+    - cart / checkout: `DeliveryOptionOut` → `CartDeliveryOptionOut`, `DeliveryRuleOut` (the buyer's rule in the cart) → `CartDeliveryRuleOut`, `AddressIn` (checkout) → `CheckoutAddressIn`. The seller's `DeliveryRuleOut` (fields `locked`, `source`, `own`, `currency`) keeps its name; `AddressIn` of the address book keeps its name.
+    - seller portal: `OptionTypeOut` → `SellerOptionTypeOut`, `RejectIn` (product) → `ProductRejectIn`, `TimelineStageOut` (orders) → `SellerOrderTimelineStageOut`.
+    - returns: `RejectIn` → `ReturnRejectIn`. Seller applications: `CategoryRefOut` → `ApplicationCategoryOut`, `TimelineStageOut` → `ApplicationTimelineStageOut`, `RejectIn` → `ApplicationRejectIn`.
+    - chat / notifications / site: `MessageOut` (chat) → `ChatMessageOut`, `StoreRefOut` (chat) → `ChatStoreRefOut`, `SummaryOut` → `NotificationSummaryOut`, `ContactIn` (contact form) → `ContactFormIn`, `ChoiceOut` → `SiteChoiceOut`; the category-request parent `CategoryRefOut` → `RequestedParentOut`.
+    - The names that kept their name are the common ones: `CategoryRefOut` (with `slug`), `StoreRefOut` (with `display_name`), `OptionTypeOut` (with `id`, `values`), `MessageOut` (`{detail}`), `ContactIn`, `AddressIn`.
+  - **Review title (ask #7, additive):** `POST /products/{slug}/reviews` accepts an optional `title` (max 120, default empty); `ReviewOut` returns `title`.
+  - **Seller-application list shape (ask #4, additive):** `GET /admin/seller-applications` now answers `{items, total, page, per_page, pages, count}` and takes `page`/`per_page`. `limit`/`offset` and `count` still work, so nothing breaks.
+  - **Banners (ask #3):** `BannerOut.placement` is a declared enum (`hero`, `top_discount`, and the rest); an unknown `?placement=` is a 422.
+  - **Per-market contact details (ask #6, additive):** `GET /site-info` overlays the market's own `contact_phone`, `contact_email`, `address` and `social` over the platform-wide ones, so ZA and PK differ. Edited in Django admin on the country.
+  - **Demo pictures and banners (ask #6):** the staging data gets product galleries, category pictures, five hero slides and four promo tiles. Image URLs are full `https://` links (placeholder photos); real uploads still need object storage, which is a separate decision.
+
 - **Fixed: a brand-new guest's first `POST /cart/items` (and every other cart-changing call) answered with an EMPTY cart.** The item was saved, but the response was built from a second, empty cart (and left an orphan cart row behind). Every cart call now answers with the cart it changed, so `cart_token` and `items` in the first response are right. If you worked around it by calling `GET /cart` again after the first add, you can stop. **Live on Preview since 2026-10-16** (verified: a new guest's first add returns the item, the same cart answers the next calls).
 - **The OpenAPI document now declares the shared request headers and the error body** (additive, documentation only; nothing changes at runtime). **Live on Preview since 2026-10-16** (verified: 234 operations, headers declared, `ErrorResponse` present).
   - `X-Region`, `X-Language`, `X-Timezone` on every operation; `X-Store` on `/seller/*`; `X-Cart-Token` on `/cart*` and `/checkout*`. All optional; defined once under `components.parameters`.
@@ -19,7 +32,7 @@
 
 ## 2026-10-15
 
-- **Category requests** (additive). A seller cannot create categories; they ask and staff decide. **Not on Preview yet**: it is committed on `develop` and goes live with the next push; this note is removed then.
+- **Category requests** (additive). A seller cannot create categories; they ask and staff decide. **Live on Preview since 2026-10-16** (all seven paths are in the OpenAPI document).
   - Seller: `POST /seller/category-requests` (multipart: `name`, `reason`, `parent_id?`, `document?`), `GET /seller/category-requests`, `GET` and `DELETE /seller/category-requests/{id}` (withdraw).
   - Staff: `GET /admin/category-requests`, `GET /{id}`, `POST /{id}/approve`, `POST /{id}/reject`.
   - Errors to handle: `409 category_exists` (with the category to use instead), `409 already_requested`, `409 not_pending`, `422 parent_must_be_top_level`, `429` (5 waiting per store).

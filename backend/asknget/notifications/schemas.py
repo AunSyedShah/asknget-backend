@@ -24,7 +24,7 @@ class TabCountOut(Schema):
     unread: int
 
 
-class SummaryOut(Schema):
+class NotificationSummaryOut(Schema):
     unread: int = Field(description="The header badge")
     tabs: dict[str, TabCountOut] = Field(description="Only the tabs this person may see, plus `all`: 'Orders (5)', 'Payments (2)'…")
 

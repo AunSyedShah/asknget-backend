@@ -14,7 +14,9 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
-from ninja.pagination import LimitOffsetPagination, paginate
+from ninja.pagination import paginate
+
+from core.pagination import PageOrLimitPagination
 
 from accounts.services import client_ip
 from core.auth import SellerAuth, StaffAuth
@@ -40,7 +42,7 @@ from .schemas import (
     DocumentOut,
     DocumentReviewIn,
     DocumentTypeLit,
-    RejectIn,
+    ApplicationRejectIn,
     RepresentativeIn,
     RequestInfoIn,
     ResubmitIn,
@@ -231,7 +233,7 @@ def lookups_banks(request, country: Optional[str] = Query(None, min_length=2, ma
 
 
 @admin_sellers_router.get("", response=list[AdminApplicationListOut], summary="Review queue")
-@paginate(LimitOffsetPagination)
+@paginate(PageOrLimitPagination)
 def admin_list(request, status: Optional[str] = None, account_type: Optional[str] = None, q: Optional[str] = None,
                country: Optional[str] = Query(None, min_length=2, max_length=2)):
     qs = SellerApplication.objects.select_related("user").exclude(status=SellerApplication.ApplicationStatus.DRAFT)
@@ -281,7 +283,7 @@ def admin_approve(request, application_id: UUID, payload: ApproveIn = None):
 
 
 @admin_sellers_router.post("/{application_id}/reject", response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
-def admin_reject(request, application_id: UUID, payload: RejectIn):
+def admin_reject(request, application_id: UUID, payload: ApplicationRejectIn):
     services.reject(services.admin_get(application_id), reviewer=request.auth, reason=payload.reason)
     return services.serialize(services.admin_get(application_id), admin=True)
 

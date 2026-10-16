@@ -210,7 +210,7 @@ class ContentIn(Schema):
     sections: list[ContentSectionIn] = Field([], max_length=20)
 
 
-class OptionTypeOut(Schema):
+class SellerOptionTypeOut(Schema):
     name: str
     values: list[OptionValueIn]
 
@@ -259,7 +259,7 @@ class SellerProductOut(Schema):
     is_featured: bool
     is_new_arrival: bool
     images: list[SellerImageOut]
-    option_types: list[OptionTypeOut]
+    option_types: list[SellerOptionTypeOut]
     variants: list[SellerVariantOut]
     key_benefits: list[ContentSectionIn]
     usage_steps: list[ContentSectionIn]
@@ -292,7 +292,7 @@ class ProductAnalyticsOut(Schema):
     daily: list[SeriesPoint] = Field(..., description="last 30 days: views, sold")
 
 
-class RejectIn(Schema):
+class ProductRejectIn(Schema):
     reason: NonEmptyStr = Field(max_length=1000)
 
 
@@ -445,7 +445,7 @@ class SellerOrdersOverviewOut(Schema):
     tabs: OrderTabsOut
 
 
-class TimelineStageOut(Schema):
+class SellerOrderTimelineStageOut(Schema):
     key: str
     label: str
     at: Optional[datetime] = None
@@ -504,7 +504,7 @@ class SellerOrderDetailOut(Schema):
     delivery_method: Optional[dict] = None
     special_note: str
     payment: OrderPaymentOut
-    timeline: list[TimelineStageOut]
+    timeline: list[SellerOrderTimelineStageOut]
     items: list[SellerOrderItemOut]
     summary: OrderSummaryBlockOut
     cancel_reason: str

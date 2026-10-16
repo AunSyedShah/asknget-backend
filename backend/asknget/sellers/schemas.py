@@ -192,7 +192,7 @@ class BasicInfoOut(Schema):
     residential_province: str
 
 
-class CategoryRefOut(Schema):
+class ApplicationCategoryOut(Schema):
     id: UUID
     name: str
     slug: str
@@ -215,7 +215,7 @@ class BusinessInfoOut(Schema):
     returns_same_as_business: bool
     returns_address: str
     store_description: str
-    categories: list[CategoryRefOut]
+    categories: list[ApplicationCategoryOut]
 
 
 class RepresentativeOut(Schema):
@@ -336,7 +336,7 @@ class ApplicationOut(Schema):
     updated_at: datetime
 
 
-class TimelineStageOut(Schema):
+class ApplicationTimelineStageOut(Schema):
     stage: str
     state: Literal["done", "current", "pending", "skipped"]
     at: Optional[datetime]
@@ -358,7 +358,7 @@ class ApplicationStatusOut(Schema):
     account_type: str
     store_display_name: str
     submitted_at: Optional[datetime]
-    timeline: list[TimelineStageOut]
+    timeline: list[ApplicationTimelineStageOut]
     events: list[StatusEventOut]
     open_info_request: Optional[InfoRequestOut]
     reviewer_message: str
@@ -471,7 +471,7 @@ class RequestInfoIn(Schema):
     items: list[InfoRequestItemIn] = Field(min_length=1, max_length=20)
 
 
-class RejectIn(Schema):
+class ApplicationRejectIn(Schema):
     reason: NonEmptyStr = Field(max_length=2000)
 
 

@@ -287,6 +287,7 @@ class Review(SoftDeleteModel):
     reviewer_name = models.CharField(max_length=120)
     reviewer_email = models.EmailField(help_text="Never published")
     rating = models.PositiveSmallIntegerField()
+    title = models.CharField(max_length=120, blank=True, default="", help_text="Optional headline ('Review Title'); shown above the text")
     body = models.TextField()
     status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING, db_index=True)
 

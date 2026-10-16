@@ -84,7 +84,7 @@ class CartSummaryOut(Schema):
     item_count: int
 
 
-class DeliveryOptionOut(Schema):
+class CartDeliveryOptionOut(Schema):
     """One of a seller's own delivery options."""
 
     id: UUID
@@ -96,7 +96,7 @@ class DeliveryOptionOut(Schema):
     follows_rule: bool = Field(False, description="The price comes from the seller's or the platform's free-over / fee rule, not a fixed price")
 
 
-class DeliveryRuleOut(Schema):
+class CartDeliveryRuleOut(Schema):
     """Free delivery over an amount, otherwise a fee: show 'Add R120 more for free delivery' when remaining_cents > 0."""
 
     free_over_cents: int = Field(description="0 = this seller has no free-delivery threshold")
@@ -111,10 +111,10 @@ class CartDeliveryOut(Schema):
 
     store_id: UUID
     store_name: str
-    options: list[DeliveryOptionOut] = Field(description="Only options every item from this store supports")
+    options: list[CartDeliveryOptionOut] = Field(description="Only options every item from this store supports")
     selected_option_id: Optional[UUID]
     price_cents: int
-    rule: DeliveryRuleOut
+    rule: CartDeliveryRuleOut
 
 
 class DeliveryChoiceIn(Schema):
@@ -149,7 +149,7 @@ class ContactIn(Schema):
     phone: PhoneStr
 
 
-class AddressIn(Schema):
+class CheckoutAddressIn(Schema):
     """'Delivery Address' block (inline). Alternatively pass a saved `address_id`."""
 
     address: NonEmptyStr = Field(max_length=255)
@@ -167,9 +167,9 @@ class CheckoutIn(Schema):
 
     contact: ContactIn
     address_id: Optional[UUID] = Field(None, description="Use a saved address (members)")
-    address: Optional[AddressIn] = Field(None, description="…or type one in")
+    address: Optional[CheckoutAddressIn] = Field(None, description="…or type one in")
     ship_to_different_address: bool = False
-    shipping_address: Optional[AddressIn] = None
+    shipping_address: Optional[CheckoutAddressIn] = None
     deliveries: list[DeliveryChoiceIn] = Field(default_factory=list, description="Per-store delivery choice; omit to use what the cart already has")
     payment_method_type: PaymentMethodLit
     payment_method_id: Optional[UUID] = Field(None, description="Saved card (members, type=card)")

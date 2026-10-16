@@ -208,9 +208,13 @@ same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them
 
 ## 5b. Still not in the backend
 
-Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
-and the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders, products), planned as the
-next sprint (`docs/data-model.md` Q74–Q83). Report what you need instead of assuming a shape.
+**The seller's Category Request popup is built** (section 5a, "Category requests", with the staff queue under `/admin/category-requests`).
+
+**The Admin portal is partly built.** These admin endpoints exist: seller-application review (`/admin/seller-applications`), orders (`/admin/orders`, with status changes), product review
+(`/admin/products`), stores (`/admin/stores`), returns (`/admin/returns`: queue, decide, refund-paid, policies, reasons, rules), ledger and payouts (`/admin/ledger`, `/admin/payouts`), flagged chat
+(`/admin/chat`), category requests (`/admin/category-requests`), and the per-market settings in Django admin. **Not built, so do not wire (render static or empty, and report what you need): the admin dashboard figures, category
+management (add, edit, activate or deactivate, reorder, image), the seller list and seller detail with their figures, the customer list and customer detail (and suspending a customer), the marketplace transactions
+overview, application review notes, product suspend, and richer rows and tab counts on the admin orders and products lists.** What each designed screen needs is in the frontend's `BACKEND_ASKS.md` (ask 5); the backend plans an admin sprint for them. Report what you need instead of assuming a shape.
 
 ## 6. Reading the Figma design
 

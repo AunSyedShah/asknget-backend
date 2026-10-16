@@ -33,7 +33,7 @@ from .schemas import (
     CustomerThreadOut,
     FlaggedMessageOut,
     MessageIn,
-    MessageOut,
+    ChatMessageOut,
     SellerConversationOut,
     SellerSummaryOut,
     SellerTabLit,
@@ -77,14 +77,14 @@ def my_conversation(request, conversation_id: UUID, after: Optional[str] = Query
     return services.thread_out(convo, for_role=Role.CUSTOMER, after=after, limit=limit)
 
 
-@customer_chat_router.get("/conversations/{conversation_id}/messages", response={200: list[MessageOut], 404: ErrorOut, 422: ErrorOut},
+@customer_chat_router.get("/conversations/{conversation_id}/messages", response={200: list[ChatMessageOut], 404: ErrorOut, 422: ErrorOut},
                           summary="Poll for new messages")
 def my_messages(request, conversation_id: UUID, after: Optional[str] = Query(None), limit: int = Query(50, ge=1, le=200)):
     convo = services.get_for_customer(request.auth, conversation_id)
     return [services.message_out(m) for m in services.messages(convo, after=after, limit=limit)]
 
 
-@customer_chat_router.post("/conversations/{conversation_id}/messages", response={201: MessageOut, 404: ErrorOut, 422: ErrorOut, 429: ErrorOut})
+@customer_chat_router.post("/conversations/{conversation_id}/messages", response={201: ChatMessageOut, 404: ErrorOut, 422: ErrorOut, 429: ErrorOut})
 def my_send(request, conversation_id: UUID, payload: MessageIn):
     convo = services.get_for_customer(request.auth, conversation_id)
     return 201, services.message_out(services.send(convo, role=Role.CUSTOMER, sender=request.auth, body=payload.body))
@@ -126,14 +126,14 @@ def seller_conversation(request, conversation_id: UUID, after: Optional[str] = Q
     return services.thread_out(convo, for_role=Role.SELLER, after=after, limit=limit)
 
 
-@seller_chat_router.get("/{conversation_id}/messages", response={200: list[MessageOut], 403: ErrorOut, 404: ErrorOut, 422: ErrorOut})
+@seller_chat_router.get("/{conversation_id}/messages", response={200: list[ChatMessageOut], 403: ErrorOut, 404: ErrorOut, 422: ErrorOut})
 def seller_messages(request, conversation_id: UUID, after: Optional[str] = Query(None), limit: int = Query(50, ge=1, le=200)):
     entitlements.require(request.store, entitlements.CHAT_INBOX)
     convo = services.get_for_store(request.store, conversation_id)
     return [services.message_out(m) for m in services.messages(convo, after=after, limit=limit)]
 
 
-@seller_chat_router.post("/{conversation_id}/messages", response={201: MessageOut, 403: ErrorOut, 404: ErrorOut, 422: ErrorOut, 429: ErrorOut})
+@seller_chat_router.post("/{conversation_id}/messages", response={201: ChatMessageOut, 403: ErrorOut, 404: ErrorOut, 422: ErrorOut, 429: ErrorOut})
 def seller_send(request, conversation_id: UUID, payload: MessageIn):
     entitlements.require(request.store, entitlements.CHAT_INBOX)
     convo = services.get_for_store(request.store, conversation_id)

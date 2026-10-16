@@ -57,6 +57,10 @@ class Country(models.Model):
     is_active = models.BooleanField(default=True, help_text="Inactive countries are not resolvable from the API")
     is_default = models.BooleanField(default=False, help_text="Used when a request carries no region (bare domain, tests)")
     sort_order = models.PositiveSmallIntegerField(default=0)
+    site_info = models.JSONField(
+        default=dict, blank=True,
+        help_text='This market\'s footer / Contact Us details, over the platform-wide ones: {"contact_phone": "+27 11 555 0123", "contact_email": "...", '
+                  '"address": "...", "social": {"facebook": "https://..."}}. Leave a key out to use the platform-wide value.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -85,6 +89,11 @@ class Country(models.Model):
             raise ValidationError({"languages": f"Unknown language code(s): {', '.join(bad)}. Allowed: {', '.join(language_codes())}"})
         if self.default_language not in self.languages:
             raise ValidationError({"default_language": "Must be one of `languages`."})
+        allowed = {"contact_phone", "contact_email", "address", "social"}
+        if not isinstance(self.site_info, dict) or set(self.site_info) - allowed:
+            raise ValidationError({"site_info": f"An object with only these keys: {', '.join(sorted(allowed))}."})
+        if not isinstance(self.site_info.get("social", {}), dict):
+            raise ValidationError({"site_info": "social must be an object of name: link."})
         if self.postal_code_regex:
             try:
                 re.compile(self.postal_code_regex)
