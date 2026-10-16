@@ -7,7 +7,7 @@
 
 ## 2026-10-16
 
-- **Answers to `BACKEND_ASKS.md`** (ask #5, the admin portal API, is a separate sprint and not in this batch). **Not on Preview yet**: committed on `develop`, live with the next push; this note is then removed.
+- **Answers to `BACKEND_ASKS.md`** (ask #5, the admin portal API, is a separate sprint and not in this batch). **Live on Preview since 2026-10-16** (verified: schema names, 5 hero slides and 4 tiles, ZA and PK contact details, product and category pictures).
   - **BREAKING for generated type names only (ask #2); no response or request body changed.** Fifteen schema classes shared a name with another class, so `openapi.json` merged them and a generated client got one of the two shapes wrong. Each now has its own name, and a test fails if two share one again. Old to new (wire format identical):
     - cart / checkout: `DeliveryOptionOut` → `CartDeliveryOptionOut`, `DeliveryRuleOut` (the buyer's rule in the cart) → `CartDeliveryRuleOut`, `AddressIn` (checkout) → `CheckoutAddressIn`. The seller's `DeliveryRuleOut` (fields `locked`, `source`, `own`, `currency`) keeps its name; `AddressIn` of the address book keeps its name.
     - seller portal: `OptionTypeOut` → `SellerOptionTypeOut`, `RejectIn` (product) → `ProductRejectIn`, `TimelineStageOut` (orders) → `SellerOrderTimelineStageOut`.
