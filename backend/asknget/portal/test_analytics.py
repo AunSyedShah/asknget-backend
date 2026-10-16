@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from config.models import Setting
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
 
@@ -324,7 +324,7 @@ class SalesAnalyticsTests(AnalyticsTestCase):
     def test_staff_adjustments_come_from_the_ledger_and_are_signed(self):
         from ledger import services as ledger
 
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         ledger.adjust(self.store, amount_cents=1500, note="Goodwill credit", by=staff)
         ledger.adjust(self.store, amount_cents=-400, note="Chargeback", by=staff)
         body = self.get(f"{A}/sales", self.token).json()
@@ -338,7 +338,7 @@ class SalesAnalyticsTests(AnalyticsTestCase):
     def test_the_chart_adds_up_to_the_cards(self):
         from ledger import services as ledger
 
-        ledger.adjust(self.store, amount_cents=700, note="Goodwill credit", by=make_user(is_staff=True))
+        ledger.adjust(self.store, amount_cents=700, note="Goodwill credit", by=make_staff())
         body = self.get(f"{A}/sales", self.token).json()
         gross = sum(p["values"]["gross"] for p in body["revenue_over_time"])
         net = sum(p["values"]["net"] for p in body["revenue_over_time"])

@@ -14,6 +14,7 @@ from ninja import Header, Query, Router
 from ninja.pagination import paginate
 
 from core.auth import JWTAuth, OptionalJWTAuth, StaffAuth
+from staff.access import scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
@@ -193,10 +194,10 @@ def track_order(request, payload: TrackIn):
 # --------------------------------------------------------------------------- #
 
 
-@admin_orders_router.get("", response=list[OrderSummaryOut])
+@admin_orders_router.get("", auth=StaffAuth("orders.view"), response=list[OrderSummaryOut])
 @paginate(PagePagination)
 def admin_orders(request, status: str | None = None, q: str | None = None):
-    qs = services.order_qs()
+    qs = scope(request, services.order_qs())
     if status:
         qs = qs.filter(status=status)
     if q:
@@ -204,17 +205,17 @@ def admin_orders(request, status: str | None = None, q: str | None = None):
     return qs
 
 
-@admin_orders_router.get("/{order_id}", response={200: OrderDetailOut, 404: ErrorOut})
+@admin_orders_router.get("/{order_id}", auth=StaffAuth("orders.view"), response={200: OrderDetailOut, 404: ErrorOut})
 def admin_order_detail(request, order_id: UUID):
-    order = services.order_qs().filter(pk=order_id).first()
+    order = scope(request, services.order_qs()).filter(pk=order_id).first()
     if order is None:
         return 404, {"detail": "Order not found"}
     return order
 
 
-@admin_orders_router.post("/{order_id}/status", response={200: OrderDetailOut, 404: ErrorOut, 409: ErrorOut}, summary="Advance an order (writes the tracking timeline)")
+@admin_orders_router.post("/{order_id}/status", auth=StaffAuth("orders.manage"), response={200: OrderDetailOut, 404: ErrorOut, 409: ErrorOut}, summary="Advance an order (writes the tracking timeline)")
 def admin_order_status(request, order_id: UUID, payload: AdminOrderStatusIn):
-    order = services.order_qs().filter(pk=order_id).first()
+    order = scope(request, services.order_qs()).filter(pk=order_id).first()
     if order is None:
         return 404, {"detail": "Order not found"}
     services.set_status(order, status=payload.status, actor_user=request.auth, note=payload.note, location=payload.location)

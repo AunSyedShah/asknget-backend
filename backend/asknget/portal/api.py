@@ -20,6 +20,7 @@ from ninja.files import UploadedFile
 from ninja.pagination import paginate
 
 from core.auth import StaffAuth
+from staff.access import scope
 from sellers.models import Store
 from core.pagination import PagePagination
 from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
@@ -218,15 +219,15 @@ def product_analytics(request, product_id: UUID, period: PeriodLit = "month"):
 # --------------------------------------------------------------------------- #
 
 
-@admin_products_router.get("", response=list[AdminProductRowOut], summary="Review queue (default: pending)")
+@admin_products_router.get("", auth=StaffAuth("products.view"), response=list[AdminProductRowOut], summary="Review queue (default: pending)")
 @paginate(PagePagination)
 def admin_product_list(request, status: str = Query("pending", description="pending | active | rejected | archived | all")):
-    return [products.admin_row(p) for p in products.review_queue(None if status == "all" else status)]
+    return [products.admin_row(p) for p in scope(request, products.review_queue(None if status == "all" else status))]
 
 
-@admin_products_router.post("/{product_id}/approve", response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
+@admin_products_router.post("/{product_id}/approve", auth=StaffAuth("products.review"), response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
 def admin_product_approve(request, product_id: UUID):
-    product = products.Product.objects.filter(pk=product_id).first()
+    product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
     products.approve(product)
@@ -234,9 +235,9 @@ def admin_product_approve(request, product_id: UUID):
     return {"detail": f"{product.name} is now live"}
 
 
-@admin_products_router.post("/{product_id}/reject", response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
+@admin_products_router.post("/{product_id}/reject", auth=StaffAuth("products.review"), response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
 def admin_product_reject(request, product_id: UUID, payload: ProductRejectIn):
-    product = products.Product.objects.filter(pk=product_id).first()
+    product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
     products.reject(product, payload.reason)
@@ -511,9 +512,9 @@ def analytics_export(request, report: ReportLit = "overview", period: PeriodLit 
     return analytics.export(store, report, period)
 
 
-@admin_stores_router.post("/{store_id}/plan", response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
+@admin_stores_router.post("/{store_id}/plan", auth=StaffAuth("stores.manage"), response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
 def admin_set_plan(request, store_id: UUID, payload: PlanSetIn):
-    store = Store.objects.filter(pk=store_id).first()
+    store = scope(request, Store.objects.all()).filter(pk=store_id).first()
     if store is None:
         raise HttpError(404, "Store not found")
     if store.is_premium != payload.is_premium:

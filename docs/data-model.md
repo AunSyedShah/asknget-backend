@@ -71,6 +71,11 @@ asknget is a **multi-vendor marketplace**: a buyer storefront (catalog → cart 
 ### `roles` / `user_roles`
 `enum(customer, seller, admin)`; a user can hold several (a seller can also buy). The "Seller Portal" navbar implies a separately gated area.
 
+**Staff roles (sprint 9):** a staff role is a Django `auth_group` an admin creates; its permissions come from the staff catalogue
+(`staff/permissions.py`, stored as `auth_permission` rows `staff.<section>.<action>`). `staff_staffprofile` (1:1 user, optional):
+`markets` M2M `markets_country` (empty = every market). Starter roles (Administrator, KYC reviewer, Catalogue, Support, Finance) come
+from migration `staff 0002`. See `docs/sprint-9-plan.md`.
+
 ### `otp_verifications`
 | field | type | notes |
 |---|---|---|

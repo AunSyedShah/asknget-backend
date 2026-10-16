@@ -19,6 +19,7 @@ from ninja.errors import HttpError
 from ninja.pagination import paginate
 
 from core.auth import StaffAuth
+from staff.access import scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut
 from portal.auth import StoreAuth
@@ -168,29 +169,30 @@ def transaction_detail(request, reference: str):
 # --------------------------------------------------------------------------- #
 
 
-def _store(store_id: UUID) -> Store:
-    store = Store.objects.select_related("country").filter(pk=store_id).first()
+def _store(request, store_id: UUID) -> Store:
+    """The store, if it is in one of the staff member's markets (otherwise 404)."""
+    store = scope(request, Store.objects.select_related("country")).filter(pk=store_id).first()
     if store is None:
         raise HttpError(404, "Store not found")
     return store
 
 
-@admin_ledger_router.get("/stores/{store_id}", response={200: StoreBalanceOut, 404: ErrorOut}, summary="Staff: a store's balances (what a payout can be)")
+@admin_ledger_router.get("/stores/{store_id}", auth=StaffAuth("ledger.view"), response={200: StoreBalanceOut, 404: ErrorOut}, summary="Staff: a store's balances (what a payout can be)")
 def admin_balances(request, store_id: UUID):
-    store = _store(store_id)
+    store = _store(request, store_id)
     return {"store_id": store.pk, "store_name": store.display_name, "currency": store.country.currency, **services.balances(store)}
 
 
-@admin_ledger_router.post("/adjustments", response={201: EntryOut, 404: ErrorOut, 422: ErrorOut}, summary="Staff: credit or debit a store, with a reason")
+@admin_ledger_router.post("/adjustments", auth=StaffAuth("ledger.adjust"), response={201: EntryOut, 404: ErrorOut, 422: ErrorOut}, summary="Staff: credit or debit a store, with a reason")
 def admin_adjust(request, payload: AdjustmentIn):
-    entry = services.adjust(_store(payload.store_id), amount_cents=payload.amount_cents, note=payload.note, by=request.auth)
+    entry = services.adjust(_store(request, payload.store_id), amount_cents=payload.amount_cents, note=payload.note, by=request.auth)
     return 201, _row(entry)
 
 
-@admin_payouts_router.get("", response=list[PayoutOut], summary="Staff: payouts, newest first")
+@admin_payouts_router.get("", auth=StaffAuth("payouts.view"), response=list[PayoutOut], summary="Staff: payouts, newest first")
 @paginate(PagePagination)
 def admin_payout_list(request, status: str | None = None, store_id: UUID | None = None):
-    qs = Payout.objects.select_related("store")
+    qs = scope(request, Payout.objects.select_related("store"), "store__country")
     if status:
         qs = qs.filter(status=status)
     if store_id:
@@ -198,15 +200,15 @@ def admin_payout_list(request, status: str | None = None, store_id: UUID | None 
     return [_payout_out(p) for p in qs]
 
 
-@admin_payouts_router.post("", response={201: PayoutOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Staff: pay a store out of its available balance")
+@admin_payouts_router.post("", auth=StaffAuth("payouts.manage"), response={201: PayoutOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Staff: pay a store out of its available balance")
 def admin_payout_create(request, payload: PayoutIn):
-    payout = services.create_payout(_store(payload.store_id), amount_cents=payload.amount_cents, note=payload.note, by=request.auth)
+    payout = services.create_payout(_store(request, payload.store_id), amount_cents=payload.amount_cents, note=payload.note, by=request.auth)
     return 201, _payout_out(Payout.objects.select_related("store").get(pk=payout.pk))
 
 
-@admin_payouts_router.patch("/{payout_id}/status", response={200: PayoutOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Staff: mark a payout completed or failed")
+@admin_payouts_router.patch("/{payout_id}/status", auth=StaffAuth("payouts.manage"), response={200: PayoutOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Staff: mark a payout completed or failed")
 def admin_payout_status(request, payout_id: UUID, payload: PayoutStatusIn):
-    payout = Payout.objects.select_related("store").filter(pk=payout_id).first()
+    payout = scope(request, Payout.objects.select_related("store"), "store__country").filter(pk=payout_id).first()
     if payout is None:
         raise HttpError(404, "Payout not found")
     payout = services.set_payout_status(payout, payload.status, request.auth)

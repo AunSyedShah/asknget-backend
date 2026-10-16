@@ -7,7 +7,7 @@ Run it against the STAGING database only (the flag is a reminder: it creates sta
     fe-customer@asknget.test   a buyer
     fe-seller@asknget.test     a seller: a member of the demo store (Huda Beauty) with `manage` on every section, so the whole seller portal
                                works with real data; team management and plan changes stay owner-only, as for any member
-    fe-admin@asknget.test      staff (is_staff, not a superuser): the /admin/* endpoints
+    fe-admin@asknget.test      staff (is_staff, not a superuser) with the Administrator role: every /admin/* endpoint
 
 and writes E2E_CUSTOMER_EMAIL / E2E_CUSTOMER_PASSWORD, E2E_SELLER_*, E2E_ADMIN_* into the env file (other lines are kept). Running it again gives every account a NEW password and
 rewrites the file, which is also how to rotate them. The passwords exist nowhere else: not in the output, the database (only the hash), or the repository.
@@ -75,6 +75,10 @@ class Command(BaseCommand):
                 member.permissions = {section: "manage" for section in SECTIONS}
                 member.joined_at = member.joined_at or now
                 member.save()
+            if prefix == "ADMIN":                                 # every staff permission, every market
+                from django.contrib.auth.models import Group
+
+                user.groups.add(Group.objects.get(name="Administrator"))
             values[f"E2E_{prefix}_EMAIL"] = email
             values[f"E2E_{prefix}_PASSWORD"] = password
         merge_env(Path(env_file), values)

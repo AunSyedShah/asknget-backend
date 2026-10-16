@@ -18,6 +18,7 @@ from ninja.errors import HttpError
 from ninja.pagination import paginate
 
 from core.auth import JWTAuth, StaffAuth
+from staff.access import scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut as DetailOut
 from portal import entitlements
@@ -160,7 +161,7 @@ def seller_close(request, conversation_id: UUID, payload: CloseIn):
 # --------------------------------------------------------------------------- #
 
 
-@admin_chat_router.get("/flagged", response=list[FlaggedMessageOut], summary="Messages that look like off-platform contact details")
+@admin_chat_router.get("/flagged", auth=StaffAuth("chat.moderate"), response=list[FlaggedMessageOut], summary="Messages that look like off-platform contact details")
 @paginate(PagePagination)
 def flagged(request, store_id: Optional[UUID] = Query(None)):
     qs = (
@@ -168,6 +169,7 @@ def flagged(request, store_id: Optional[UUID] = Query(None)):
         .select_related("conversation__store", "conversation__customer")
         .order_by("-flagged_at")
     )
+    qs = scope(request, qs, "conversation__store__country")
     if store_id:
         qs = qs.filter(conversation__store_id=store_id)
     return [

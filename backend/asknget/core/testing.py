@@ -23,6 +23,26 @@ def make_user(email=None, **extra) -> User:
     return User.objects.create_user(email=email or f"user{n}@example.com", password=PASSWORD, **extra)
 
 
+def make_staff(*permissions: str, markets=(), email=None, **extra) -> User:
+    """A staff account. No permissions named = the Administrator role (every staff permission, as staff had before roles).
+    `markets=("ZA",)` limits what they see; empty = every market."""
+    from django.contrib.auth.models import Group, Permission
+
+    from staff.models import StaffProfile
+
+    user = make_user(email=email, is_staff=True, **extra)
+    if permissions:
+        role = Group.objects.create(name=f"role-{user.pk}")
+        role.permissions.set(Permission.objects.filter(content_type__app_label="staff", codename__in=permissions))
+        assert role.permissions.count() == len(set(permissions)), f"unknown permission in {permissions}"
+    else:
+        role = Group.objects.get(name="Administrator")
+    user.groups.add(role)
+    if markets:
+        StaffProfile.objects.create(user=user).markets.set(markets)
+    return user
+
+
 def make_country(code="PK", **extra) -> Country:
     """A second market for cross-region tests (the default one comes from the migration)."""
     profiles = {"PK": dict(name="Pakistan", currency="PKR", timezone="Asia/Karachi", languages=["en", "ur"], phone_prefix="+92", sort_order=2)}

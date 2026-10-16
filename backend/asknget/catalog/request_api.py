@@ -4,10 +4,12 @@ from typing import Literal
 from uuid import UUID
 
 from ninja import File, Form, Query, Router
+from ninja.errors import HttpError
 from ninja.files import UploadedFile
 from ninja.pagination import paginate
 
 from core.auth import StaffAuth
+from staff.access import scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut
 from portal.auth import StoreAuth
@@ -81,10 +83,18 @@ def withdraw_category_request(request, request_id: UUID):
 # --------------------------------------------------------------------------- #
 
 
-@admin_category_requests_router.get("", response=list[CategoryRequestAdminOut], summary="Category requests (default: waiting for review, oldest first)")
+def _visible(request, request_id):
+    """The request, if its store is in one of the staff member's markets (otherwise 404, as if it did not exist)."""
+    req = scope(request, service.requests_qs(), "store__country").filter(pk=request_id).first()
+    if req is None:
+        raise HttpError(404, "Category request not found")
+    return req
+
+
+@admin_category_requests_router.get("", auth=StaffAuth("category_requests.view"), response=list[CategoryRequestAdminOut], summary="Category requests (default: waiting for review, oldest first)")
 @paginate(PagePagination)
 def category_requests_queue(request, status: StatusLit = Query("pending"), q: str | None = Query(None, description="Name or store")):
-    qs = service.requests_qs().filter(status=status)
+    qs = scope(request, service.requests_qs(), "store__country").filter(status=status)
     if status == CategoryRequest.Status.PENDING:
         qs = qs.order_by("created_at")
     if q:
@@ -94,19 +104,18 @@ def category_requests_queue(request, status: StatusLit = Query("pending"), q: st
     return [service.out(r, staff=True) for r in qs]
 
 
-@admin_category_requests_router.get("/{request_id}", response={200: CategoryRequestAdminOut, 404: ErrorOut})
+@admin_category_requests_router.get("/{request_id}", auth=StaffAuth("category_requests.view"), response={200: CategoryRequestAdminOut, 404: ErrorOut})
 def category_request_detail(request, request_id: UUID):
-    req = service.requests_qs().filter(pk=request_id).first()
-    if req is None:
-        return 404, {"detail": "Category request not found"}
+    req = _visible(request, request_id)
     return service.out(req, staff=True)
 
 
 @admin_category_requests_router.post(
-    "/{request_id}/approve", response={200: CategoryRequestAdminOut, 404: ErrorOut, 409: CategoryExistsOut | ErrorOut, 422: ErrorOut},
+    "/{request_id}/approve", auth=StaffAuth("category_requests.decide"), response={200: CategoryRequestAdminOut, 404: ErrorOut, 409: CategoryExistsOut | ErrorOut, 422: ErrorOut},
     summary="Approve: create the category (optionally renamed or moved), or give the seller an existing one (use_category_id)",
 )
 def approve_category_request(request, request_id: UUID, payload: CategoryApproveIn):
+    _visible(request, request_id)
     given = payload.dict(exclude_unset=True)
     try:
         req = service.approve(
@@ -118,8 +127,9 @@ def approve_category_request(request, request_id: UUID, payload: CategoryApprove
     return service.out(service.requests_qs().get(pk=req.pk), staff=True)
 
 
-@admin_category_requests_router.post("/{request_id}/reject", response={200: CategoryRequestAdminOut, 404: ErrorOut, 409: ErrorOut},
+@admin_category_requests_router.post("/{request_id}/reject", auth=StaffAuth("category_requests.decide"), response={200: CategoryRequestAdminOut, 404: ErrorOut, 409: ErrorOut},
                                      summary="Reject, with a reason the seller sees")
 def reject_category_request(request, request_id: UUID, payload: CategoryRejectIn):
+    _visible(request, request_id)
     req = service.reject(request_id, request.auth, reason=payload.reason)
     return service.out(service.requests_qs().get(pk=req.pk), staff=True)

@@ -14,7 +14,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from config.models import CommissionRule, Setting
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from ledger import services
 from ledger.models import LedgerEntry, Payout
 from orders.models import Order, OrderItem, OrderStatusEvent, Voucher
@@ -41,7 +41,7 @@ class LedgerTestCase(ApiTestCase):
         cls.cable = make_product(cls.store_a, cls.tech, "Cable", 2000, None, stock=50)
         cls.watch = make_product(cls.store_b, cls.tech, "Smart Watch", 20000, None, stock=50)
         cls.buyer = make_user(email="olivia@example.com", full_name="Olivia Martin")
-        cls.staff = make_user(is_staff=True)
+        cls.staff = make_staff()
 
     def setUp(self):
         self.buyer_token = self.token_for(self.buyer)

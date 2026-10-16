@@ -8,7 +8,7 @@ from PIL import Image
 from django.utils import timezone
 
 from catalog.models import Brand, Category, Product, ProductVariant, StockMovement
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from orders.models import Order, OrderItem, OrderStatusEvent
 from sellers.models import Store
 
@@ -30,7 +30,7 @@ class PortalBase(ApiTestCase):
         cls.beauty = make_category("Beauty")
         cls.makeup = make_category("Makeup", parent=cls.beauty)
         cls.brand = Brand.objects.create(name="NARS", slug="nars")
-        cls.staff = make_user(is_staff=True)
+        cls.staff = make_staff()
 
     def setUp(self):
         self.token = self.token_for(self.owner)

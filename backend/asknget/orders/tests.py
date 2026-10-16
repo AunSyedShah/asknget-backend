@@ -5,7 +5,7 @@ from django.core import mail
 from django.utils import timezone
 
 from catalog.models import ProductVariant
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 
 from .models import Cart, Order, OrderDelivery, Voucher
 
@@ -309,7 +309,7 @@ class MyOrdersTests(OrdersTestCase):
 
 class AdminOrderTests(OrdersTestCase):
     def test_status_progression_writes_timeline(self):
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         staff_token = self.token_for(staff)
         self.cart_with(self.token)
         order = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token).json()["order"]

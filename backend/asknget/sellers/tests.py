@@ -3,6 +3,7 @@
 import tempfile
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
@@ -25,6 +26,7 @@ class SellerTestCase(TestCase):
         self.cat_beauty = Category.objects.create(name="Beauty", slug="beauty")
         self.cat_fashion = Category.objects.create(name="Fashion", slug="fashion")
         self.staff = User.objects.create_user(email="admin@asknget.com", password="Str0ngPassw0rd!", is_staff=True)
+        self.staff.groups.add(Group.objects.get(name="Administrator"))
         self.staff_token = self.login("admin@asknget.com")
 
     # --- http helpers ---------------------------------------------------------

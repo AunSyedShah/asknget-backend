@@ -13,6 +13,7 @@ from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
 from catalog.category_requests import category_files_router
 from catalog.request_api import admin_category_requests_router, seller_category_requests_router
+from staff.api import admin_me_router
 from discovery.api import discovery_router
 from marketing.api import marketing_router
 from chat.api import admin_chat_router, customer_chat_router, seller_chat_router
@@ -122,3 +123,4 @@ api.add_router("/files", files_router)
 api.add_router("/files", category_files_router)
 api.add_router("/seller/category-requests", seller_category_requests_router)
 api.add_router("/admin/category-requests", admin_category_requests_router)
+api.add_router("/admin/me", admin_me_router)

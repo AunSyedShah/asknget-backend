@@ -5,6 +5,19 @@
 > Everything before 2026-10-14 is described in [`frontend-handoff.md`](frontend-handoff.md) sections 4 to 5a. Regenerate your API types from
 > `openapi.json` on Preview whenever there is a new entry. Last endpoint count: **234 operations**.
 
+## 2026-10-17
+
+- **Staff roles and permissions on every `/admin/*` endpoint** (sprint 9, phase 1). **Not on Preview yet**: committed on `develop`,
+  live with the next push; this note is then removed.
+  - Each `/admin/*` operation now needs a permission from the staff catalogue (e.g. `orders.view`, `sellers.review`,
+    `returns.configure`; 18 in all), granted through roles that admins create in Django admin. Without it: `403
+    {"detail": "Missing permission: <code>"}`. **Existing staff accounts (including the frontend test admin) were given the
+    Administrator role, so nothing changes for them.** A new staff account has no permissions until it gets a role.
+  - **New: `GET /admin/me`** → `{is_superuser, permissions: ["orders.view", ...], markets: ["ZA"] | null}`. Use it to hide admin
+    menu items and buttons the person cannot use (null markets = every market).
+  - Staff can be limited to markets. Lists then show only those markets; a record in another market answers **404**. Return reasons
+    and return rules for every market can only be changed by staff without a market limit (`403` otherwise).
+
 ## 2026-10-16
 
 - **Answers to `BACKEND_ASKS.md`** (ask #5, the admin portal API, is a separate sprint and not in this batch). **Live on Preview since 2026-10-16** (verified: schema names, 5 hero slides and 4 tiles, ZA and PK contact details, product and category pictures).

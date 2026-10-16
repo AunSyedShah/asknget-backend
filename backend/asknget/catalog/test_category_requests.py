@@ -7,7 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
 from catalog.models import Category, CategoryRequest
-from core.testing import ApiTestCase, make_category, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_store, make_user, make_staff
 from notifications.models import StoreNotification
 
 SELLER = "/api/v1/seller/category-requests"
@@ -29,7 +29,7 @@ class CategoryRequestTestCase(ApiTestCase):
         cls.store = make_store(owner=cls.owner, name="Huda Beauty")
         cls.other_owner = make_user(is_seller=True)
         cls.other_store = make_store(owner=cls.other_owner, name="Other Co")
-        cls.staff = make_user(is_staff=True)
+        cls.staff = make_staff()
 
     def setUp(self):
         self.token = self.token_for(self.owner)
