@@ -21,6 +21,10 @@ the OpenAPI document at https://asknget-backend-git-develop-aun-syed-shahs-proje
 seller portal, then admin portal. Responsive defaults are in the handoff, section 1 (360 / 768 / 1024 / 1280 px). The definition of done is
 a screenshot of each screen at those four widths next to its Figma picture.
 
+A copy of the design material is already in this repository under ./design: ./design/frames/ (the 89 pictures, split into customer/, seller/ and admin/, with INDEX.md and manifest.json),
+./design/outlines/ (the text outline of each screen: exact copy, labels, component states; 82 of the 91 screens have one, the newest do not) and ./design/Icons.png. Use that copy for the pictures and
+outlines wherever the list above says <BACKEND>/Figma/frames or <BACKEND>/docs/figma/screens. Everything else (the three docs) is read from <BACKEND> so that it is always current.
+
 Rules:
 - Build against the Preview environment only (the URL is in the brief), never Production. Do not call the API straight from the browser
   until the brief says CORS is set: proxy through a Next.js rewrite instead (brief, section 7).
