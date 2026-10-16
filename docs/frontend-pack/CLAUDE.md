@@ -15,6 +15,6 @@ Hard rules:
 - **Never edit `docs/backend/` or `design/`**: the owner regenerates them. Your notes go in `DESIGN_NOTES.md` and `BACKEND_ASKS.md` (create them on day one).
 - The pictures in `design/frames` are the design; the outlines in `design/outlines` give the exact copy. Treat the design as a hypothesis: where it contradicts the API or itself, write it in `DESIGN_NOTES.md` and ask; never guess.
 - When you need something from the backend (a missing field, a wrong shape, a bug), write it in `BACKEND_ASKS.md`: the request you sent, the response you got, what you expected. Do not work around backend bugs silently.
-- Never print, store or commit credentials. You have no Figma token and do not call Figma. Demo passwords are given to you by the owner in chat, never written to a file.
+- Never print, store or commit credentials. You have no Figma token and do not call Figma. `.env.local` (git-ignored) already holds `API_ORIGIN` and the test logins `E2E_CUSTOMER_*`, `E2E_SELLER_*`, `E2E_ADMIN_*` for the backend Preview: read them from the environment, never print, log, commit or paste them, and never copy a password into another file.
 - Start of every session: fetch the live `openapi.json`, diff it against `api/openapi.snapshot.json`, read the top of `docs/backend/api-changes.md`, regenerate the client, replace the snapshot (brief, section 6).
 - Definition of done for a screen: Playwright screenshots at 360, 768, 1024 and 1280 px next to its picture in `design/frames`.

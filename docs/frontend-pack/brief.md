@@ -69,7 +69,12 @@ The Figma file has **desktop frames only** (1920 px wide). Until the designer de
     shows a header named `x_cart_token` with underscores, it is an old copy: re-fetch.
   - Every operation has a `default` error response typed `ErrorResponse` (`{detail, errors?}`); many also list specific 4xx codes. Model errors once, globally.
   - The security schemes (`JWTAuth`, `OptionalJWTAuth`, `StaffAuth`, `SellerAuth`, `StoreAuth`) are all `Authorization: Bearer <access_token>`; they differ only in who is let in.
-- **Demo accounts** exist on Preview: `customer@asknget.demo`, `seller@asknget.demo`, `admin@asknget.demo`. **The password is not in this folder: ask the owner** (it is a staging demo password; never use it anywhere else).
+- **Test logins are already set up for you, in `.env.local`** (git-ignored): `E2E_CUSTOMER_EMAIL` / `E2E_CUSTOMER_PASSWORD`, `E2E_SELLER_*`, `E2E_ADMIN_*`, next to `API_ORIGIN`. They exist **only on Preview**:
+  a **buyer**; a **seller** who is a member of the demo store (Huda Beauty, with orders, products and analytics) with `manage` on every section, so the whole seller portal works with real data (team management
+  and plan changes are owner-only, so those screens answer 403 for this seller: build them from the design and tell the owner if you need to see them live); and a **staff admin** (`is_staff`, not a superuser; the `/admin/*` APIs).
+  Use them for development and for the Playwright tests: read them from the environment, **never print, log, commit or paste them**, and never write a password into any other file. If they stop working or you
+  need a different kind of account, say so in `BACKEND_ASKS.md` and tell the owner: the backend session recreates them (which also rotates the passwords) and rewrites `.env.local`. Other demo accounts exist on Preview;
+  their password is deliberately not given to you.
 - **Free-tier infrastructure:** keep test traffic light; no loops, no load tests.
 - **File uploads do not work on Preview yet** (the server's disk is read-only; object storage is not set up): avatar, product images, review and return photos, KYC documents and the category-request image
   all fail. Build the upload UI, but expect an error there and note it in `BACKEND_ASKS.md`.
