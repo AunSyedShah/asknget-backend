@@ -1,5 +1,7 @@
 # asknget: brief for the agent that builds the frontend
 
+> **The frontend session does not read this file.** It gets a self-contained, regenerated copy of the instructions and the design pictures in its own folder: `python docs/make_frontend_pack.py <frontend folder>` (see `frontend-kickoff-prompt.md`), built from `docs/frontend-pack/brief.md` (the frontend-facing brief), this repository's `frontend-handoff.md`, `api-changes.md` and `Figma/frames`. This file stays as the backend session's own record; **when the contract, the environments or the design change, update `docs/frontend-pack/brief.md` too**, then regenerate the pack.
+
 > **Approved by the owner 2026-10-16** (the decisions are recorded in section 8). Written by the backend session so that a fresh Claude
 > session can build the frontend against this backend while the backend keeps changing. It is the *entry point*: it says what
 > the product is, where everything is, and how the two sessions stay in step. It does not repeat
