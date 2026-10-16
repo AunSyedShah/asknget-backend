@@ -1,40 +1,38 @@
-# Kickoff prompt for the frontend session
+# Starting the frontend session (fully separated from the backend)
 
-> Paste the block below as the first message of the new session, started in the **new, empty frontend folder** (its own git repository).
-> Before pasting: give that session read access to the backend repository folder (the one this file is in); the prompt refers to it as `<BACKEND>`,
-> replace that with the real absolute path (on the owner's machine: `D:\aunsyedshah\programming\beandband\asknget`).
-> Do not paste any token or password into it. The frontend session needs none.
+The frontend session gets **no access to this repository**. Everything it needs is generated into its own folder by one command, and that command can be re-run whenever
+the backend or the design changes.
+
+## 1. Generate the pack (once, then again after every backend or design update)
+
+From the backend repository, with the new frontend folder's path (it must be OUTSIDE this repository):
 
 ```
-You are building the frontend for asknget, a multi-vendor marketplace, in this new repository. The backend already exists and is
-worked on by a separate Claude session that you must never ask to change, and whose files you must never edit.
-
-Read these, in this order, before doing anything else (they are in the backend repository at <BACKEND>):
-1. <BACKEND>/docs/frontend-agent-brief.md   (what the product is, environments, what is and is not built, the Figma material, the
-   rules for working in parallel with the backend session, and the owner's decisions)
-2. <BACKEND>/docs/frontend-handoff.md        (the API contract: headers, auth, errors, lists, money; sections 3 to 5b)
-3. <BACKEND>/docs/api-changes.md             (what changed in the API recently)
-4. <BACKEND>/Figma/frames/INDEX.md           (the 89 design screens as pictures, split into customer/, seller/ and admin/)
-
-Decisions already made by the owner (do not reopen them): Next.js (App Router) + TypeScript + Tailwind; a typed API client generated from
-the OpenAPI document at https://asknget-backend-git-develop-aun-syed-shahs-projects.vercel.app/api/v1/openapi.json (read the brief's section 0 about its pitfalls first: paths already start with /api/v1, so the client's base URL is the origin only); TanStack Query; Playwright for screenshots. Build order: storefront first, then
-seller portal, then admin portal. Responsive defaults are in the handoff, section 1 (360 / 768 / 1024 / 1280 px). The definition of done is
-a screenshot of each screen at those four widths next to its Figma picture.
-
-A copy of the design material is already in this repository under ./design: ./design/frames/ (the 89 pictures, split into customer/, seller/ and admin/, with INDEX.md and manifest.json),
-./design/outlines/ (the text outline of each screen: exact copy, labels, component states; 82 of the 91 screens have one, the newest do not) and ./design/Icons.png. Use that copy for the pictures and
-outlines wherever the list above says <BACKEND>/Figma/frames or <BACKEND>/docs/figma/screens. Everything else (the three docs) is read from <BACKEND> so that it is always current.
-
-Rules:
-- Build against the Preview environment only (the URL is in the brief), never Production. Do not call the API straight from the browser
-  until the brief says CORS is set: proxy through a Next.js rewrite instead (brief, section 7).
-- The pictures in Figma/frames are the design. Read the text outline in <BACKEND>/docs/figma/screens for the exact copy and labels of a
-  screen. Treat the design as a hypothesis: where it contradicts the API or itself, write it in DESIGN_NOTES.md and ask; do not guess.
-- When you need something from the backend (a missing field, a wrong shape, a bug), write it in BACKEND_ASKS.md in this repo: the request you
-  sent, the response you got, what you expected. Do not work around backend bugs silently.
-- Never print, store or commit credentials. There is no Figma token for you; you do not call Figma.
-- Start of every session: re-read api-changes.md and regenerate the API types from openapi.json.
-
-First task, before writing UI: confirm you have read the four files, scaffold the project, generate the API client, and prove the
-loop by showing GET /regions, GET /categories and GET /products working through the proxy. Then ask me which storefront screen to build first.
+backend\.venv\Scripts\python docs\make_frontend_pack.py "<path of the new frontend folder>"
 ```
+
+It writes only inside that folder:
+
+| Written | What | On a re-run |
+|---|---|---|
+| `CLAUDE.md` | the standing instructions the session reads automatically | **kept** if it exists (never overwritten) |
+| `docs/backend/README.md`, `api-contract.md`, `api-changes.md`, `PACK_VERSION.txt` | the project brief, the API contract, the log of backend changes | replaced |
+| `design/frames/` (89 pictures: `customer/`, `seller/`, `admin/`, `INDEX.md`, `manifest.json`), `design/outlines/` (82 text outlines), `design/Icons.png` | the design | replaced |
+
+Everything the frontend session creates itself (code, `BACKEND_ASKS.md`, `DESIGN_NOTES.md`, `api/openapi.snapshot.json`) is left alone. The tool scans every generated document for secrets first
+and stops if it finds one. There is nothing secret in the pack: no token, no password, no `.env`. The `design/frames` folder is 38 MB; add it to the frontend's `.gitignore` if you do not want it in git.
+
+## 2. First message to paste into the new session
+
+```
+Read CLAUDE.md, then docs/backend/README.md, docs/backend/api-contract.md and docs/backend/api-changes.md, in that order.
+Then do the first task in section 9 of the brief: scaffold the project, set up the API proxy, generate the API client, and show me
+GET /regions, GET /categories and GET /products working through the proxy. After that, ask me which storefront screen to build first.
+```
+
+## 3. Keeping the two sessions in step
+
+- The frontend session writes what it needs from the backend into `BACKEND_ASKS.md`; you bring it to the backend session.
+- When the backend session says it changed the contract, or the Figma export was updated and catalogued, re-run the command in section 1. The frontend session starts every session by diffing the live OpenAPI document
+  against its own snapshot, so it notices changes even if you forget.
+- The frontend session never needs to see this repository, and this repository never needs to see that one.
