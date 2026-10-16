@@ -80,7 +80,7 @@ The Figma file has **desktop frames only** (1920 px wide). Until the designer de
   all fail. Build the upload UI, but expect an error there and note it in `BACKEND_ASKS.md`.
 - **Never** put credentials, tokens or `.env` contents in code, logs, commits or chat.
 
-**Do not call the backend straight from the browser.** CORS is not set for any origin, and with the proxy below it never needs to be. In `next.config.mjs` add a `rewrites()` entry (check the bundled Next docs for its current form) that forwards
+**Prefer not to call the backend straight from the browser.** Preview does allow the exact origins `http://localhost:3000` and `http://127.0.0.1:3000` (nothing else, and Production allows none), so a quick direct call from those two works: no `credentials: 'include'`, and only the headers `Authorization`, `Content-Type`, `Accept-Language`, `X-Region`, `X-Language`, `X-Timezone`, `X-Cart-Token`, `X-Store`. But a deployed frontend, another port, or Production would all be refused, and with the proxy below none of that matters. In `next.config.mjs` add a `rewrites()` entry (check the bundled Next docs for its current form) that forwards
 `/api/v1/:path*` to `${API_ORIGIN}/api/v1/:path*` and have the app call its own origin. Consequences: the backend sees the backend's host, so the market is **not** inferred from a `za.` or `pk.`
 subdomain: **always send `X-Region`**, and forward `X-Language`, `X-Timezone`, `X-Store`, `X-Cart-Token` and `Authorization`. Do not use `credentials: 'include'`.
 

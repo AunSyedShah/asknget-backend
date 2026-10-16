@@ -318,6 +318,7 @@ CORS_ALLOW_HEADERS = (
     'x-requested-with', 'x-csrftoken',
     'x-cart-token',   # guest carts (orders.services.CART_TOKEN_HEADER)
     'x-region', 'x-language', 'x-timezone',  # markets.middleware
+    'x-store',        # seller calls when a person belongs to several stores (portal.auth.StoreAuth)
 )
 # ...and these response headers must be exposed, or JS cannot read them cross-origin.
 CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')

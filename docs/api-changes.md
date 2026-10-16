@@ -13,7 +13,8 @@
   - Every operation has a `default` response typed `ErrorResponse` (`{detail, errors?}`). `info.description` says the base URL is the origin only (paths already start with `/api/v1`).
   - Regenerate your client after Preview has it; if you wired `X-Cart-Token` by hand, you can drop that.
 - **Preview and Production are separate environments.** Preview (`develop`) reads the staging database with demo data; Production (`main`) is empty. Build against Preview only. Swagger is public on both.
-- **CORS is not set for any browser origin yet.** The frontend's `http://localhost:<port>` is added once the owner confirms the port (this file will say when).
+- **CORS on Preview now allows `http://localhost:3000` and `http://127.0.0.1:3000`** (so a browser page there can call Preview directly; exact origins, so another port such as 5173 is still refused). **Production allows no browser origin** and never will for localhost: develop against Preview. Browser calls must not use credentials (`credentials: 'include'`); the allowed request headers are `Authorization`, `Content-Type`, `Accept-Language`, `X-Region`, `X-Language`, `X-Timezone`, `X-Cart-Token` and (after the next push) `X-Store`; `X-Region` and `Content-Language` are readable on responses. Another port or a deployed frontend: ask the owner, who has the backend session add the origin. The proxy approach in the brief needs none of this and also works on deployed sites.
+- **A bug fixed in the CORS settings:** `X-Store` (seller calls for a person with several stores) was missing from the allowed request headers, so a browser call carrying it was blocked at the preflight. Added; test added. **Live on Preview with the next push** (the origin setting above is live now).
 
 ## 2026-10-15
 
