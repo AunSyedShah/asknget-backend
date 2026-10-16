@@ -77,6 +77,14 @@ def resolve_cart(request, *, create: bool = True) -> tuple[Cart, str | None]:
     return _cart_qs().get(pk=cart.pk), token
 
 
+def reload_cart(cart: Cart) -> Cart:
+    """The same cart, read again with fresh lines, for building a response after a change.
+
+    Do NOT call `resolve_cart` again for this: a guest who has no token yet gets a brand-new, empty cart the second time
+    (and an orphan row left behind), so the first add-to-cart answered with an empty cart."""
+    return _cart_qs().get(pk=cart.pk)
+
+
 def cart_country_id(cart: Cart) -> str | None:
     """A cart belongs to the market of its first line (lines are already prefetched).
     An empty cart belongs to no market yet — the first item decides."""

@@ -7,6 +7,7 @@
 
 ## 2026-10-16
 
+- **Fixed: a brand-new guest's first `POST /cart/items` (and every other cart-changing call) answered with an EMPTY cart.** The item was saved, but the response was built from a second, empty cart (and left an orphan cart row behind). Every cart call now answers with the cart it changed, so `cart_token` and `items` in the first response are right. If you worked around it by calling `GET /cart` again after the first add, you can stop. **Not live on Preview until the next push.**
 - **The OpenAPI document now declares the shared request headers and the error body** (additive, documentation only; nothing changes at runtime). **Live on Preview since 2026-10-16** (verified: 234 operations, headers declared, `ErrorResponse` present).
   - `X-Region`, `X-Language`, `X-Timezone` on every operation; `X-Store` on `/seller/*`; `X-Cart-Token` on `/cart*` and `/checkout*`. All optional; defined once under `components.parameters`.
   - **A bug fixed in the document:** the cart token was declared as `x_cart_token` (underscores), which a generated client would send literally and servers and proxies drop. It is `X-Cart-Token` now; the server always accepted that.
@@ -42,5 +43,4 @@
 
 ## Known issues (backend session will fix; do not work around silently)
 
-- The first `POST /cart/items` from a brand-new guest answers with an **empty cart**, although the item is saved; read `GET /cart` with the returned `cart_token` and the item is there.
 - **Uploads fail on Vercel** (read-only disk; no object storage yet): avatar, product images, review and return photos, KYC documents, the category-request image.

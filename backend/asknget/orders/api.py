@@ -66,49 +66,49 @@ def cart_get(request, x_cart_token: str | None = Header(None, description=_TOKEN
 def cart_add_item(request, payload: CartItemIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.add_item(cart, variant_id=payload.variant_id, qty=payload.qty)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.patch("/items/{item_id}", response=_CART, summary="Change quantity")
 def cart_set_qty(request, item_id: UUID, payload: CartItemPatchIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.set_item_qty(cart, item_id, payload.qty)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/items/{item_id}", response=_CART, summary="Remove line")
 def cart_remove_item(request, item_id: UUID, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.remove_item(cart, item_id)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/items", response=_CART, summary="Empty the cart ('clear cart and switch region')")
 def cart_clear(request, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.clear_items(cart)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.patch("", response=_CART, summary="Order note / delivery type")
 def cart_update(request, payload: CartPatchIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.update_cart(cart, payload.dict(exclude_unset=True))
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.post("/voucher", response=_CART, summary="'Discount Voucher → Apply'")
 def cart_apply_voucher(request, payload: VoucherApplyIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.apply_voucher(cart, payload.code)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/voucher", response=_CART)
 def cart_remove_voucher(request, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.remove_voucher(cart)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 # --------------------------------------------------------------------------- #
@@ -121,7 +121,7 @@ def cart_remove_voucher(request, x_cart_token: str | None = Header(None, descrip
 def cart_set_delivery(request, payload: DeliveryChoiceIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.set_cart_delivery(cart, store_id=payload.store_id, option_id=payload.option_id)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @checkout_router.post(
@@ -168,7 +168,7 @@ def my_order_reorder(request, order_id: UUID):
     order = services.get_my_order(request.auth, order_id)
     cart, _ = services.resolve_cart(request)
     skipped = services.reorder(order, cart)
-    body = services.cart_out(services.resolve_cart(request)[0])
+    body = services.cart_out(services.reload_cart(cart))
     body["problems"] = [f"{n} is no longer available" for n in skipped] + body["problems"]
     return body
 

@@ -84,7 +84,7 @@ a seller cannot create categories, they request them; an order keeps a snapshot 
 - **Admin portal API gaps**: dashboard KPIs, category management (add, edit, deactivate, reorder), customers, transactions overview, applications screens beyond seller-application review, account information, recent activity.
 - **Customer order screens of 2026-10-14**: backend work is planned (`sprint-8-plan.md` section 2): cancel reasons list, card brand and last four digits on an order, estimated delivery date, tracking fields. Until then build the screens from the data that exists.
 
-**Known backend bugs** (the backend session will fix; do not code around them without telling the owner): the first `POST /cart/items` from a brand-new guest returns an empty cart in its response (the item *is* saved; read the cart again with the returned `cart_token`).
+**Known backend bugs:** none at the moment (the guest-cart bug, where the first add-to-cart answered with an empty cart, was fixed 2026-10-16; see `api-changes.md`).
 
 ## 5. Reading the Figma design (a fresh session has no memory of this)
 

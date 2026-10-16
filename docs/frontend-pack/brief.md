@@ -95,7 +95,7 @@ subdomain: **always send `X-Region`**, and forward `X-Language`, `X-Timezone`, `
 - **Admin portal API gaps**: dashboard KPIs, category management (add, edit, deactivate, reorder), customers, transactions overview, application screens beyond seller-application review, account information, recent activity.
 - **Customer order screens of 2026-10-14** (View Details, Order Cancel, Return Order, Track order): backend work is planned (a cancel-reasons list, card brand and last four digits on an order, an estimated delivery date, tracking fields). Build the screens from the data that exists today.
 
-**Known backend bugs** (the backend session will fix them; tell the owner if you hit one, do not hide it): the first `POST /cart/items` from a brand-new guest returns an empty cart in its response (the item *is* saved; read `GET /cart` again with the returned `cart_token`).
+**Known backend bugs:** none at the moment (the guest-cart bug, where the first add-to-cart answered with an empty cart, was fixed 2026-10-16; see `api-changes.md`).
 
 ## 5. The design
 
