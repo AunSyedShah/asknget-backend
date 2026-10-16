@@ -5,8 +5,9 @@ Each app exposes Router(s) in `<app>/api.py`; mount them here so Swagger
 """
 
 from django.http import Http404
-from ninja import NinjaAPI
 from ninja.errors import ValidationError
+
+from core.openapi import DocumentedAPI
 
 from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
@@ -37,10 +38,17 @@ from returns.api import admin_returns_router, my_returns_router, returns_public_
 from sellers.files import files_router
 from team.api import accept_router, me_router as seller_me_router, team_router
 
-api = NinjaAPI(
+api = DocumentedAPI(
     title="asknget API",
     version="1.0.0",
-    description="Multi-vendor marketplace: buyer storefront + seller onboarding.",
+    description=(
+        "Multi-vendor marketplace: buyer storefront, seller portal, admin.\n\n"
+        "**Base URL: every path in this document already starts with `/api/v1`, so a client's base URL is the origin only** "
+        "(for example `https://asknget-backend.vercel.app`), never `.../api/v1`.\n\n"
+        "Auth is `Authorization: Bearer <access_token>`. Money is integer minor units (`*_cents`). Lists return `{items, total, page, per_page, pages}`. "
+        "Every error is `{\"detail\": \"...\"}` (422 adds `errors[]`). `X-Region`, `X-Language`, `X-Timezone` (all calls), `X-Store` (seller calls) and "
+        "`X-Cart-Token` (cart and checkout) are declared on the operations that use them."
+    ),
     urls_namespace="api_v1",
 )
 

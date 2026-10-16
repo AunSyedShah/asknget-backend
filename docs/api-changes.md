@@ -7,6 +7,11 @@
 
 ## 2026-10-16
 
+- **The OpenAPI document now declares the shared request headers and the error body** (additive, documentation only; nothing changes at runtime). **Not on Preview until the next push.**
+  - `X-Region`, `X-Language`, `X-Timezone` on every operation; `X-Store` on `/seller/*`; `X-Cart-Token` on `/cart*` and `/checkout*`. All optional; defined once under `components.parameters`.
+  - **A bug fixed in the document:** the cart token was declared as `x_cart_token` (underscores), which a generated client would send literally and servers and proxies drop. It is `X-Cart-Token` now; the server always accepted that.
+  - Every operation has a `default` response typed `ErrorResponse` (`{detail, errors?}`). `info.description` says the base URL is the origin only (paths already start with `/api/v1`).
+  - Regenerate your client after Preview has it; if you wired `X-Cart-Token` by hand, you can drop that.
 - **Preview and Production are separate environments.** Preview (`develop`) reads the staging database with demo data; Production (`main`) is empty. Build against Preview only. Swagger is public on both.
 - **CORS is not set for any browser origin yet.** The frontend's `http://localhost:<port>` is added once the owner confirms the port (this file will say when).
 
