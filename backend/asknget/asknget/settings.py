@@ -75,6 +75,15 @@ if TESTING:
 ZEAL_ENABLED = TESTING or os.environ.get('ZEAL') == '1'
 ZEAL_RAISE = True
 
+# Redis (optional): the shared cache and the WebSocket channel layer (the live bell, notifications/realtime.py).
+# Without it the cache is per process and, outside development and tests, nothing is pushed live (Vercel: clients poll).
+REDIS_URL = os.environ.get('REDIS_URL', '').strip()
+if REDIS_URL:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}}
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer', 'CONFIG': {'hosts': [REDIS_URL]}}}
+elif DEBUG or TESTING:
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}    # one process only
+
 # Auth / OTP knobs (asknget.core.auth, accounts.services)
 JWT_ACCESS_TTL_MINUTES = int(os.environ.get('JWT_ACCESS_TTL_MINUTES', 15))
 JWT_REFRESH_TTL_DAYS = int(os.environ.get('JWT_REFRESH_TTL_DAYS', 30))

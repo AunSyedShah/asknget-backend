@@ -7,6 +7,32 @@
 
 ## 2026-10-17
 
+- **The live bell over WebSocket** (sprint 9, phase 3, additive). **Not on Preview, and it cannot be there:** Vercel does not
+  keep WebSocket connections open. It works locally (`docker compose up`: services `realtime` + `redis`) and on the planned
+  AWS deployment. On Preview, poll `/summary`; build both paths now.
+  - `POST /realtime/ticket` (signed in) → `{ticket, expires_in: 30, url: "/ws/notifications"}`; open
+    `wss://<API host>/ws/notifications?ticket=<ticket>`. One ticket, one connection, 30 seconds. Close code `4401` = get a new
+    ticket and reconnect. Never put the access token in the URL.
+  - Messages: `{"type": "hello"}`, then `{"type": "notification.created", id, audience, category, kind, title, body, link, unread}`
+    and `{"type": "notification.read", audience, unread}` (another tab marked things read). Send `{"type": "ping"}` → `pong`.
+  - `audience` (`customer` | `seller` | `staff`) says which bell to update. On connect and reconnect, call `/summary` to catch up;
+    the socket is a hint, the API is the record.
+
+- **Notifications for customers and staff, and e-mail for every audience** (sprint 9, phase 2, additive). **Not on Preview
+  yet**: committed on `develop`, live with the next push; this note is then removed.
+  - **New: the customer's bell.** `GET /me/notifications?tab=orders|returns|all` (paged), `GET /me/notifications/summary`
+    (`{unread, tabs}`), `POST /me/notifications/read-all?tab=`, `POST /me/notifications/{id}/read` (204). Same item shape as the
+    seller's (`id, category, kind, title, body, link_type, link_id, created_at, group, is_read`); `link_type` is `order` or
+    `return`. Customers are told when an order is placed, paid, cancelled, shipped, out for delivery or delivered (a multi-store
+    order: per store), and at each step of a return and its refund.
+  - **New: the staff bell.** `GET /admin/notifications` (+ `/summary`, `/read-all`, `/{id}/read`): what the staff member's
+    permissions and markets let them see (returns requested and disputed, cancelled orders; high-value orders when an admin
+    switches that on). Any staff account may read its own bell.
+  - Sellers' existing bell is unchanged. **New for sellers:** the owner and members who may see the section now also get an
+    e-mail for a new paid order, cancellations and returns.
+  - Real-time push of these comes in phase 3; until then poll `/summary` (every 30-60 s is plenty).
+
+
 - **Staff roles and permissions on every `/admin/*` endpoint** (sprint 9, phase 1). **Not on Preview yet**: committed on `develop`,
   live with the next push; this note is then removed.
   - Each `/admin/*` operation now needs a permission from the staff catalogue (e.g. `orders.view`, `sellers.review`,

@@ -184,7 +184,8 @@ class CheckoutTests(OrdersTestCase):
         self.cart_with(self.token, variant=self.buds_variant)
         self.post(f"{CART}/voucher", {"code": "SAVE20"}, self.token)
         self.patch(CART, {"order_note": "Ring twice"}, self.token)
-        res = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token)
+        with self.captureOnCommitCallbacks(execute=True):                # the confirmation e-mail goes once the order is saved
+            res = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token)
         self.assertEqual(res.status_code, 201, res.content)
         body = res.json()
         self.assertIn("Thank You, John Ali", body["detail"])

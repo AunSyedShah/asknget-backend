@@ -76,6 +76,12 @@ asknget is a **multi-vendor marketplace**: a buyer storefront (catalog → cart 
 `markets` M2M `markets_country` (empty = every market). Starter roles (Administrator, KYC reviewer, Catalogue, Support, Finance) come
 from migration `staff 0002`. See `docs/sprint-9-plan.md`.
 
+**Notifications (sprint 9):** `notifications_event` (name, actor, market, subject type + id, payload): every notification's
+source, and the activity log. `notifications_notification` (was `storenotification`): `audience` customer | seller | staff, with
+`user` / `store` / `market` + `permission`. `notifications_notificationrule` (event x audience x market: channels, opt-out,
+staff permission, min amount) with `notifications_rulechange` (audit). `notifications_notificationpreference` (user x category x
+channel). `notifications_delivery` (the e-mail outbox: unique key, status, attempts, next attempt, last error).
+
 ### `otp_verifications`
 | field | type | notes |
 |---|---|---|

@@ -21,7 +21,7 @@ from core.testing import ApiTestCase, make_category, make_country, make_product,
 from ledger import services as ledger
 from ledger.models import LedgerEntry
 from markets.models import Country, ReturnPolicy
-from notifications.models import NotificationTemplate, StoreNotification
+from notifications.models import NotificationTemplate, Notification as StoreNotification
 from orders.models import Order, OrderDelivery, OrderItem, OrderStatusEvent, Voucher
 from team.models import StoreMember
 
@@ -886,9 +886,9 @@ class AccessTests(ReturnsTestCase):
         self.assertEqual(feed[0]["title"], "Return Requested")
         self.assertIn("Olivia Martin", feed[0]["body"])
         NotificationTemplate.objects.filter(kind="return_requested").update(is_active=False)
-        before = StoreNotification.objects.count()
+        before = StoreNotification.objects.filter(audience="seller").count()
         self.request(order, [self.item(order, self.lip)])
-        self.assertEqual(StoreNotification.objects.count(), before)
+        self.assertEqual(StoreNotification.objects.filter(audience="seller").count(), before)
 
 
 # ======================================================================================

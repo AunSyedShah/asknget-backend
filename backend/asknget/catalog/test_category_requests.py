@@ -8,7 +8,7 @@ from PIL import Image
 
 from catalog.models import Category, CategoryRequest
 from core.testing import ApiTestCase, make_category, make_store, make_user, make_staff
-from notifications.models import StoreNotification
+from notifications.models import Notification as StoreNotification
 
 SELLER = "/api/v1/seller/category-requests"
 ADMIN = "/api/v1/admin/category-requests"

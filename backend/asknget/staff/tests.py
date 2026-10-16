@@ -13,7 +13,10 @@ from core.testing import ApiTestCase, make_category, make_country, make_product,
 
 from .permissions import CATALOGUE
 
-NO_PERMISSION_NEEDED = {"/api/v1/admin/me"}       # says what the caller may do; any staff member may ask
+NO_PERMISSION_NEEDED = {          # any staff member: what they may do, and their own bell (filtered by their permissions)
+    "/api/v1/admin/me", "/api/v1/admin/notifications", "/api/v1/admin/notifications/summary",
+    "/api/v1/admin/notifications/read-all", "/api/v1/admin/notifications/{notification_id}/read",
+}
 
 
 def admin_operations():

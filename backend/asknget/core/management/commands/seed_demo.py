@@ -261,7 +261,7 @@ class Command(BaseCommand):
         from ledger import services as ledger
         from ledger.models import LedgerEntry, Payout
         from notifications import services as notifications
-        from notifications.models import StoreNotification
+        from notifications.models import Notification as StoreNotification
         from team.models import StoreMember, TeamRole
 
         now = timezone.now()

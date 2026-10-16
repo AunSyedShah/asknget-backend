@@ -8,7 +8,6 @@ and the PSP hook will move it to `confirmed` / `paid` later.
 import secrets
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F, Prefetch, Sum
 from django.utils import timezone
@@ -566,11 +565,9 @@ def checkout(request, cart: Cart, payload) -> Order:
     cart.order_note = ""
     cart.save()
 
-    send_mail(
-        f"asknget order {order.order_number} received",
-        f"Thank you, {order.contact_first_name} {order.contact_last_name}. Your order {order.order_number} has been placed.",
-        None, [order.contact_email], fail_silently=True,
-    )
+    from notifications import bus
+
+    bus.emit("order.placed", order, actor=user)               # the confirmation e-mail goes after this commits
     return order
 
 
@@ -617,7 +614,7 @@ def cancel(order: Order, *, user, reason: str) -> Order:
     order.items.update(status=Fulfilment.CANCELLED)
     _record_event(order, Status.CANCELLED, actor="buyer", actor_user=user, note=reason or "Cancelled by customer")
     on_order_money_returned(order)
-    on_order_cancelled(order, by="customer")
+    on_order_cancelled(order, by="customer", actor=user)
     return order
 
 
@@ -655,17 +652,28 @@ def track(*, order_number: str, email: str) -> Order:
 
 def on_payment_confirmed(order: Order) -> None:
     from ledger import services as ledger
-    from notifications import services as notifications
+    from notifications import bus
 
     ledger.post_sales(order)
-    notifications.order_paid(order)
+    bus.emit("order.paid", order)
 
 
-def on_order_cancelled(order: Order, *, by: str) -> None:
-    """Tell the sellers who had already seen this order that it is gone."""
-    from notifications import services as notifications
+def on_order_cancelled(order: Order, *, by: str, store=None, actor=None) -> None:
+    """Tell the customer, and the sellers who had already seen this order, that it (or one store's part) is gone."""
+    from notifications import bus
 
-    notifications.order_cancelled(order, by=by)
+    bus.emit("order.cancelled", order, actor=actor, by=by, store=store)
+
+
+# What the customer is told when the order (or one store's part of it) moves on.
+PROGRESS_EVENTS = {"shipped": "order.shipped", "out_for_delivery": "order.out_for_delivery", "delivered": "order.delivered"}
+
+
+def on_order_progress(order: Order, status: str, *, store=None, actor=None) -> None:
+    if status in PROGRESS_EVENTS:
+        from notifications import bus
+
+        bus.emit(PROGRESS_EVENTS[status], order, actor=actor, store=store)
 
 
 def on_goods_delivered(order: Order, store_id=None) -> None:
@@ -765,12 +773,13 @@ def set_status(order: Order, *, status: str, actor_user, note: str = "", locatio
     _record_event(order, status, actor="admin", actor_user=actor_user, note=note, location=location)
     if just_paid:
         on_payment_confirmed(order)
+    on_order_progress(order, status, actor=actor_user)
     if status == Status.DELIVERED:
         on_goods_delivered(order)
     elif status in (Status.CANCELLED, Status.RETURNED, Status.REFUNDED):
         on_order_money_returned(order)
         if status == Status.CANCELLED:
-            on_order_cancelled(order, by="staff")
+            on_order_cancelled(order, by="staff", actor=actor_user)
     return order
 
 
@@ -823,8 +832,11 @@ def set_store_status(order: Order, store, *, status: str, actor_user, note: str 
         actor=OrderStatusEvent.OrderEventActor.SELLER, actor_user=actor_user,
     )
     derive_order_status(order)
+    on_order_progress(order, status, store=store, actor=actor_user)
     if status == Fulfilment.DELIVERED:
         on_goods_delivered(order, store.pk)
     elif status in (Fulfilment.CANCELLED, Fulfilment.RETURNED):
         on_order_money_returned(order, store.pk)
+        if status == Fulfilment.CANCELLED:
+            on_order_cancelled(order, by="seller", store=store, actor=actor_user)
     return order
