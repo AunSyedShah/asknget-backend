@@ -1,0 +1,107 @@
+[Application Details]
+  [Top Header]
+    [Bread Crums]
+      T: Applications
+      T: Dashboard  / Applications / TechHub Store
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: TechHub Store
+      T: Seller ID: SLR-2026-001285
+        T: Registered Company
+        T: Joined 12 Jan 2026
+      [Status]
+        T: Pending
+    [I:Button | State=Default]
+      T: Reject Application
+    [I:Button | State=Default]
+      T: Approve Application
+    [Tabs]
+        T: Business Information
+        T: Product Categories
+        T: Documents
+        T: Activity
+          T: Overview
+    [Contact Information]
+                T: Contact Person
+              T: Ahmed Khan
+                T: Email
+              T: support@techhubstore.com
+                T: Phone
+              T: +92 300 4567890
+                T: Business Address
+              T: Office 14, Main Boulevard, Gulberg III, Lahore
+        T: Contact Information
+    [Account Information]
+                T: Application ID
+              T: SLR-2026-001285
+                T: Account Status
+              T: Pending
+                T: Verification
+              T: Not Verified
+                T: Submitted On
+              T: 12 Sep 2026
+                T: Business Name
+              T: TechHub Store
+                T: Business Type
+              T: Registered Company
+                T: Registration Number
+              T: 30 Sep 2026, 11:42 AM
+                T: Tax ID
+              T: TAX-784521
+        T: Application Information
+    [Recent Activity]
+          T: Document
+          T: Status
+          T: Action
+          T: Business Registration Certificate
+          T: Submitted
+          T: View Document
+          T: Identity Document
+          T: Submitted
+          T: View Document
+          T: Tax Registration Document
+          T: Needs Review
+          T: View Document
+      T: Submitted Documents
+    [Recent Activity]
+            T: No Notes added yet
+            T: + Add Note
+          T: Admin Review Notes
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications Active]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

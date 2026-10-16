@@ -1,0 +1,169 @@
+[Applications]
+  [Top Header]
+    [Bread Crums]
+      T: Applications
+      T: Dashboard  / Applications
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Applications
+      T: Review and manage sellers applications, product submissions, and other requests.
+    [KPI - 1]
+          T: All submissions
+              T: 486
+              T: All Applications
+    [KPI - 5]
+          T: Accepted
+              T: 428
+              T: Approved Applications
+    [KPI - 7]
+          T: Need action
+              T: 18
+              T: Pending Applications
+    [KPI - 8]
+          T: Not approved
+              T: 40
+              T: Rejected Applications
+    [I:Button | State=Default]
+      T: Export Application
+    [Customers]
+        [Filters]
+            [Search Bar]
+                T: Search by application ID or seller email
+              [Brand]
+                  T: Customer Type
+              [Brand]
+                  T: Business Type
+              [Brand]
+                  T: Store Name
+              [Brand]
+                  T: Status
+              [Brand]
+                  T: Filters
+            T: Application List
+              [Row 1]
+                  T: olivia.martin@gmail.com
+                  T: TechHub Store
+                  T: +27 71 456 8921
+                  T: APP-2026-001265
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Registered Company
+                  T: Approved
+                    T: Olivia Martin
+                      T: Urban Finds
+                      T: SLR-2026-001284
+              [Row 2]
+                  T: james.wilson@gmail.com
+                  T: Urban Finds
+                  T: +27 71 456 8921
+                  T: APP-2026-001264
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Registered Company
+                  T: Approved
+                    T: James Wilson
+                      T: Urban Finds
+                      T: SLR-2026-001284
+              [Row 3]
+                  T: emma.roberts@gmail.com
+                  T: Beauty Lane
+                  T: +27 71 456 8921
+                  T: APP-2026-001263
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Sole Proprietor
+                  T: Pending
+                    T: Emma Roberts
+                      T: Urban Finds
+                      T: SLR-2026-001284
+              [Row 4]
+                  T: daniel.smith@gmail.com
+                  T: Home Living Co.
+                  T: +27 71 456 8921
+                  T: APP-2026-001262
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Sole Proprietor
+                  T: Approved
+                    T: Daniel Smith
+                      T: Urban Finds
+                      T: SLR-2026-001284
+              [Row 5]
+                  T: sophia.lee@gmail.com
+                  T: Sports Hub
+                  T: +27 71 456 8921
+                  T: APP-2026-001261
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Registered Company
+                  T: Pending
+                    T: Sophia Lee
+                      T: Urban Finds
+                      T: SLR-2026-001284
+              [Row 6]
+                  T: noah.williams@gmail.com
+                  T: Huda Beauty
+                  T: +27 71 456 8921
+                  T: APP-2026-001260
+                  T: Sep 20, 2026
+                  T: Sep 14, 2026
+                  T: Partnership
+                  T: Rejected
+                    T: Noah Williams
+                      T: Urban Finds
+                      T: SLR-2026-001284
+    [Pagination]
+      T: Showing 6 of 486 applications
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications Active]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

@@ -57,7 +57,7 @@
                   T: 24
                   T: Sep 14, 2026
                   T: R 48,620
-                  T: Approved
+                  T: Successful
                     T: Olivia Martin
               [Row 2]
                   T: CUS-2026-008422
@@ -66,7 +66,7 @@
                   T: 18
                   T: Sep 14, 2026
                   T: R 36,840
-                  T: Approved
+                  T: Successful
                     T: James Wilson
               [Row 3]
                   T: CUS-2026-008423
@@ -75,7 +75,7 @@
                   T: 12
                   T: Sep 14, 2026
                   T: R 18,420
-                  T: Approved
+                  T: Successful
                     T: Emma Roberts
               [Row 4]
                   T: CUS-2026-008424
@@ -84,7 +84,7 @@
                   T: 9
                   T: Sep 14, 2026
                   T: R 14,280
-                  T: Approved
+                  T: Pending
                     T: Daniel Smith
               [Row 5]
                   T: CUS-2026-008425
@@ -93,7 +93,7 @@
                   T: 31
                   T: Sep 14, 2026
                   T: R 62,480
-                  T: Approved
+                  T: Failed
                     T: Sophia Lee
               [Row 6]
                   T: CUS-2026-008426
@@ -102,7 +102,7 @@
                   T: 6
                   T: Sep 14, 2026
                   T: R  8,640
-                  T: Approved
+                  T: Successful
                     T: Noah Williams
     [Pagination]
       T: Showing 6 of 28,460 customers

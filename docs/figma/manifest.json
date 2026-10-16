@@ -1,8 +1,8 @@
 {
   "file_key": "dAGMv3hUJXkyW4QmJPw20Q",
   "page": "Web UI Design",
-  "version": "2409463274772617281",
-  "lastModified": "2026-10-12T13:16:38Z",
+  "version": "2410923752668607424",
+  "lastModified": "2026-10-16T11:59:21Z",
   "fetched_via": "files",
   "screens": [
     {
@@ -108,6 +108,12 @@
       "lines": 45
     },
     {
+      "name": "Order Cancel ",
+      "node_id": "1221:18153",
+      "file": "Order_Cancel__1221-18153.txt",
+      "lines": 56
+    },
+    {
       "name": "View Details",
       "node_id": "1201:14380",
       "file": "View_Details__1201-14380.txt",
@@ -117,7 +123,19 @@
       "name": "My Account - Completed Orders",
       "node_id": "284:7773",
       "file": "My_Account_Completed_Orders__284-7773.txt",
-      "lines": 37
+      "lines": 41
+    },
+    {
+      "name": "Leave Review",
+      "node_id": "1246:19417",
+      "file": "Leave_Review__1246-19417.txt",
+      "lines": 59
+    },
+    {
+      "name": "Return Order",
+      "node_id": "1223:18810",
+      "file": "Return_Order__1223-18810.txt",
+      "lines": 70
     },
     {
       "name": "My Account - Cancelled Orders",
@@ -450,10 +468,46 @@
       "lines": 157
     },
     {
+      "name": "Applications",
+      "node_id": "1249:19951",
+      "file": "Applications__1249-19951.txt",
+      "lines": 169
+    },
+    {
+      "name": "Returns & Refunds",
+      "node_id": "1258:20684",
+      "file": "Returns_Refunds__1258-20684.txt",
+      "lines": 169
+    },
+    {
       "name": "Seller Details",
       "node_id": "1166:14620",
       "file": "Seller_Details__1166-14620.txt",
       "lines": 136
+    },
+    {
+      "name": "Application Details",
+      "node_id": "1258:21105",
+      "file": "Application_Details__1258-21105.txt",
+      "lines": 107
+    },
+    {
+      "name": "Return Details",
+      "node_id": "1271:12266",
+      "file": "Return_Details__1271-12266.txt",
+      "lines": 119
+    },
+    {
+      "name": "Reviews",
+      "node_id": "1302:12389",
+      "file": "Reviews__1302-12389.txt",
+      "lines": 151
+    },
+    {
+      "name": "Review Detail",
+      "node_id": "1307:13158",
+      "file": "Review_Detail__1307-13158.txt",
+      "lines": 151
     },
     {
       "name": "Customer Detail",

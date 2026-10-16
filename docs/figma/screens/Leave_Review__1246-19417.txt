@@ -1,0 +1,59 @@
+[Leave Review]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Active]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+        T: Completed
+        T: Order #ORD-00120
+          T: Apple Watch
+          T: QTY: 1 |  Color: Orange
+            T: $49.99
+            T: $54.99
+      [I:Button | State=Default]
+        T: Leave Review
+      [I:Button | State=Secondary]
+        T: Return Order
+        T: Completed
+        T: Order #ORD-00120
+          T: Black Earbuds
+          T: QTY: 1 |  Color: Black
+            T: $12.99
+            T: $20.99
+      [I:Button | State=Default]
+        T: Leave Review
+      [I:Button | State=Secondary]
+        T: Return Order
+  [I:Orders Tabs | State=Completed]
+    T: All Orders
+    T: Ongoing
+      T: Completd
+    T: Cancelled
+  [I:Leave Review Popup]
+      [I:Button | State=Default]
+        T: Submit Review
+      [I:Button | State=TErtiory Button]
+        T: Cancel
+      T: NARS BB CREAM
+        T: Order #ORD-00123
+        T: Purchase on Sep 12, 2026
+        T: R 25.99
+        T: Review Title
+          T: Write a title
+        T: Your Review
+          T: Share your experience with this product
+      T: Upload Photos
+              T: PNG,JPG up to 5MB. You can upload up to 3 photos.
+              T: Drag and drop photos here or click  browse
+              T: Browse
+      T: Rate this product

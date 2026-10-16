@@ -1,0 +1,119 @@
+[Return Details]
+  [Top Header]
+    [Bread Crums]
+      T: Returns & Refunds
+      T: Dashboard  / Returns & Refunds / TechHub Store
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Return Details
+      T: Return ID: RET-2026-00421
+        T: Registered Company
+        T: Joined 12 Jan 2026
+      [Status]
+        T: Pending
+    [I:Button | State=Default]
+      T: Reject Return
+    [I:Button | State=Default]
+      T: Approve Return
+    [Tabs]
+        T: Customer
+        T: Product & Order
+        T: Timeline
+        T: Activity
+          T: Overview
+        T: Customer
+        T: Olivia Martin
+        T: Customer ID
+        T: CUS-2026-008421
+        T: Email
+        T: olivia.martin@email.com
+        T: Phone
+        T: +92 300 1234567
+      T: Customer Information
+        T: Order Date
+        T: 26 Sep 2026
+        T: Order Total
+        T: R 2,840
+        T: Requested Refund
+        T: R 2,000
+        T: Status
+        T: Not processed
+      T: Order & Refund Information
+        T: Return Timeline
+              T: Return requested
+              T: Customer Olivia Martin submitted a defective-product claim.
+              T: 28 Sep 2026  -  12:30 PM
+              T: Under Review
+              T: Admin reviewing request and evidence.
+              T: 28 Sep 2026  -  02:30 PM
+              T: Return Approved
+              T: Admin approved return for refund R 2,000
+              T: 29 Sep 2026  -  10:00 AM
+              T: Product Received
+              T: Warehouse received item
+              T: 01 Oct 2026  -  11:30 PM
+              T: Quality Check Passed
+              T: Defect confirmed eligible for refund.
+              T: 01 Oct 2026  - 03:00 PM
+            T: Return ID
+            T: RET-2026-00421
+            T: Order ID
+            T: #ORD-28502
+            T: Request Date
+            T: 28 Sep 2026, 04:12 PM
+            T: Payment Method
+            T: Credit / Debit Card
+            T: Status
+            T: Pending
+            T: SKU: WH-2048
+            T: Seller: TechHub Store
+            T: Refund requested: R 2,000
+            T: Wireless Headphones
+            T: Return Reason
+            T: Customer reports that the headphones stopped working after three days of use.
+            T: Defective Product
+        T: Return Request
+          T: Customer Comments
+          T: Evidence Attachments
+                T: Product Photo 1
+                T: Product Photo 2
+          T: Customer reports that the headphones stopped working after three days of use.
+      T: Return Request
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns Active]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout
