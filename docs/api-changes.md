@@ -7,7 +7,7 @@
 
 ## 2026-10-16
 
-- **The OpenAPI document now declares the shared request headers and the error body** (additive, documentation only; nothing changes at runtime). **Not on Preview until the next push.**
+- **The OpenAPI document now declares the shared request headers and the error body** (additive, documentation only; nothing changes at runtime). **Live on Preview since 2026-10-16** (verified: 234 operations, headers declared, `ErrorResponse` present).
   - `X-Region`, `X-Language`, `X-Timezone` on every operation; `X-Store` on `/seller/*`; `X-Cart-Token` on `/cart*` and `/checkout*`. All optional; defined once under `components.parameters`.
   - **A bug fixed in the document:** the cart token was declared as `x_cart_token` (underscores), which a generated client would send literally and servers and proxies drop. It is `X-Cart-Token` now; the server always accepted that.
   - Every operation has a `default` response typed `ErrorResponse` (`{detail, errors?}`). `info.description` says the base URL is the origin only (paths already start with `/api/v1`).
