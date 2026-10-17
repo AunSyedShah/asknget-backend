@@ -183,7 +183,7 @@ class SellerDocument(TimeStampedModel):
         REPLACEMENT_REQUESTED = "replacement_requested", "Replacement Requested"
 
     application = models.ForeignKey(SellerApplication, on_delete=models.CASCADE, related_name="documents")
-    type = models.CharField(max_length=30, choices=DocumentType.choices)
+    type = models.CharField(max_length=30, help_text="A markets.DocumentType code (the built-in ones are DocumentType above)")
     file = models.FileField(upload_to=seller_document_path, help_text="PDF, JPG or PNG · max 10 MB")
     file_name = models.CharField(max_length=255)
     mime_type = models.CharField(max_length=100)
@@ -197,7 +197,7 @@ class SellerDocument(TimeStampedModel):
         indexes = [models.Index(fields=["application", "type", "version"])]
 
     def __str__(self):
-        return f"{self.get_type_display()} v{self.version} – {self.file_name}"
+        return f"{self.type} v{self.version} – {self.file_name}"
 
 
 class SellerInfoRequest(TimeStampedModel):

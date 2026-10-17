@@ -11,8 +11,8 @@ decided while building; a new session resumes from the **Progress** table.
 | 1 | Staff roles with dynamic permissions, per market | done (655 tests pass) | see git log "Sprint 9 phase 1" |
 | 2 | Events, router, outbox, email, admin rules, inboxes | done (676 tests pass) | see git log "Sprint 9 phases 2-3" |
 | 3 | Real-time bell (Channels + Redis) | done; works locally (compose) and on AWS later, not on Vercel | same commit |
-| 4 | Dynamic seller documents | in progress | |
-| 5 | Legal documents, re-acceptance, market launch checklist | | |
+| 4 | Dynamic seller documents | done (682 tests pass) | see git log "Sprint 9 phase 4" |
+| 5 | Legal documents, re-acceptance, market launch checklist | next (paused by the owner 2026-10-17; design notes below) | |
 | 6 | Remaining events, preferences, digests, HTML email, delivery log, retention | | |
 
 Figma re-check 2026-10-17: nine new screens (admin Applications, Application Details, Returns & Refunds, Return Details, Reviews,
@@ -114,3 +114,52 @@ belong to the admin portal API (`BACKEND_ASKS` #5). Application Details lists do
 
 - Badges are counted from the database when pushing (once per person per publish), not kept as Redis counters: simpler, always
   right, and cheap at this size. Revisit if a bell gets very large audiences.
+
+## Phase 4: dynamic seller documents
+
+### Contract
+
+- **`markets.DocumentType`** (Django admin > Markets > Document types): `code` (permanent once created), `name` and `help` per
+  language, `accepted_types` (a subset of PDF / JPEG / PNG, the formats the upload code checks safely), `max_mb` (at most the
+  platform limit), `default_step`, `is_active` (off = no longer asked for or accepted; earlier uploads stay). Not deletable.
+  Migration `markets 0006` creates the seven built-in types.
+- **`markets.DocumentRequirement`** (inline on the country): market x account type x document type, `required` (off = offered
+  but not needed to submit), `step` (empty = the type's default), `label` and `instructions` per language. An account type with no
+  rows in its market uses the platform defaults (`sellers.rules`). Migration `markets 0006` turned each country's KYC JSON
+  (document lists and local labels) into rows; `0007` removed the JSON fields from `KycPolicy` (it keeps the identity-field
+  labels, the ID-number format and the instructions).
+- **API:** `policy.required_documents[]` (application and `/lookups/seller`) now lists required and optional documents, each
+  `{type, label, step, required, help, instructions, accepted_types, max_mb}`. `POST /seller/application/documents` takes any
+  active catalogue code (`type` is a string, no longer a fixed enum) and checks that type's file types and size
+  (`422 "<label> must be PDF"`, `"<label> must be 1 MB or smaller"`, `"Unknown document type: <code>"`). `/lookups/seller`
+  `document_types` comes from the catalogue. Staff may ask for any active type in an info request.
+
+### Decided while building
+
+- Requirements apply to applications not yet approved. Approved sellers are not asked again automatically, and "before first
+  payout" requirements are **not built**: both need an upload flow for approved sellers and a payout gate. Follow-up, owner's call.
+- Document numbers, expiry dates and front/back sides (plan C1) are not built: no screen asks for them yet.
+- Market-specific names live on the requirement (`label`), so "CNIC / Passport" (PK) and "SA ID / Passport" (ZA) share the
+  type `id_passport`.
+
+## Phase 5: design notes (not started; written before the pause)
+
+- `markets.LegalDocument` (market or every market, `kind` slug: terms, privacy, seller_terms, seller_agreement,
+  marketplace_policies, cookies; `audience` customer | seller | all; title i18n) and `LegalDocumentVersion` (version label,
+  content i18n Markdown, summary of changes, `effective_at`, `requires_reacceptance`, draft → published; published versions are
+  never edited, only superseded). A market's document beats the every-market one of the same kind.
+- `accounts.TermsAcceptance` gains a FK to the version and the market; `document` loses its fixed choices (it holds the kind).
+- **Only a current version with `requires_reacceptance` blocks anyone** (a v1.0 does not lock out existing customers; a new
+  privacy policy marked "must accept again" does). Blocked: customers' checkout, address and payment-method writes; sellers'
+  writes under `/seller/*` (StoreAuth and SellerAuth, unsafe methods only). Answer: `409 {"detail": "terms_update_required",
+  "pending": [...]}` through an exception handler. `/me` gains `pending_legal`; `POST /me/terms` accepts `version_ids` (old
+  `{document, version}` still accepted).
+- Public: `GET /legal` (the market's current documents for the footer) and `GET /legal/{kind}` (text in the reader's language).
+- Notices: publishing emits `legal.updated` (customer + seller, mandatory, in-app + e-mail; new templates, category `system`,
+  which joins the customer bell's tabs); a daily `legal_notices` command emits `legal.effective` on the effective day.
+- **No legal text in migrations** (Production would show placeholder text): demo versions come only from `seed_lookups` on
+  staging. Old acceptance rows are not linked to versions (nothing to link to in Production yet).
+- Country gains `sender_email`, `marketing_opt_in_required`, `data_retention_days`, `minimum_age`, exposed in
+  `/regions/current`. Launch checklist (`markets.launch.checklist(country)`): currency, timezone, languages, sender e-mail,
+  contact details, current terms + privacy (customer) and seller terms (seller), KYC policy, return policy. It blocks switching a
+  market **on** in Django admin only (editing an active market never fails because of it).

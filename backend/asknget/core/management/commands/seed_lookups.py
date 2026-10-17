@@ -10,7 +10,8 @@ from django.utils.text import slugify
 
 from catalog.models import Brand, Category
 from core.models import Bank
-from markets.models import Country, KycPolicy, ReturnPolicy
+from markets.models import Country, DocumentRequirement, KycPolicy, ReturnPolicy
+from sellers.rules import REQUIRED_DOCUMENTS
 from orders.models import DeliveryMethod
 
 # Markets. Each country is a separate market (own currency, timezone, languages,
@@ -122,7 +123,15 @@ class Command(BaseCommand):
             if was_created and not Country.objects.filter(is_default=True).exclude(pk=code).exists():
                 country.is_default = True
                 country.save()
-            KycPolicy.objects.update_or_create(country=country, defaults=spec["kyc"])
+            kyc = dict(spec["kyc"])
+            documents, labels = kyc.pop("required_documents", {}), kyc.pop("document_labels", {})
+            KycPolicy.objects.update_or_create(country=country, defaults=kyc)
+            for account_type, defaults in REQUIRED_DOCUMENTS.items():       # the market's list, or the platform's, with local names
+                for order, code in enumerate(documents.get(account_type) or defaults):
+                    DocumentRequirement.objects.update_or_create(
+                        market=country, account_type=account_type, document_type_id=code,
+                        defaults={"required": True, "label": labels.get(code, {}), "sort_order": order},
+                    )
             ReturnPolicy.objects.update_or_create(country=country, defaults=spec["returns"])
             created["countries"] += was_created
 

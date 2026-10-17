@@ -432,9 +432,12 @@ class CountryPolicyTests(SellerTestCase):
         from core.testing import make_country
 
         self.pk = make_country("PK")
+        from markets.models import DocumentRequirement
+
+        labels = {"id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"}, "tax_registration": {"en": "NTN certificate"}}
+        for order, code in enumerate(["id_passport", "proof_of_address", "tax_registration"]):      # individuals in PK
+            DocumentRequirement.objects.create(market=self.pk, account_type="individual", document_type_id=code, label=labels.get(code, {}), sort_order=order)
         kyc = self.pk.kyc_policy
-        kyc.required_documents = {"individual": ["id_passport", "proof_of_address", "tax_registration"]}
-        kyc.document_labels = {"id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"}, "tax_registration": {"en": "NTN certificate"}}
         kyc.id_number_label = "CNIC / Passport number"
         kyc.id_number_regex = r"^(\d{13}|[A-Z]{2}\d{7})$"
         kyc.tax_id_label = "NTN"
@@ -458,7 +461,8 @@ class CountryPolicyTests(SellerTestCase):
         self.assertEqual([d["type"] for d in policy["required_documents"]], ["id_passport", "proof_of_address", "tax_registration"])
         self.assertEqual(policy["required_documents"][0]["label"], "CNIC / Passport")
         # an individual skips the Representative step, so the NTN certificate is collected on Banking
-        self.assertEqual(policy["required_documents"][2], {"type": "tax_registration", "label": "NTN certificate", "step": 4})
+        self.assertEqual({k: policy["required_documents"][2][k] for k in ("type", "label", "step", "required")},
+                         {"type": "tax_registration", "label": "NTN certificate", "step": 4, "required": True})
         self.assertEqual((policy["id_number_label"], policy["tax_id_label"]), ("CNIC / Passport number", "NTN"))
         # the policy is the application's, whatever domain the seller uses
         body = self.client.get(f"{SELLER}/application", headers={**self._h(token), "X-Region": settings.DEFAULT_COUNTRY}).json()

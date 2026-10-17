@@ -7,6 +7,15 @@
 
 ## 2026-10-17
 
+- **Seller documents come from a catalogue admins control, per market** (sprint 9, phase 4). **Not on Preview yet**: committed
+  on `develop`, live with the next push; this note is then removed.
+  - **BREAKING (types only):** the document `type` in `POST /seller/application/documents`, `DocumentOut` and info-request
+    items is now a plain string, not a fixed enum: admins add types (e.g. `tax_clearance`). Treat unknown codes as normal and
+    show the label from `policy.document_labels` / `policy.required_documents[].label`.
+  - `policy.required_documents[]` items gained `required` (false = optional, show it but do not block submitting), `help`,
+    `instructions`, `accepted_types` (use it for the file picker) and `max_mb`. Optional documents are now in the list too.
+  - Upload errors now name the document and its own limits, e.g. `422 "Tax Clearance Certificate must be 1 MB or smaller"`.
+
 - **The live bell over WebSocket** (sprint 9, phase 3, additive). **Not on Preview, and it cannot be there:** Vercel does not
   keep WebSocket connections open. It works locally (`docker compose up`: services `realtime` + `redis`) and on the planned
   AWS deployment. On Preview, poll `/summary`; build both paths now.

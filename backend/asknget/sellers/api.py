@@ -42,7 +42,6 @@ from .schemas import (
     DirectorOut,
     DocumentOut,
     DocumentReviewIn,
-    DocumentTypeLit,
     ApplicationRejectIn,
     RepresentativeIn,
     RequestInfoIn,
@@ -131,9 +130,10 @@ def director_delete(request, director_id: UUID):
 @seller_router.post(
     "/application/documents",
     response={201: DocumentOut, 409: ErrorOut, 422: ErrorOut},
-    summary="Upload or replace a KYC document (PDF/JPG/PNG ≤ 10 MB)",
+    summary="Upload or replace a KYC document (the type's accepted files and size: see `policy.required_documents`)",
 )
-def document_upload(request, type: DocumentTypeLit = Form(...), file: UploadedFile = File(...)):
+def document_upload(request, type: str = Form(..., max_length=30, description="A document type code: `policy.required_documents[].type`, or any in `document_types` (/lookups/seller); admins add types"),
+                    file: UploadedFile = File(...)):
     app = services.get_application(request.auth)
     return 201, services.upload_document(app, doc_type=type, file=file)
 
@@ -207,13 +207,14 @@ def lookups_seller(request, country: Optional[str] = Query(None, min_length=2, m
     market = markets.countries_qs().filter(pk=country.upper(), is_active=True).first() if country else getattr(request, "country", None)
     if country and market is None:
         raise HttpError(404, "Unknown country")
+    rules_for = policy.for_country(market, language=getattr(request, "language", None))
     return {
-        "policy": policy.for_country(market, language=getattr(request, "language", None)).as_payload(account_type),
+        "policy": rules_for.as_payload(account_type),
         "account_types": _choices(SellerApplication.AccountType.choices),
         "business_types": _choices(SellerApplication.BusinessType.choices),
         "representative_roles": _choices(SellerApplication.RepresentativeRole.choices),
         "bank_account_types": _choices(SellerApplication.BankAccountType.choices),
-        "document_types": _choices(SellerDocument.DocumentType.choices),
+        "document_types": [{"value": code, "label": label} for code, label in rules_for.document_labels.items() if code in rules_for.types],
         "field_groups": [{"value": k, "label": k.replace("_", " ").title()} for k in rules.FIELD_GROUPS],
         "document_max_bytes": settings.SELLER_DOCUMENT_MAX_BYTES,
         "document_allowed_types": sorted(rules.DOCUMENT_ALLOWED_TYPES),

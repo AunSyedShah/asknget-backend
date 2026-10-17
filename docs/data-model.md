@@ -82,6 +82,11 @@ source, and the activity log. `notifications_notification` (was `storenotificati
 staff permission, min amount) with `notifications_rulechange` (audit). `notifications_notificationpreference` (user x category x
 channel). `notifications_delivery` (the e-mail outbox: unique key, status, attempts, next attempt, last error).
 
+**Seller documents (sprint 9):** `markets_documenttype` (code PK, name/help i18n, accepted types, max MB, default step, active)
+and `markets_documentrequirement` (market x account type x document type: required, step, label/instructions i18n). They replace
+`markets_kycpolicy.required_documents` / `document_labels`. `sellers_sellerdocument.type` holds a document type code (no fixed
+choices any more).
+
 ### `otp_verifications`
 | field | type | notes |
 |---|---|---|
