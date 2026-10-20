@@ -92,3 +92,11 @@ class DocumentCatalogueTests(SellerTestCase):
         self.assertRaises(ValidationError, bad.full_clean)
         bad = DocumentType(code="y", name={"en": "Y"}, max_mb=500)
         self.assertRaises(ValidationError, bad.full_clean)
+
+    def test_the_payload_never_promises_more_than_the_platform_allows(self):
+        from django.test import override_settings
+
+        token = self.register_seller()
+        with override_settings(SELLER_DOCUMENT_MAX_BYTES=4 * 1024 * 1024):
+            docs = self.application(token)["policy"]["required_documents"]
+        self.assertTrue(docs and all(d["max_mb"] <= 4 for d in docs), [(d["type"], d["max_mb"]) for d in docs])

@@ -8,10 +8,10 @@ decided while building; a new session resumes from the **Progress** table.
 
 | Phase | Scope | Status | Commit |
 |---|---|---|---|
-| 1 | Staff roles with dynamic permissions, per market | done (655 tests pass) | see git log "Sprint 9 phase 1" |
-| 2 | Events, router, outbox, email, admin rules, inboxes | done (676 tests pass) | see git log "Sprint 9 phases 2-3" |
+| 1 | Staff roles with dynamic permissions, per market | done, live on Preview 2026-10-20 | see git log "Sprint 9 phase 1" |
+| 2 | Events, router, outbox, email, admin rules, inboxes | done, live on Preview 2026-10-20 | see git log "Sprint 9 phases 2-3" |
 | 3 | Real-time bell (Channels + Redis) | done; works locally (compose) and on AWS later, not on Vercel | same commit |
-| 4 | Dynamic seller documents | done (682 tests pass) | see git log "Sprint 9 phase 4" |
+| 4 | Dynamic seller documents | done, live on Preview 2026-10-20 | see git log "Sprint 9 phase 4" |
 | 5 | Legal documents, re-acceptance, market launch checklist | next (paused by the owner 2026-10-17; design notes below) | |
 | 6 | Remaining events, preferences, digests, HTML email, delivery log, retention | | |
 

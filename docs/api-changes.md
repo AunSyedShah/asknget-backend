@@ -7,14 +7,13 @@
 
 ## 2026-10-20
 
-- **Uploads work on Vercel Preview** (additive). **Not on Preview yet**: committed on `develop`, live with the next push; this note is then removed.
+- **Uploads work on Vercel Preview** (additive). **Live on Preview since 2026-10-20** (verified: `/lookups/seller` shows the 4 MB limit and the 7 document types, a file stored in the database is served at `/media/`, private paths answer 404, and the CORS preflight from `http://localhost:3000` is allowed).
   - Seller documents, product pictures, avatars, banners, review media, return photos and category-request files can now be uploaded on Preview. Until now every upload failed there (Vercel's disk is read-only). Files are kept in the database and served at `/media/<path>` exactly as before; image URLs keep the same shape (`/media/products/...`), so nothing changes in how you show them. Seller documents and category-request files are still never served from `/media/`, only through the API's signed links.
   - **Size limit on Preview: 4 MB per request.** Vercel rejects bigger request bodies before the API sees them (the answer is a platform error, not our JSON). So on Preview the limits are 4 MB for seller documents (`document_max_bytes` in `/lookups/seller` now says 4194304, and `policy.required_documents[].max_mb` is capped to it by the server), 4 MB for review media (the design says 25 MB) and 4 MB for return photos; product images stay 1 MB and avatars 2 MB. A review with several photos must fit 4 MB in total. Read the limit from `/lookups/seller` instead of hard-coding 10 MB; show your own message when a request comes back with a non-JSON 413.
   - The same code runs unchanged on the AWS deployment (S3 or R2, no size cap): only the server's `FILE_STORAGE` setting changes.
 ## 2026-10-17
 
-- **Seller documents come from a catalogue admins control, per market** (sprint 9, phase 4). **Not on Preview yet**: committed
-  on `develop`, live with the next push; this note is then removed.
+- **Seller documents come from a catalogue admins control, per market** (sprint 9, phase 4). **Live on Preview since 2026-10-20** (verified against the staging data).
   - **BREAKING (types only):** the document `type` in `POST /seller/application/documents`, `DocumentOut` and info-request
     items is now a plain string, not a fixed enum: admins add types (e.g. `tax_clearance`). Treat unknown codes as normal and
     show the label from `policy.document_labels` / `policy.required_documents[].label`.
@@ -22,7 +21,7 @@
     `instructions`, `accepted_types` (use it for the file picker) and `max_mb`. Optional documents are now in the list too.
   - Upload errors now name the document and its own limits, e.g. `422 "Tax Clearance Certificate must be 1 MB or smaller"`.
 
-- **The live bell over WebSocket** (sprint 9, phase 3, additive). **Not on Preview, and it cannot be there:** Vercel does not
+- **The live bell over WebSocket** (sprint 9, phase 3, additive). **Not on Preview, and it cannot be there (Vercel):** Vercel does not
   keep WebSocket connections open. It works locally (`docker compose up`: services `realtime` + `redis`) and on the planned
   AWS deployment. On Preview, poll `/summary`; build both paths now.
   - `POST /realtime/ticket` (signed in) → `{ticket, expires_in: 30, url: "/ws/notifications"}`; open
@@ -33,8 +32,7 @@
   - `audience` (`customer` | `seller` | `staff`) says which bell to update. On connect and reconnect, call `/summary` to catch up;
     the socket is a hint, the API is the record.
 
-- **Notifications for customers and staff, and e-mail for every audience** (sprint 9, phase 2, additive). **Not on Preview
-  yet**: committed on `develop`, live with the next push; this note is then removed.
+- **Notifications for customers and staff, and e-mail for every audience** (sprint 9, phase 2, additive). **Live on Preview since 2026-10-20** (verified against the staging data).
   - **New: the customer's bell.** `GET /me/notifications?tab=orders|returns|all` (paged), `GET /me/notifications/summary`
     (`{unread, tabs}`), `POST /me/notifications/read-all?tab=`, `POST /me/notifications/{id}/read` (204). Same item shape as the
     seller's (`id, category, kind, title, body, link_type, link_id, created_at, group, is_read`); `link_type` is `order` or
@@ -48,8 +46,7 @@
   - Real-time push of these comes in phase 3; until then poll `/summary` (every 30-60 s is plenty).
 
 
-- **Staff roles and permissions on every `/admin/*` endpoint** (sprint 9, phase 1). **Not on Preview yet**: committed on `develop`,
-  live with the next push; this note is then removed.
+- **Staff roles and permissions on every `/admin/*` endpoint** (sprint 9, phase 1). **Live on Preview since 2026-10-20** (verified against the staging data).
   - Each `/admin/*` operation now needs a permission from the staff catalogue (e.g. `orders.view`, `sellers.review`,
     `returns.configure`; 18 in all), granted through roles that admins create in Django admin. Without it: `403
     {"detail": "Missing permission: <code>"}`. **Existing staff accounts (including the frontend test admin) were given the

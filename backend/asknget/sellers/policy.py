@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from django.conf import settings
+
 from markets.i18n import pick
 from markets.models import DocumentType
 
@@ -66,8 +68,13 @@ class KycRules:
         return {
             "type": doc_type, "label": self.label(doc_type), "step": self.step_for(doc_type, account_type), "required": required,
             "help": pick(t.help, country=None) if t and t.help else "", "instructions": self.document_instructions.get(doc_type, ""),
-            "accepted_types": list(t.accepted_types) if t else list(rules.DOCUMENT_ALLOWED_TYPES), "max_mb": t.max_mb if t else 10,
+            "accepted_types": list(t.accepted_types) if t else list(rules.DOCUMENT_ALLOWED_TYPES), "max_mb": self._max_mb(t),
         }
+
+    @staticmethod
+    def _max_mb(t) -> int:
+        """The type's own limit, never above the platform's (smaller where the host limits the request: Vercel)."""
+        return min(t.max_mb if t else 10, settings.SELLER_DOCUMENT_MAX_BYTES // (1024 * 1024))
 
     def as_payload(self, account_type: str) -> dict:
         """The block the wizard renders: what to upload, how fields are labelled."""
