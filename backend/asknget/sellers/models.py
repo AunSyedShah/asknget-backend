@@ -10,6 +10,7 @@ from django.db import models
 
 from core.fields import EncryptedTextField
 from core.models import TimeStampedModel
+from core.storage import private_storage
 
 
 def seller_document_path(instance, filename):
@@ -184,7 +185,7 @@ class SellerDocument(TimeStampedModel):
 
     application = models.ForeignKey(SellerApplication, on_delete=models.CASCADE, related_name="documents")
     type = models.CharField(max_length=30, help_text="A markets.DocumentType code (the built-in ones are DocumentType above)")
-    file = models.FileField(upload_to=seller_document_path, help_text="PDF, JPG or PNG · max 10 MB")
+    file = models.FileField(upload_to=seller_document_path, storage=private_storage, help_text="PDF, JPG or PNG · max 10 MB")
     file_name = models.CharField(max_length=255)
     mime_type = models.CharField(max_length=100)
     size_bytes = models.PositiveIntegerField()

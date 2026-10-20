@@ -13,6 +13,7 @@ disagree.
 
 import logging
 from datetime import timedelta
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -32,7 +33,6 @@ from .models import ReturnEvent, ReturnItem, ReturnPhoto, ReturnReason, ReturnRe
 log = logging.getLogger(__name__)
 S = ReturnRequest.Status
 Actor = ReturnEvent.Actor
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
 
 
 def _round_div(numerator: int, denominator: int) -> int:
@@ -143,7 +143,7 @@ def _check_photos(files, reason, country) -> list:
         raise HttpError(422, f"At most {limit} photos")
     if reason.requires_photo and not files:
         raise HttpError(422, "photo_required")
-    return [safe_image(f, max_bytes=MAX_PHOTO_BYTES, formats=("JPEG", "PNG", "WEBP"), label="Each photo") for f in files]
+    return [safe_image(f, max_bytes=settings.RETURN_PHOTO_MAX_BYTES, formats=("JPEG", "PNG", "WEBP"), label="Each photo") for f in files]
 
 
 def _refund_amounts(order, store_id, items, reason) -> dict:

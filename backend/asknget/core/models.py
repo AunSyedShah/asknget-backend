@@ -85,3 +85,19 @@ def coerce_nulls(model, data: dict) -> dict:
     Map None -> "" for any non-nullable field so create()/setattr never violate NOT NULL."""
     nullable = {f.name for f in model._meta.get_fields() if getattr(f, "null", False)}
     return {k: ("" if v is None and k not in nullable else v) for k, v in data.items()}
+
+class StoredFile(models.Model):
+    """An uploaded file kept in the database (core.storage.DatabaseStorage), for hosts without a writable disk."""
+
+    name = models.CharField(max_length=255, primary_key=True, help_text="The path the file field stores, e.g. products/ab12.png")
+    content = models.BinaryField()
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveIntegerField()
+    etag = models.CharField(max_length=32)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.size} bytes)"

@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 
 from core.models import SoftDeleteModel, TimeStampedModel
+from core.storage import private_storage
 
 
 class Category(TimeStampedModel):
@@ -339,7 +340,7 @@ class CategoryRequest(TimeStampedModel):
                                help_text="Empty: the seller asks for a new top-level category")
     name = models.CharField(max_length=100)
     reason = models.CharField(max_length=250, help_text='"Why do you need this category?"')
-    document = models.FileField(upload_to="category_requests/", null=True, blank=True,
+    document = models.FileField(upload_to="category_requests/", storage=private_storage, null=True, blank=True,
                                 help_text="Optional supporting image; private, served only through a signed link")
     document_name = models.CharField(max_length=255, blank=True, help_text="The file name the seller uploaded, for display")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)

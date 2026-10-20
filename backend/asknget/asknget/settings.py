@@ -96,9 +96,19 @@ TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')   # checks the webho
 TWILIO_WHATSAPP_NUMBER = re.sub(r'\D', '', os.environ.get('TWILIO_WHATSAPP_NUMBER', ''))   # the number people message, digits only
 TWILIO_WEBHOOK_URL = os.environ.get('TWILIO_WEBHOOK_URL', '')   # only if the URL Twilio calls differs from the one Django sees
 WHATSAPP_CHALLENGE_TTL_MINUTES = int(os.environ.get('WHATSAPP_CHALLENGE_TTL_MINUTES', 10))
+# Vercel rejects a request body over 4.5 MB before Django sees it, so on Vercel no upload can be bigger than this until files go straight to a bucket.
+# UPLOAD_CAP_BYTES=0 lifts the cap (an AWS deployment, or direct-to-bucket uploads). Smaller limits below are unaffected.
+UPLOAD_CAP_BYTES = int(os.environ.get('UPLOAD_CAP_BYTES', 4 * 1024 * 1024 if ON_VERCEL else 0))
+
+
+def _capped(limit):
+    return min(limit, UPLOAD_CAP_BYTES) if UPLOAD_CAP_BYTES else limit
+
+
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
-SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
-REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
+SELLER_DOCUMENT_MAX_BYTES = _capped(10 * 1024 * 1024)  # design: 'PDF, JPG or PNG · Max 10 MB'
+REVIEW_MEDIA_MAX_BYTES = _capped(25 * 1024 * 1024)  # review 'Photo / Video (Optional)'
+RETURN_PHOTO_MAX_BYTES = _capped(5 * 1024 * 1024)
 PRODUCT_IMAGE_MAX_BYTES = 1 * 1024 * 1024  # seller wizard Media popup: 'PNG, JPG upto 1-MB'
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
 PORTAL_URL = os.environ.get('PORTAL_URL', '').rstrip('/')  # seller portal, for team-invitation links (falls back to STOREFRONT_URL)
@@ -275,10 +285,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STORAGES = {
-    'default': {'BACKEND': 'core.storage.UrlFriendlyStorage'},
-    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
-}
+# Uploaded files: FILE_STORAGE = filesystem | database | s3 (default: database on Vercel, whose disk is read-only; filesystem elsewhere).
+# See core/storage.py and core/storage_config.py (the S3 / R2 variables).
+from core.storage_config import build_storages, file_storage_name  # noqa: E402
+
+FILE_STORAGE = file_storage_name(os.environ, ON_VERCEL)
+STORAGES = build_storages(os.environ, ON_VERCEL, signed_ttl=int(os.environ.get('SIGNED_FILE_TTL_SECONDS', 3600)))
+DB_STORAGE_MAX_BYTES = 8 * 1024 * 1024  # a file kept in the database is read whole into memory
 
 # User uploads (avatars, product images, seller KYC documents)
 MEDIA_URL = 'media/'

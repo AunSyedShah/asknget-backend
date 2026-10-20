@@ -63,6 +63,11 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | `BEHIND_PROXY` | *(unset)* | `1` makes Django trust `X-Forwarded-Proto`/`Host` from nginx. Set by `compose.yaml` for the `web` service. |
 | `MEDIA_ROOT` | `backend/asknget/media` | Where uploads land. Compose sets `/app/asknget/media`. |
 | `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. Seller documents are never served from `/media/` either way. |
+| `FILE_STORAGE` | `database` on Vercel, `filesystem` elsewhere | Where uploads live: `filesystem` (MEDIA_ROOT), `database` (rows in `core_storedfile`, served by Django at `/media/`; for hosts with a read-only disk) or `s3` (AWS S3 / R2 / MinIO). Product pictures, avatars, banners, review media and return photos use the public backend; seller documents and category-request files use the private one. See `core/storage_config.py`. |
+| `UPLOAD_CAP_BYTES` | 4 MB on Vercel, none elsewhere | Vercel rejects request bodies over 4.5 MB before Django sees them, so on Vercel seller documents, review media and return photos are capped at 4 MB. `0` lifts the cap (AWS, or once uploads go straight to a bucket). |
+| `AWS_STORAGE_BUCKET_NAME` | | `FILE_STORAGE=s3`: the public media bucket. |
+| `AWS_PRIVATE_BUCKET_NAME` | the public bucket | `FILE_STORAGE=s3`: a **separate** bucket (all public access blocked) for seller documents and category-request files, served through expiring links. Do not leave it unset in production. |
+| `AWS_S3_REGION_NAME` / `AWS_S3_ENDPOINT_URL` / `AWS_S3_CUSTOM_DOMAIN` | | Region; endpoint (only for R2 / MinIO); a CloudFront domain in front of the public bucket (recommended). On ECS the task role is used, so no access keys; on Vercel set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. `django-storages[s3]` must be installed in that image. |
 | `SIGNED_FILE_TTL_SECONDS` | `3600` | How long a signed link to a private file (seller documents) works. |
 | `STOREFRONT_URL` | *(empty)* | Public buyer site, used to build "View Product" links in the seller portal. |
 | `PORTAL_URL` | *(empty)* | The seller portal's address, used to build **team-invitation links** (`<PORTAL_URL>/accept-invite?token=…`). Falls back to `STOREFRONT_URL`; with neither, the e-mailed link has no host. |

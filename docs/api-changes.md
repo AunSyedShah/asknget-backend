@@ -5,6 +5,12 @@
 > Everything before 2026-10-14 is described in [`frontend-handoff.md`](frontend-handoff.md) sections 4 to 5a. Regenerate your API types from
 > `openapi.json` on Preview whenever there is a new entry. Last endpoint count: **234 operations**.
 
+## 2026-10-20
+
+- **Uploads work on Vercel Preview** (additive). **Not on Preview yet**: committed on `develop`, live with the next push; this note is then removed.
+  - Seller documents, product pictures, avatars, banners, review media, return photos and category-request files can now be uploaded on Preview. Until now every upload failed there (Vercel's disk is read-only). Files are kept in the database and served at `/media/<path>` exactly as before; image URLs keep the same shape (`/media/products/...`), so nothing changes in how you show them. Seller documents and category-request files are still never served from `/media/`, only through the API's signed links.
+  - **Size limit on Preview: 4 MB per request.** Vercel rejects bigger request bodies before the API sees them (the answer is a platform error, not our JSON). So on Preview the limits are 4 MB for seller documents (`document_max_bytes` in `/lookups/seller` now says 4194304, and `policy.required_documents[].max_mb` is capped to it by the server), 4 MB for review media (the design says 25 MB) and 4 MB for return photos; product images stay 1 MB and avatars 2 MB. A review with several photos must fit 4 MB in total. Read the limit from `/lookups/seller` instead of hard-coding 10 MB; show your own message when a request comes back with a non-JSON 413.
+  - The same code runs unchanged on the AWS deployment (S3 or R2, no size cap): only the server's `FILE_STORAGE` setting changes.
 ## 2026-10-17
 
 - **Seller documents come from a catalogue admins control, per market** (sprint 9, phase 4). **Not on Preview yet**: committed
