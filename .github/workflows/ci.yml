@@ -1,0 +1,98 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, pre-prod, main]
+  workflow_call:          # the deploy workflow runs this first
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}     # a newer push to a PR replaces the older run; main is never cancelled
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test-sqlite:
+    # What a developer runs locally (the full suite on SQLite). Must be green.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: The lockfile matches pyproject.toml
+        run: uv lock --check
+      - run: uv sync --frozen
+      - name: Every model change has a migration
+        run: uv run python asknget/manage.py makemigrations --check --dry-run
+      - name: Tests
+        run: uv run python asknget/manage.py test --parallel 4
+
+  test-postgres:
+    # Production runs on Postgres with pgvector; the suite has so far only been run on SQLite, so this starts as advisory.
+    # Once it has been green a few times, remove `continue-on-error` and make it required.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DB_POOL: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen
+      - name: Tests on Postgres
+        run: uv run python asknget/manage.py test --parallel 2
+
+  scripts:
+    # The shell scripts that run as root or as the deploy user on the server. Advisory until it has been green once.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: for f in deploy/ec2/setup.sh deploy/ec2/bin/*; do bash -n "$f"; done
+      - name: shellcheck
+        run: shellcheck -S warning deploy/ec2/setup.sh deploy/ec2/bin/*
+
+  docker-build:
+    # The Docker image stays buildable (dev stack today, containers on AWS later). Built, not pushed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

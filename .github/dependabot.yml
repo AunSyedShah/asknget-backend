@@ -1,0 +1,16 @@
+# Weekly pull requests for outdated dependencies. Each one runs the CI workflow before anyone merges it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly

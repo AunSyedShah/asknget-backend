@@ -1,0 +1,83 @@
+# EXAMPLE for the FRONTEND repo (AunSyedShah/asknget-frontend): save as .github/workflows/deploy-ec2.yml there.
+# The backend session does not edit that repo; the frontend session (or the owner) adds this file after reviewing it.
+#
+# Needs the GitHub Environment `ec2-test` in the FRONTEND repo with these secrets:
+#   EC2_HOST         the server's public address (same as the backend's)
+#   EC2_SSH_KEY      the PRIVATE half of the FRONTEND deploy key (a different key from the backend's; its public half is in
+#                    deploy's authorized_keys on the server, forced to run deploy-frontend only)
+#   EC2_KNOWN_HOSTS  `ssh-keyscan -t ed25519 <host>` output, checked against the AWS console
+# Runs only when `main` (production) moves. frontend-ci.yml already builds and tests every pull request and pre-prod push.
+name: Deploy frontend to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-frontend-ec2
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_API_URL: ""            # same origin: nginx on the server forwards /api, /media, /django-admin and /static to the backend
+      VITE_API_REGION: ZA
+      VITE_API_LANGUAGE: en
+      VITE_API_TIMEZONE: Africa/Johannesburg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Fail if the build points at localhost:8000
+        run: |
+          if grep -R "localhost:8000" build/; then echo "build/ contains localhost:8000" >&2; exit 1; fi
+      - run: echo "${{ github.sha }}" > build/version.txt
+      - name: Package the build (the contents of build/, not the folder)
+        run: tar -czf frontend.tgz -C build .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-package
+          path: frontend.tgz
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'      # only `main` deploys, whatever started the run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ec2-test
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-package
+
+      - name: Send it to the server
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              "deploy@$EC2_HOST" "$GITHUB_SHA" < frontend.tgz
+
+      - name: Smoke test (the live version is this commit)
+        env:
+          # The public address: set the repository variable PUBLIC_URL (https://asknget.co.za) once HTTPS is on.
+          BASE: ${{ vars.PUBLIC_URL || format('http://{0}', secrets.EC2_HOST) }}
+        run: |
+          for i in 1 2 3 4 5 6; do
+            live="$(curl -fsSL "$BASE/version.txt" | tr -d '[:space:]' || true)"
+            [ "$live" = "$GITHUB_SHA" ] && { echo "live: $live"; exit 0; }
+            sleep 5
+          done
+          echo "expected $GITHUB_SHA, the server serves '$live'" >&2; exit 1

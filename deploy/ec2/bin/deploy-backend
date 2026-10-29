@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Installed as /opt/asknget/bin/deploy-backend (root-owned). It is the ONLY thing the backend CI key may run: sshd forces it
+# (authorized_keys `command=`), so the key gives no shell.
+#
+#   ssh deploy@host <git-sha> < release.tgz          (release.tgz: pyproject.toml, uv.lock, asknget/)
+#
+# Unpack to a new release folder, install dependencies, migrate, collect static files, switch `current`, restart, check health, and
+# go back to the previous release if the new one does not answer. Migrations are NOT rolled back (they ran before the switch).
+set -euo pipefail
+umask 022
+
+APP=/opt/asknget/backend
+SHA="${SSH_ORIGINAL_COMMAND:-}"
+if [[ ! "$SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+  echo "deploy-backend: give the git sha as the command (got '${SHA}')" >&2
+  exit 2
+fi
+
+exec 9>/opt/asknget/.deploy-backend.lock
+flock -n 9 || { echo "deploy-backend: another backend deploy is running" >&2; exit 3; }
+
+export UV_PYTHON_INSTALL_DIR=/opt/asknget/python UV_PYTHON=3.13
+export UV_PROJECT_ENVIRONMENT="$APP/venv" UV_CACHE_DIR=/opt/asknget/.uv-cache
+VENV_PY="$APP/venv/bin/python"
+# Unique per deploy, so redeploying the sha that is live never deletes the folder in use.
+REL="$APP/releases/${SHA}-$(date -u +%Y%m%d%H%M%S)"
+PREVIOUS="$(readlink -e "$APP/current" 2>/dev/null || true)"     # -e: empty when there is no release yet (-f would print the path anyway)
+
+echo "==> unpacking $SHA"
+rm -rf "$REL"; mkdir -p "$REL"
+tar -xzf - -C "$REL" --no-same-owner --no-same-permissions
+[ -f "$REL/pyproject.toml" ] && [ -f "$REL/uv.lock" ] && [ -f "$REL/asknget/manage.py" ] \
+  || { echo "deploy-backend: the archive is missing pyproject.toml, uv.lock or asknget/manage.py" >&2; rm -rf "$REL"; exit 4; }
+ln -s "$APP/.env" "$REL/.env"            # settings read <release>/.env
+
+echo "==> installing dependencies (shared virtualenv)"
+uv sync --frozen --no-dev --no-install-project --project "$REL"
+
+cd "$REL/asknget"
+echo "==> migrating"
+"$VENV_PY" manage.py migrate --noinput
+echo "==> collecting static files"
+"$VENV_PY" manage.py collectstatic --noinput >/dev/null
+echo "==> seeding lookup tables (idempotent)"
+"$VENV_PY" manage.py seed_lookups
+
+# First deploy of this environment only: leave just the launch market(s) switched on. Later changes are made by an admin
+# (set_markets or Django admin), and a deploy must not undo them.
+if [ -z "$PREVIOUS" ]; then
+  MARKETS="$(sed -n 's/^ACTIVE_MARKETS=//p' "$APP/.env" | head -1 | tr -d '\r')"
+  if [ -n "$MARKETS" ]; then
+    echo "==> first deploy: active markets = $MARKETS"
+    # shellcheck disable=SC2086
+    "$VENV_PY" manage.py set_markets ${MARKETS//,/ }
+  fi
+fi
+
+echo "==> switching to the new release"
+ln -sfn "$REL" "$APP/current.new"
+mv -Tf "$APP/current.new" "$APP/current"
+sudo -n /usr/bin/systemctl restart asknget-web
+
+healthy() {
+  for _ in $(seq 1 30); do
+    if curl -fsS -m 3 -o /dev/null http://127.0.0.1:8000/api/v1/health; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+if healthy; then
+  echo "==> healthy: $SHA is live"
+else
+  echo "deploy-backend: $SHA did not become healthy; last log lines:" >&2
+  journalctl -u asknget-web -n 25 --no-pager >&2 || true
+  if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS" ]; then
+    echo "==> going back to $(basename "$PREVIOUS")" >&2
+    ln -sfn "$PREVIOUS" "$APP/current.new"; mv -Tf "$APP/current.new" "$APP/current"
+    sudo -n /usr/bin/systemctl restart asknget-web
+    healthy && echo "==> previous release is serving again" >&2 || echo "==> previous release is NOT healthy either" >&2
+  fi
+  exit 1
+fi
+
+echo "$SHA $(date -u +%FT%TZ)" > "$APP/deployed.txt"
+# Keep the current, the previous and one more; the disk is small.
+ls -1dt "$APP"/releases/*/ | tail -n +4 | xargs -r rm -rf
+echo "==> done"

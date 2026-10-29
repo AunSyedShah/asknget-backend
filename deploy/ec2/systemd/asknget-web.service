@@ -1,0 +1,28 @@
+[Unit]
+Description=asknget API (gunicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+ConditionPathExists=/opt/asknget/backend/current
+
+[Service]
+User=asknget
+Group=asknget
+UMask=0022
+WorkingDirectory=/opt/asknget/backend/current/asknget
+Environment=DJANGO_SETTINGS_MODULE=asknget.settings
+Environment=PYTHONUNBUFFERED=1
+# gunicorn keeps a small control file under $HOME; the app user's home is read-only, so give it a writable one.
+Environment=HOME=/var/lib/asknget
+# Settings come from /opt/asknget/backend/.env (linked into each release); Django reads it itself.
+ExecStart=/opt/asknget/backend/venv/bin/gunicorn asknget.wsgi:application --bind 127.0.0.1:8000 --workers 2 --threads 2 --timeout 60 --access-logfile -
+Restart=always
+RestartSec=3
+# This box has about 900 MB: keep the API from taking Postgres down with it.
+MemoryHigh=420M
+MemoryMax=520M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

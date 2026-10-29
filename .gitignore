@@ -6,6 +6,11 @@ Thumbs.db
 
 # Local secrets anywhere
 .env
+# Private keys and server credentials (EC2 .pem, SSH keys): never in the repository
+*.pem
+*.key
+id_rsa*
+id_ed25519*
 
 # Python bytecode anywhere
 __pycache__/
