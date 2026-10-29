@@ -24,6 +24,7 @@ from ninja.pagination import paginate
 from catalog.models import Category
 from config import services as config
 from core.auth import JWTAuth, StaffAuth
+from staff.access import check_market, require_every_market, scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut
 from markets.context import get_country
@@ -46,7 +47,7 @@ from .schemas import (
     ReasonAdminPatch,
     ReceivedIn,
     RefundPaidIn,
-    RejectIn,
+    ReturnRejectIn,
     ReturnableOut,
     ReturnCreateIn,
     ReturnOut,
@@ -199,7 +200,7 @@ def seller_return_approve(request, return_id: UUID):
 
 
 @seller_returns_router.post("/{return_id}/reject", response={200: SellerReturnOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Reject with a reason the buyer sees")
-def seller_return_reject(request, return_id: UUID, payload: RejectIn):
+def seller_return_reject(request, return_id: UUID, payload: ReturnRejectIn):
     services.reject(services.get_for_store(request.store, return_id), actor="seller", user=request.auth, reason=payload.reason)
     return services.get_for_store(request.store, return_id)
 
@@ -215,10 +216,10 @@ def seller_return_received(request, return_id: UUID, payload: ReceivedIn):
 # --------------------------------------------------------------------------------------
 
 
-@admin_returns_router.get("", response=list[AdminReturnRowOut], summary="All returns (default: escalated and damaged first)")
+@admin_returns_router.get("", auth=StaffAuth("returns.view"), response=list[AdminReturnRowOut], summary="All returns (default: escalated and damaged first)")
 @paginate(PagePagination)
 def admin_returns(request, tab: str = Query("all"), country: str | None = None, store_id: UUID | None = None, q: str | None = None):
-    qs = services.all_requests(tab)
+    qs = scope(request, services.all_requests(tab))
     if country:
         qs = qs.filter(country_id=country.upper())
     if store_id:
@@ -228,19 +229,19 @@ def admin_returns(request, tab: str = Query("all"), country: str | None = None, 
     return qs
 
 
-@admin_returns_router.get("/summary", response=ReturnTabsOut)
+@admin_returns_router.get("/summary", auth=StaffAuth("returns.view"), response=ReturnTabsOut)
 def admin_returns_summary(request, country: str | None = None):
-    qs = ReturnRequest.objects.all()
+    qs = scope(request, ReturnRequest.objects.all())
     return _tab_counts(qs.filter(country_id=country.upper()) if country else qs)
 
 
 # --- the rules (declared before the {return_id} routes so "policies" is never read as an id) ---
 
 
-@admin_returns_router.get("/policies", response=list[PolicyAdminOut], summary="Every market's return policy")
+@admin_returns_router.get("/policies", auth=StaffAuth("returns.view"), response=list[PolicyAdminOut], summary="Every market's return policy")
 def admin_policies(request):
     rows = []
-    for country in Country.objects.select_related("return_policy").order_by("sort_order", "name"):
+    for country in scope(request, Country.objects.select_related("return_policy").order_by("sort_order", "name"), "code"):
         pol = country.returns
         rows.append({"country": country.code, "country_name": country.name, "is_active": bool(pol and pol.is_active),
                      "window_days": pol.window_days if pol else 0, "defect_days": pol.defect_days if pol else 0,
@@ -249,11 +250,12 @@ def admin_policies(request):
     return rows
 
 
-@admin_returns_router.put("/policies/{code}", response={200: PolicyAdminOut, 404: ErrorOut, 422: ErrorOut}, summary="Set a market's return policy (creates it if the market has none)")
+@admin_returns_router.put("/policies/{code}", auth=StaffAuth("returns.configure"), response={200: PolicyAdminOut, 404: ErrorOut, 422: ErrorOut}, summary="Set a market's return policy (creates it if the market has none)")
 def admin_policy_put(request, code: str, payload: PolicyAdminIn):
     country = Country.objects.filter(pk=code.upper()).first()
     if country is None:
         raise HttpError(404, "Unknown market")
+    check_market(request, country.code, "Unknown market")
     pol = country.returns or ReturnPolicy(country=country)
     for field, value in payload.dict().items():
         setattr(pol, field, value)
@@ -272,7 +274,7 @@ def _validate(instance) -> None:
         raise HttpError(422, "; ".join(f"{k}: {' '.join(v)}" for k, v in exc.message_dict.items()))
 
 
-@admin_returns_router.get("/reasons", response=list[ReasonAdminOut])
+@admin_returns_router.get("/reasons", auth=StaffAuth("returns.view"), response=list[ReasonAdminOut])
 def admin_reasons(request):
     return ReturnReason.objects.prefetch_related("countries").order_by("sort_order", "code")
 
@@ -285,9 +287,10 @@ def _countries(codes) -> list:
     return found
 
 
-@admin_returns_router.post("/reasons", response={201: ReasonAdminOut, 409: ErrorOut, 422: ErrorOut})
+@admin_returns_router.post("/reasons", auth=StaffAuth("returns.configure"), response={201: ReasonAdminOut, 409: ErrorOut, 422: ErrorOut})
 @transaction.atomic
 def admin_reason_create(request, payload: ReasonAdminIn):
+    require_every_market(request)                 # reasons are shared by every market
     if ReturnReason.objects.filter(code=payload.code).exists():
         raise HttpError(409, "A reason with that code exists")
     data = payload.dict()
@@ -299,9 +302,10 @@ def admin_reason_create(request, payload: ReasonAdminIn):
     return 201, ReturnReason.objects.prefetch_related("countries").get(pk=reason.pk)
 
 
-@admin_returns_router.patch("/reasons/{reason_id}", response={200: ReasonAdminOut, 404: ErrorOut, 422: ErrorOut})
+@admin_returns_router.patch("/reasons/{reason_id}", auth=StaffAuth("returns.configure"), response={200: ReasonAdminOut, 404: ErrorOut, 422: ErrorOut})
 @transaction.atomic
 def admin_reason_patch(request, reason_id: UUID, payload: ReasonAdminPatch):
+    require_every_market(request)
     reason = ReturnReason.objects.filter(pk=reason_id).first()
     if reason is None:
         raise HttpError(404, "Reason not found")
@@ -316,15 +320,18 @@ def admin_reason_patch(request, reason_id: UUID, payload: ReasonAdminPatch):
     return ReturnReason.objects.prefetch_related("countries").get(pk=reason.pk)
 
 
-@admin_returns_router.get("/rules", response=list[RuleAdminOut], summary="Per-category overrides of the market policy")
+@admin_returns_router.get("/rules", auth=StaffAuth("returns.view"), response=list[RuleAdminOut], summary="Per-category overrides of the market policy")
 def admin_rules(request, country: str | None = None):
     qs = ReturnRule.objects.select_related("category")
+    if request.staff.markets is not None:
+        qs = qs.filter(Q(country_id__in=request.staff.markets) | Q(country__isnull=True))
     return qs.filter(Q(country_id=country.upper()) | Q(country__isnull=True)) if country else qs
 
 
-@admin_returns_router.post("/rules", response={201: RuleAdminOut, 409: ErrorOut, 422: ErrorOut})
+@admin_returns_router.post("/rules", auth=StaffAuth("returns.configure"), response={201: RuleAdminOut, 409: ErrorOut, 422: ErrorOut})
 def admin_rule_create(request, payload: RuleAdminIn):
     country = _countries([payload.country])[0] if payload.country else None
+    _may_edit_rule(request, country.code if country else None)
     category = Category.objects.filter(pk=payload.category_id).first()
     if category is None:
         raise HttpError(422, "Unknown category")
@@ -335,11 +342,12 @@ def admin_rule_create(request, payload: RuleAdminIn):
     return 201, ReturnRule.objects.select_related("category").get(pk=rule.pk)
 
 
-@admin_returns_router.patch("/rules/{rule_id}", response={200: RuleAdminOut, 404: ErrorOut})
+@admin_returns_router.patch("/rules/{rule_id}", auth=StaffAuth("returns.configure"), response={200: RuleAdminOut, 404: ErrorOut})
 def admin_rule_patch(request, rule_id: UUID, payload: RuleAdminPatch):
     rule = ReturnRule.objects.select_related("category").filter(pk=rule_id).first()
     if rule is None:
         raise HttpError(404, "Rule not found")
+    _may_edit_rule(request, rule.country_id)
     data = payload.dict(exclude_unset=True)
     if data.pop("clear_change_of_mind", False):
         rule.change_of_mind_days = None
@@ -353,29 +361,46 @@ def admin_rule_patch(request, rule_id: UUID, payload: RuleAdminPatch):
     return rule
 
 
-@admin_returns_router.delete("/rules/{rule_id}", response={204: None, 404: ErrorOut})
+@admin_returns_router.delete("/rules/{rule_id}", auth=StaffAuth("returns.configure"), response={204: None, 404: ErrorOut})
 def admin_rule_delete(request, rule_id: UUID):
-    deleted, _ = ReturnRule.objects.filter(pk=rule_id).delete()
-    if not deleted:
+    rule = ReturnRule.objects.filter(pk=rule_id).first()
+    if rule is None:
         raise HttpError(404, "Rule not found")
+    _may_edit_rule(request, rule.country_id)
+    rule.delete()
     return 204, None
 
 
 # --- one request ---------------------------------------------------------------------------
 
 
-@admin_returns_router.get("/{return_id}", response={200: AdminReturnOut, 404: ErrorOut})
+def _get_any(request, return_id):
+    """The return, if it is in one of the staff member's markets (otherwise 404)."""
+    r = services.get_any(return_id)
+    check_market(request, r.country_id, "Return not found")
+    return r
+
+
+def _may_edit_rule(request, country_code):
+    """A rule for every market (no country) is a platform-wide setting; a market's rule needs that market."""
+    if country_code is None:
+        require_every_market(request)
+    else:
+        check_market(request, country_code, "Rule not found")
+
+
+@admin_returns_router.get("/{return_id}", auth=StaffAuth("returns.view"), response={200: AdminReturnOut, 404: ErrorOut})
 def admin_return(request, return_id: UUID):
-    return services.get_any(return_id)
+    return _get_any(request, return_id)
 
 
-@admin_returns_router.post("/{return_id}/decide", response={200: AdminReturnOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Settle an escalated rejection or a damaged parcel (final)")
+@admin_returns_router.post("/{return_id}/decide", auth=StaffAuth("returns.decide"), response={200: AdminReturnOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="Settle an escalated rejection or a damaged parcel (final)")
 def admin_return_decide(request, return_id: UUID, payload: DecideIn):
-    services.decide(services.get_any(return_id), user=request.auth, outcome=payload.outcome, note=payload.note)
-    return services.get_any(return_id)
+    services.decide(_get_any(request, return_id), user=request.auth, outcome=payload.outcome, note=payload.note)
+    return _get_any(request, return_id)
 
 
-@admin_returns_router.post("/{return_id}/refund-paid", response={200: AdminReturnOut, 404: ErrorOut, 409: ErrorOut}, summary="Staff paid the buyer")
+@admin_returns_router.post("/{return_id}/refund-paid", auth=StaffAuth("returns.refund"), response={200: AdminReturnOut, 404: ErrorOut, 409: ErrorOut}, summary="Staff paid the buyer")
 def admin_return_refund_paid(request, return_id: UUID, payload: RefundPaidIn = None):
-    services.mark_refund_paid(services.get_any(return_id), user=request.auth, reference=payload.reference if payload else "")
-    return services.get_any(return_id)
+    services.mark_refund_paid(_get_any(request, return_id), user=request.auth, reference=payload.reference if payload else "")
+    return _get_any(request, return_id)

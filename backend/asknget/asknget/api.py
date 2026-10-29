@@ -5,11 +5,15 @@ Each app exposes Router(s) in `<app>/api.py`; mount them here so Swagger
 """
 
 from django.http import Http404
-from ninja import NinjaAPI
 from ninja.errors import ValidationError
+
+from core.openapi import DocumentedAPI
 
 from accounts.api import auth_router, me_router
 from catalog.api import catalog_router, wishlist_router
+from catalog.category_requests import category_files_router
+from catalog.request_api import admin_category_requests_router, seller_category_requests_router
+from staff.api import admin_me_router
 from discovery.api import discovery_router
 from marketing.api import marketing_router
 from chat.api import admin_chat_router, customer_chat_router, seller_chat_router
@@ -29,16 +33,23 @@ from portal.api import (
 )
 from orders.api import admin_orders_router, cart_router, checkout_router, my_orders_router, orders_public_router
 from sellers.api import admin_sellers_router, lookups_router, seller_router
-from notifications.api import notifications_router
+from notifications.api import notifications_router, admin_notifications_router, my_notifications_router, realtime_router
 from ledger.api import admin_ledger_router, admin_payouts_router, transactions_router
 from returns.api import admin_returns_router, my_returns_router, returns_public_router, seller_returns_router
 from sellers.files import files_router
 from team.api import accept_router, me_router as seller_me_router, team_router
 
-api = NinjaAPI(
+api = DocumentedAPI(
     title="asknget API",
     version="1.0.0",
-    description="Multi-vendor marketplace: buyer storefront + seller onboarding.",
+    description=(
+        "Multi-vendor marketplace: buyer storefront, seller portal, admin.\n\n"
+        "**Base URL: every path in this document already starts with `/api/v1`, so a client's base URL is the origin only** "
+        "(for example `https://asknget-backend.vercel.app`), never `.../api/v1`.\n\n"
+        "Auth is `Authorization: Bearer <access_token>`. Money is integer minor units (`*_cents`). Lists return `{items, total, page, per_page, pages}`. "
+        "Every error is `{\"detail\": \"...\"}` (422 adds `errors[]`). `X-Region`, `X-Language`, `X-Timezone` (all calls), `X-Store` (seller calls) and "
+        "`X-Cart-Token` (cart and checkout) are declared on the operations that use them."
+    ),
     urls_namespace="api_v1",
 )
 
@@ -74,6 +85,7 @@ me_router.add_router("", wishlist_router)
 me_router.add_router("", my_orders_router)
 me_router.add_router("", my_returns_router)
 me_router.add_router("", customer_chat_router)
+me_router.add_router("/notifications", my_notifications_router)
 api.add_router("/me", me_router)
 api.add_router("", catalog_router)
 api.add_router("", discovery_router)
@@ -109,3 +121,9 @@ api.add_router("", returns_public_router)
 api.add_router("/seller/returns", seller_returns_router)
 api.add_router("/admin/returns", admin_returns_router)
 api.add_router("/files", files_router)
+api.add_router("/files", category_files_router)
+api.add_router("/seller/category-requests", seller_category_requests_router)
+api.add_router("/admin/category-requests", admin_category_requests_router)
+api.add_router("/admin/me", admin_me_router)
+api.add_router("/admin/notifications", admin_notifications_router)
+api.add_router("/realtime", realtime_router)

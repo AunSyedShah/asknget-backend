@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from catalog.models import Brand, Review
 from catalog.services import refresh_stock_status
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from discovery.indexing import embed_products
 from orders.models import Order, OrderItem
 from returns.models import ReturnEvent, ReturnItem, ReturnPhoto, ReturnReason, ReturnRequest, ReturnShipment
@@ -169,6 +169,6 @@ class QueryBudgetTests(ApiTestCase):
 
     def test_admin_returns_queue(self):
         self._returns()
-        staff = self.token_for(make_user(is_staff=True))
-        body = self.budget(4, "/api/v1/admin/returns", token=staff)
+        staff = self.token_for(make_staff())
+        body = self.budget(6, "/api/v1/admin/returns", token=staff)      # +2 since sprint 9: the staff member's permissions and markets
         self.assertEqual(body["total"], ORDERS)

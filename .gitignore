@@ -6,6 +6,11 @@ Thumbs.db
 
 # Local secrets anywhere
 .env
+# Private keys and server credentials (EC2 .pem, SSH keys): never in the repository
+*.pem
+*.key
+id_rsa*
+id_ed25519*
 
 # Python bytecode anywhere
 __pycache__/
@@ -13,6 +18,10 @@ __pycache__/
 
 # Figma frame renders (docs/figma/snapshot.py --render) — regenerate, do not commit
 docs/figma/renders/
+
+# The owner's PNG export from the Figma app and the catalogued frames (docs/figma/catalog_exports.py): large, regenerate
+/Figma/
+/figma/
 
 # Local Figma exports (.fig) — large binaries, regenerate from Figma
 *.fig

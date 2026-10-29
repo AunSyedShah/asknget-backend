@@ -4,6 +4,11 @@
 > code, not from memory: the endpoint index at the end is generated from the OpenAPI schema. If this file and the
 > running API disagree, the API wins; `GET /api/v1/openapi.json` is the contract and `/api/v1/docs` is its UI.
 > Backend repo: `github.com/AunSyedShah/asknget-backend` (renamed from `asknget`; the old URL redirects).
+>
+> **Starting a new frontend from scratch? Read [`frontend-agent-brief.md`](frontend-agent-brief.md) first** (product, environments, the Figma
+> tooling, how the two sessions work in parallel, the owner's decisions). Backend changes after 2026-10-12 are logged in
+> [`api-changes.md`](api-changes.md), newest first. Sections 1 and 2 below describe an older situation (an existing frontend to make
+> responsive; the Vercel host as it was); the brief's section 3 has the current environments.
 
 ## 1. The task, and what is still undecided
 
@@ -160,11 +165,56 @@ same fields (`tracking_number`, `tracking_url`, `label_url`) are filled for them
   count), so it can be later than placed date + the market's change-of-mind days.
 - **Endpoint index paths** below were printed as `/api/v1/api/v1/…` before; they are right now.
 
+**Phone verification by WhatsApp (QR or button), built after the email OTP:**
+1. `POST /auth/whatsapp/start` `{"purpose":"signup_phone","phone":"+92..."}` (the bearer token is optional; `phone` can be left out when signed in and the account has one) returns
+   `{id, link, message, whatsapp_number, expires_at}`. `429` after 5 tries an hour, `503` when WhatsApp is not configured, `422` when `phone` is not the account's.
+2. Draw `link` as a **QR code** on desktop and open it from a **button** on a phone (a phone cannot scan its own screen). It opens WhatsApp with
+   "Verify your OTP for asknget: XXXXXXXX" already typed; the user only presses Send.
+3. Poll `GET /auth/whatsapp/{id}` every 2-3 s: `status` is `pending`, `verified` (then `phone_masked`), `failed` (`failure`: `phone_mismatch` when it was sent from another number,
+   `phone_in_use` when another account owns that number) or `expired` (10 minutes). Stop polling on anything but `pending`.
+4. There is no code to type: the number the message came from is the proof. When it succeeds the account's `phone_verified_at` is set; an account without a phone takes that number.
+   Email OTP is unchanged and still available.
+- Sandbox only: each tester first sends `join <word>` to the sandbox number once.
+
+**Delivery fee rule: free over an amount, otherwise a fee (built after the WhatsApp verification):**
+- The **admin** sets a free-delivery threshold and a fee for the whole platform or per market (Django admin, settings `shipping.free_over_cents` and
+  `shipping.fee_cents`); the **seller** sets their own for their store. Both are in the market's currency, in cents. `0` as the threshold means "no free delivery".
+- It applies to a delivery option **with no price** (`price_cents: null` in the seller's options, shown as `follows_rule: true` to buyers). An option with a price
+  (Express R25) is a fixed price and never changes. Pickup is always fixed. Existing options are unchanged until a seller blanks a price.
+- It is judged **per seller**, on that seller's items in the cart before any voucher.
+- **Cart:** each `deliveries[]` line has `rule: {free_over_cents, fee_cents, store_subtotal_cents, remaining_cents, free}`. Show "Add R{remaining_cents/100} more for free
+  delivery" when `free_over_cents > 0` and `remaining_cents > 0`, and "Free delivery" when `free`. Each option has `price_cents` (already the price for this cart),
+  `waived` and `follows_rule`.
+- **Seller portal** (next to Delivery options): `GET /seller/delivery-options/rule` returns what applies now (`free_over_cents`, `fee_cents`), where each came from
+  (`source`: `store` / `country` / `global` / `default`), `own` (the store's own values, `null` when unset), `currency` and `locked`. `PUT` sets `free_over_cents` and/or
+  `fee_cents` (send one or both); `DELETE` goes back to the platform's numbers. `409 rule_locked` on `PUT` while the admin has locked the market: show the values read-only.
+  Creating or editing an option accepts `price_cents: null` (not for pickup, `422`); list responses return `null` for those.
+- An order keeps what it was charged (`waived`, the threshold) and is never recalculated.
+
+**Category requests (Category Request Popup): a seller asks, staff decide.** A seller cannot create a category.
+- `POST /seller/category-requests` (multipart): `name` ("Category Name"), `reason` ("Why do you need this category?", 3-250 characters), `parent_id`
+  ("Parent Category", a **top-level** one; leave it out to ask for a new top-level category), `document` (optional, PNG or JPG up to 1 MB). `201` returns the request
+  (`status: pending`). Errors: **`409 category_exists`** with `category {id, name, slug}` and `is_active` when that name already exists: offer "Use {name}" instead;
+  `409 already_requested` (this store already asked); `422 parent_must_be_top_level`, `unknown_parent`, or a file that is not a real PNG/JPG or is over 1 MB; `429` with 5
+  requests already waiting.
+- `GET /seller/category-requests?status=` (paginated) and `GET /seller/category-requests/{id}`; `DELETE` withdraws one still `pending`.
+- When staff decide, the seller gets a portal notification (`category_request_approved` / `category_request_rejected`, tab **System**) and the request shows `status`,
+  `review_note` (the rejection reason) and, once approved, `category {id, name, slug}`: that is the category to pick in the product form (it may have a different
+  name or parent than asked, or be one that already existed).
+- `document_url` is a signed link that expires; fetch the request again for a fresh one.
+- **Admin portal** (no screen designed yet): `GET /admin/category-requests` (default `pending`, oldest first; `?status=`, `?q=` name or store), `GET /{id}` (with
+  `store`, `requested_by` and `existing_category` when the name now exists), `POST /{id}/approve` with `{}` to create it as asked, or `{name, parent_id, note}` to rename
+  or move it, or `{use_category_id}` to give the seller an existing category; `POST /{id}/reject` with `{reason}`. A decided request answers `409 not_pending`.
+
 ## 5b. Still not in the backend
 
-Do not wire these (render static or empty states, or leave out, as the owner decides): **Category Request**,
-and the whole **Admin portal** (13 screens added 2026-10-09: dashboard, sellers, categories, orders, products), planned as the
-next sprint (`docs/data-model.md` Q74–Q83). Report what you need instead of assuming a shape.
+**The seller's Category Request popup is built** (section 5a, "Category requests", with the staff queue under `/admin/category-requests`).
+
+**The Admin portal is partly built.** These admin endpoints exist: seller-application review (`/admin/seller-applications`), orders (`/admin/orders`, with status changes), product review
+(`/admin/products`), stores (`/admin/stores`), returns (`/admin/returns`: queue, decide, refund-paid, policies, reasons, rules), ledger and payouts (`/admin/ledger`, `/admin/payouts`), flagged chat
+(`/admin/chat`), category requests (`/admin/category-requests`), and the per-market settings in Django admin. **Not built, so do not wire (render static or empty, and report what you need): the admin dashboard figures, category
+management (add, edit, activate or deactivate, reorder, image), the seller list and seller detail with their figures, the customer list and customer detail (and suspending a customer), the marketplace transactions
+overview, application review notes, product suspend, and richer rows and tab counts on the admin orders and products lists.** What each designed screen needs is in the frontend's `BACKEND_ASKS.md` (ask 5); the backend plans an admin sprint for them. Report what you need instead of assuming a shape.
 
 ## 6. Reading the Figma design
 
@@ -197,7 +247,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 ## 8. Endpoint index (generated from the OpenAPI schema)
 
-220 operations in 34 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
+234 operations in 36 groups. Regenerate with `uv run poe endpoints` (from `backend/`) after changing routes.
 
 #### auth
 
@@ -213,6 +263,8 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | POST | `/api/v1/auth/register` | - | Register as a customer |
 | POST | `/api/v1/auth/seller/register` | - | Register as a seller ('Create your seller account') |
 | POST | `/api/v1/auth/team/accept` | bearer | Accept an invitation (sign in first if the e-mail already has an account) |
+| POST | `/api/v1/auth/whatsapp/start` | bearer | Verify a phone number by WhatsApp: the user sends us a message (QR or button) |
+| GET | `/api/v1/auth/whatsapp/{challenge_id}` | - | Has the WhatsApp message arrived? (poll every 2-3 s) |
 
 #### cart
 
@@ -265,6 +317,7 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
+| GET | `/api/v1/files/category-requests/{request_id}` | - | A category request's supporting image, through a signed link (expires) |
 | GET | `/api/v1/files/seller-documents/{doc_id}` | - | A seller document, through a signed link from the API (expires) |
 
 #### lookups
@@ -384,6 +437,15 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/seller/analytics/sales` | bearer | Sales Analytics: gross vs net, discounts, refunds, revenue over time, channel and category mix |
 | GET | `/api/v1/seller/analytics/search` | bearer | What shoppers typed; market searches that found nothing |
 
+#### seller: category requests
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/seller/category-requests` | bearer | My category requests |
+| POST | `/api/v1/seller/category-requests` | bearer | Ask for a category (Category Request Popup). 409 category_exists names the one to use instead |
+| DELETE | `/api/v1/seller/category-requests/{request_id}` | bearer | Withdraw a request still waiting for review |
+| GET | `/api/v1/seller/category-requests/{request_id}` | bearer | My Category Request |
+
 #### seller: chat
 
 | Method | Path | Auth | What it does |
@@ -422,6 +484,9 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 |---|---|---|---|
 | GET | `/api/v1/seller/delivery-options` | bearer | My delivery options |
 | POST | `/api/v1/seller/delivery-options` | bearer | Add a delivery option |
+| DELETE | `/api/v1/seller/delivery-options/rule` | bearer | Back to the platform's numbers |
+| GET | `/api/v1/seller/delivery-options/rule` | bearer | Free delivery over an amount, otherwise a fee: what applies to my store |
+| PUT | `/api/v1/seller/delivery-options/rule` | bearer | Set my own threshold and/or fee (409 rule_locked when the admin fixed them) |
 | DELETE | `/api/v1/seller/delivery-options/{option_id}` | bearer | Remove one (deactivated instead when orders or products reference it) |
 | PATCH | `/api/v1/seller/delivery-options/{option_id}` | bearer | Delivery Patch |
 
@@ -519,6 +584,15 @@ Treat the design as a hypothesis: where it contradicts the API or itself, log it
 | GET | `/api/v1/seller/transactions/overview` | bearer | Transactions Overview: cards, recent transactions, summary |
 | GET | `/api/v1/seller/transactions/tabs` | bearer | Counts for the tab labels: Sales (1,102), Payouts (24)… |
 | GET | `/api/v1/seller/transactions/{reference}` | bearer | Transaction Details |
+
+#### admin · category requests
+
+| Method | Path | Auth | What it does |
+|---|---|---|---|
+| GET | `/api/v1/admin/category-requests` | bearer | Category requests (default: waiting for review, oldest first) |
+| GET | `/api/v1/admin/category-requests/{request_id}` | bearer | Category Request Detail |
+| POST | `/api/v1/admin/category-requests/{request_id}/approve` | bearer | Approve: create the category (optionally renamed or moved), or give the seller an existing one (use_category_id) |
+| POST | `/api/v1/admin/category-requests/{request_id}/reject` | bearer | Reject, with a reason the seller sees |
 
 #### admin · orders
 

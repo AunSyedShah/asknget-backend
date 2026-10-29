@@ -13,7 +13,7 @@ disagree.
 
 import logging
 from datetime import timedelta
-from django.core.mail import send_mail
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -23,6 +23,7 @@ from catalog.services import adjust_stock, lock_variants
 from config import services as config
 from core.uploads import safe_image
 from markets.i18n import pick
+from notifications import bus
 from orders import services as order_services
 from orders.models import Order, OrderDelivery, OrderItem, OrderStatusEvent
 
@@ -32,7 +33,6 @@ from .models import ReturnEvent, ReturnItem, ReturnPhoto, ReturnReason, ReturnRe
 log = logging.getLogger(__name__)
 S = ReturnRequest.Status
 Actor = ReturnEvent.Actor
-MAX_PHOTO_BYTES = 5 * 1024 * 1024
 
 
 def _round_div(numerator: int, denominator: int) -> int:
@@ -41,16 +41,6 @@ def _round_div(numerator: int, denominator: int) -> int:
 
 def _event(request, actor, status=None, note="", user=None) -> None:
     ReturnEvent.objects.create(request=request, status=status or request.status, actor=actor, actor_user=user, note=note[:500])
-
-
-def _mail(request, subject: str, body: str) -> None:
-    """Sent after the transaction commits: a change that rolls back never e-mails the buyer."""
-    subject, to = f"asknget return {request.reference}: {subject}", [request.order.contact_email]
-    transaction.on_commit(lambda: send_mail(subject, body, None, to, fail_silently=True))
-
-
-def _name(request) -> str:
-    return request.order.contact_first_name or "there"
 
 
 # --------------------------------------------------------------------------------------
@@ -153,7 +143,7 @@ def _check_photos(files, reason, country) -> list:
         raise HttpError(422, f"At most {limit} photos")
     if reason.requires_photo and not files:
         raise HttpError(422, "photo_required")
-    return [safe_image(f, max_bytes=MAX_PHOTO_BYTES, formats=("JPEG", "PNG", "WEBP"), label="Each photo") for f in files]
+    return [safe_image(f, max_bytes=settings.RETURN_PHOTO_MAX_BYTES, formats=("JPEG", "PNG", "WEBP"), label="Each photo") for f in files]
 
 
 def _refund_amounts(order, store_id, items, reason) -> dict:
@@ -224,10 +214,7 @@ def request_return(user, order: Order, *, item_ids, reason_code: str, note: str 
         ReturnPhoto.objects.create(request=req, image=f)
     _event(req, Actor.BUYER, note=note, user=user)
 
-    from notifications import services as notifications
-
-    notifications.return_requested(req)
-    _mail(req, "received", f"Hi {_name(req)}, we have your return request {req.reference}. The seller will respond within {due_days} days.")
+    bus.emit("return.requested", req, actor=user, due_days=due_days)
     if config.get("returns.auto_approve", country=country):
         approve(req, actor=Actor.SYSTEM, note="Approved automatically")
     return request_qs().get(pk=req.pk)
@@ -311,8 +298,7 @@ def _book_and_tell(shipment_id) -> None:
     else:
         address = shipment.dropoff_address
         how = f"Please post it to {address.get('name', '')}, {address.get('address', '')}, {address.get('city', '')}, and add the tracking number in your account."
-    send_mail(f"asknget return {request.reference}: approved", f"Hi {_name(request)}, your return {request.reference} was approved. {how}",
-              None, [request.order.contact_email], fail_silently=True)
+    bus.emit("return.approved", request, how=how)
 
 
 @transaction.atomic
@@ -356,11 +342,10 @@ def _reject(request: ReturnRequest, *, actor: str, user=None, reason: str) -> Re
     if goods_with_seller:
         # The parcel arrived damaged and staff refused the refund: the item is still the buyer's and goes back to them.
         _event(request, actor, note=f"{reason} - no refund; the seller sends the item back to the customer", user=user)
-        _mail(request, "no refund", f"Hi {_name(request)}, we checked the item you returned under {request.reference} and no refund is due: "
-                                    f"{reason}. The seller will send the item back to you.")
+        bus.emit("return.no_refund", request, actor=user, note=f"{reason}. The seller will send the item back to you.")
     else:
         _event(request, actor, note=reason, user=user)
-        _mail(request, "rejected", f"Hi {_name(request)}, your return {request.reference} was not approved: {reason}")
+        bus.emit("return.rejected", request, actor=user, note=reason)
     return request
 
 
@@ -374,9 +359,7 @@ def cancel(request: ReturnRequest, *, user) -> ReturnRequest:
     request.save()
     _cancel_shipments(request)
     _event(request, Actor.BUYER, note="Withdrawn by the buyer", user=user)
-    from notifications import services as notifications
-
-    notifications.return_cancelled(request)
+    bus.emit("return.cancelled", request, actor=user)
     return request
 
 
@@ -389,9 +372,7 @@ def escalate(request: ReturnRequest, *, user, note: str = "") -> ReturnRequest:
     request.status, request.escalated_at = S.ESCALATED, timezone.now()
     request.save()
     _event(request, Actor.BUYER, note=note or "Disputed the rejection", user=user)
-    from notifications import services as notifications
-
-    notifications.return_escalated(request)
+    bus.emit("return.escalated", request, actor=user)
     return request
 
 
@@ -443,8 +424,6 @@ def mark_received(request: ReturnRequest, *, user, condition: str, restock: bool
 @transaction.atomic
 def decide(request: ReturnRequest, *, user, outcome: str, note: str = "") -> ReturnRequest:
     """Staff settle an escalated rejection or a parcel that arrived damaged. Final."""
-    from notifications import services as notifications
-
     request = _locked(request)
     outcome_key = "approved" if outcome == "approve" else ("refund_refused" if request.status == S.RECEIVED else "rejected")
     if request.status == S.ESCALATED:
@@ -459,7 +438,7 @@ def decide(request: ReturnRequest, *, user, outcome: str, note: str = "") -> Ret
             request = _reject(request, actor=Actor.STAFF, user=user, reason=note)
     else:
         raise HttpError(409, "Only an escalated or damaged return needs a decision")
-    notifications.return_decided(request, OUTCOMES[outcome_key])
+    bus.emit("return.decided", request, actor=user, outcome=OUTCOMES[outcome_key])
     return request
 
 
@@ -498,8 +477,7 @@ def _complete(request: ReturnRequest, *, actor: str, user=None, restock: bool = 
         request.decided_by, request.staff_note = user, note[:500]
     request.save()
     _event(request, actor, status=S.REFUNDED, note=note or "Refund issued", user=user)
-    _mail(request, "refund issued", f"Hi {_name(request)}, your return {request.reference} is complete. A refund of {request.refund_cents / 100:,.2f} {request.currency} "
-                                    "is on its way to your original payment method.")
+    bus.emit("refund.issued", request, actor=user)
     return request
 
 

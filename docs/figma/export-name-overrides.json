@@ -1,0 +1,10 @@
+{
+  "_about": "Files from Figma's own 'Export' that cannot be matched to a frame by name alone. Key = the PNG's name without .png. catalog_exports.py applies these first.",
+  "My Account - Payments Methods-1": {
+    "node_id": "312:3402",
+    "name": "My Account - Password Manager",
+    "note": "In Figma this frame is named 'My Account - Payments Methods' (a copy-paste slip by the designer) but it shows the Password Manager screen. Figma added -1 to the file name because two frames share a name."
+  },
+  "Icons": {"skip": true, "note": "An icon sheet, not a screen; kept in the export folder only."},
+  "Rectangle 52": {"skip": true, "note": "A stray 157x51 layer (0 KiB); not a screen."}
+}

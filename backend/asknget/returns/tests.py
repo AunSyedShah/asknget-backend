@@ -17,11 +17,11 @@ from PIL import Image
 
 from catalog.models import StockMovement
 from config.models import CommissionRule, Setting
-from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user, make_staff
 from ledger import services as ledger
 from ledger.models import LedgerEntry
 from markets.models import Country, ReturnPolicy
-from notifications.models import NotificationTemplate, StoreNotification
+from notifications.models import NotificationTemplate, Notification as StoreNotification
 from orders.models import Order, OrderDelivery, OrderItem, OrderStatusEvent, Voucher
 from team.models import StoreMember
 
@@ -67,7 +67,7 @@ class ReturnsTestCase(ApiTestCase):
         cls.watch = make_product(cls.store_b, cls.tech, "Smart Watch", 20000, None, stock=50)
         cls.buyer = make_user(email="olivia@example.com", full_name="Olivia Martin")
         cls.other_buyer = make_user(email="someone@example.com")
-        cls.staff = make_user(is_staff=True)
+        cls.staff = make_staff()
         # The seeded reasons come from the migration; fetch the ones the tests use.
         cls.r_mind = ReturnReason.objects.get(code="changed_mind")
         cls.r_damaged = ReturnReason.objects.get(code="damaged")
@@ -886,9 +886,9 @@ class AccessTests(ReturnsTestCase):
         self.assertEqual(feed[0]["title"], "Return Requested")
         self.assertIn("Olivia Martin", feed[0]["body"])
         NotificationTemplate.objects.filter(kind="return_requested").update(is_active=False)
-        before = StoreNotification.objects.count()
+        before = StoreNotification.objects.filter(audience="seller").count()
         self.request(order, [self.item(order, self.lip)])
-        self.assertEqual(StoreNotification.objects.count(), before)
+        self.assertEqual(StoreNotification.objects.filter(audience="seller").count(), before)
 
 
 # ======================================================================================

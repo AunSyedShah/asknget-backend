@@ -14,6 +14,7 @@ from ninja import Header, Query, Router
 from ninja.pagination import paginate
 
 from core.auth import JWTAuth, OptionalJWTAuth, StaffAuth
+from staff.access import scope
 from core.pagination import PagePagination
 from core.schemas import ErrorOut, MessageOut
 
@@ -66,49 +67,49 @@ def cart_get(request, x_cart_token: str | None = Header(None, description=_TOKEN
 def cart_add_item(request, payload: CartItemIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.add_item(cart, variant_id=payload.variant_id, qty=payload.qty)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.patch("/items/{item_id}", response=_CART, summary="Change quantity")
 def cart_set_qty(request, item_id: UUID, payload: CartItemPatchIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.set_item_qty(cart, item_id, payload.qty)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/items/{item_id}", response=_CART, summary="Remove line")
 def cart_remove_item(request, item_id: UUID, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.remove_item(cart, item_id)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/items", response=_CART, summary="Empty the cart ('clear cart and switch region')")
 def cart_clear(request, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.clear_items(cart)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.patch("", response=_CART, summary="Order note / delivery type")
 def cart_update(request, payload: CartPatchIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.update_cart(cart, payload.dict(exclude_unset=True))
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.post("/voucher", response=_CART, summary="'Discount Voucher → Apply'")
 def cart_apply_voucher(request, payload: VoucherApplyIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.apply_voucher(cart, payload.code)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @cart_router.delete("/voucher", response=_CART)
 def cart_remove_voucher(request, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.remove_voucher(cart)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 # --------------------------------------------------------------------------- #
@@ -121,7 +122,7 @@ def cart_remove_voucher(request, x_cart_token: str | None = Header(None, descrip
 def cart_set_delivery(request, payload: DeliveryChoiceIn, x_cart_token: str | None = Header(None, description=_TOKEN_DOC)):
     cart, token = services.resolve_cart(request)
     services.set_cart_delivery(cart, store_id=payload.store_id, option_id=payload.option_id)
-    return services.cart_out(services.resolve_cart(request)[0], token)
+    return services.cart_out(services.reload_cart(cart), token)
 
 
 @checkout_router.post(
@@ -168,7 +169,7 @@ def my_order_reorder(request, order_id: UUID):
     order = services.get_my_order(request.auth, order_id)
     cart, _ = services.resolve_cart(request)
     skipped = services.reorder(order, cart)
-    body = services.cart_out(services.resolve_cart(request)[0])
+    body = services.cart_out(services.reload_cart(cart))
     body["problems"] = [f"{n} is no longer available" for n in skipped] + body["problems"]
     return body
 
@@ -193,10 +194,10 @@ def track_order(request, payload: TrackIn):
 # --------------------------------------------------------------------------- #
 
 
-@admin_orders_router.get("", response=list[OrderSummaryOut])
+@admin_orders_router.get("", auth=StaffAuth("orders.view"), response=list[OrderSummaryOut])
 @paginate(PagePagination)
 def admin_orders(request, status: str | None = None, q: str | None = None):
-    qs = services.order_qs()
+    qs = scope(request, services.order_qs())
     if status:
         qs = qs.filter(status=status)
     if q:
@@ -204,17 +205,17 @@ def admin_orders(request, status: str | None = None, q: str | None = None):
     return qs
 
 
-@admin_orders_router.get("/{order_id}", response={200: OrderDetailOut, 404: ErrorOut})
+@admin_orders_router.get("/{order_id}", auth=StaffAuth("orders.view"), response={200: OrderDetailOut, 404: ErrorOut})
 def admin_order_detail(request, order_id: UUID):
-    order = services.order_qs().filter(pk=order_id).first()
+    order = scope(request, services.order_qs()).filter(pk=order_id).first()
     if order is None:
         return 404, {"detail": "Order not found"}
     return order
 
 
-@admin_orders_router.post("/{order_id}/status", response={200: OrderDetailOut, 404: ErrorOut, 409: ErrorOut}, summary="Advance an order (writes the tracking timeline)")
+@admin_orders_router.post("/{order_id}/status", auth=StaffAuth("orders.manage"), response={200: OrderDetailOut, 404: ErrorOut, 409: ErrorOut}, summary="Advance an order (writes the tracking timeline)")
 def admin_order_status(request, order_id: UUID, payload: AdminOrderStatusIn):
-    order = services.order_qs().filter(pk=order_id).first()
+    order = scope(request, services.order_qs()).filter(pk=order_id).first()
     if order is None:
         return 404, {"detail": "Order not found"}
     services.set_status(order, status=payload.status, actor_user=request.auth, note=payload.note, location=payload.location)

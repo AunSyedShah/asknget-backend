@@ -1,0 +1,8 @@
+[Unit]
+Description=asknget: nightly database dump (kept 7 days, on this disk only)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/bin/sh -c 'mkdir -p /var/backups/asknget && pg_dump -Fc asknget > /var/backups/asknget/asknget-$(date +%%F).dump && find /var/backups/asknget -name "*.dump" -mtime +7 -delete'

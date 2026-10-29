@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Installed as /opt/asknget/bin/deploy-frontend (root-owned). The ONLY thing the frontend CI key may run (sshd forces it).
+#
+#   ssh deploy@host <git-sha> < frontend.tgz        (frontend.tgz: the CONTENTS of the Vite build/ folder: index.html, assets/, ...)
+#
+# nginx serves /opt/asknget/frontend/current, so switching the link is the whole deploy: no restart, no reload.
+set -euo pipefail
+umask 022
+
+APP=/opt/asknget/frontend
+SHA="${SSH_ORIGINAL_COMMAND:-}"
+if [[ ! "$SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+  echo "deploy-frontend: give the git sha as the command (got '${SHA}')" >&2
+  exit 2
+fi
+
+exec 9>/opt/asknget/.deploy-frontend.lock
+flock -n 9 || { echo "deploy-frontend: another frontend deploy is running" >&2; exit 3; }
+
+# Unique per deploy, so redeploying the sha that is live never deletes the folder in use.
+REL="$APP/releases/${SHA}-$(date -u +%Y%m%d%H%M%S)"
+echo "==> unpacking $SHA"
+rm -rf "$REL"; mkdir -p "$REL"
+tar -xzf - -C "$REL" --no-same-owner --no-same-permissions
+[ -f "$REL/index.html" ] || { echo "deploy-frontend: no index.html in the archive" >&2; rm -rf "$REL"; exit 4; }
+if [ -f "$REL/version.txt" ] && [ "$(tr -d '[:space:]' < "$REL/version.txt")" != "$SHA" ]; then
+  echo "deploy-frontend: version.txt does not match $SHA" >&2; rm -rf "$REL"; exit 5
+fi
+chmod -R a+rX "$REL"
+
+ln -sfn "$REL" "$APP/current.new"
+mv -Tf "$APP/current.new" "$APP/current"
+echo "$SHA $(date -u +%FT%TZ)" > "$APP/deployed.txt"
+ls -1dt "$APP"/releases/*/ | tail -n +4 | xargs -r rm -rf
+echo "==> $SHA is live"

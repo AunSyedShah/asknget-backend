@@ -317,7 +317,7 @@ def _verified_order_item(user, product):
 
 
 @transaction.atomic
-def create_review(product: Product, *, user, name: str | None, email: str | None, rating: int, body: str, files) -> Review:
+def create_review(product: Product, *, user, name: str | None, email: str | None, rating: int, body: str, files, title: str = "") -> Review:
     if user is not None:
         name = name or user.full_name or user.email.split("@")[0]
         email = email or user.email
@@ -341,7 +341,7 @@ def create_review(product: Product, *, user, name: str | None, email: str | None
 
     review = Review.objects.create(
         product=product, user=user, order_item=_verified_order_item(user, product),
-        reviewer_name=name, reviewer_email=email, rating=rating, body=body,
+        reviewer_name=name, reviewer_email=email, rating=rating, title=title.strip(), body=body,
     )
     for i, (kind, f) in enumerate(stored):
         media = ReviewMedia(review=review, sort_order=i, type=kind)

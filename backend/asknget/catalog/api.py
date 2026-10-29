@@ -134,7 +134,7 @@ def review_summary(request, slug: str):
 def review_create(request, slug: str, payload: Form[ReviewIn], files: list[UploadedFile] = File(None)):
     product = services.get_product(slug, full=False)
     review = services.create_review(
-        product, user=_user(request), name=payload.name, email=payload.email, rating=payload.rating, body=payload.body, files=files or []
+        product, user=_user(request), name=payload.name, email=payload.email, rating=payload.rating, title=payload.title, body=payload.body, files=files or []
     )
     return 201, {"id": review.id, "status": review.status, "detail": "Thanks! Your review will appear once it has been approved."}
 

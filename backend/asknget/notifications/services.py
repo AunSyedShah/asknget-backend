@@ -1,8 +1,8 @@
-"""Creating, rendering and reading notifications.
+"""Rendering and reading notifications, and the seller-only notices not yet moved to events.
 
-Emitters (`order_paid`, `stock_alert`, ...) are called from the same transaction as the event
-they describe, so if the event rolls back the notification goes with it. Each reads its template
-once per call rather than once per notification.
+Orders and returns go through events (`notifications.bus.emit`, catalogue in notifications/catalog.py). The helpers below
+(`stock_alert`, `payout_processed`, ...) write a seller notification directly, in the caller's transaction; they move to events
+in a later phase.
 """
 
 from datetime import timedelta
@@ -13,13 +13,9 @@ from ninja.errors import HttpError
 
 from config import services as config
 from markets.i18n import pick
-from orders.models import Order, OrderItem
 
 from .defaults import CATEGORY_SECTION, TEMPLATES
-from .models import NotificationRead, NotificationTemplate, StoreNotification
-
-PAID_STATES = [Order.OrderPaymentStatus.PAID, Order.OrderPaymentStatus.PARTIALLY_REFUNDED, Order.OrderPaymentStatus.REFUNDED]
-
+from .models import Notification, NotificationRead, NotificationTemplate
 
 # --------------------------------------------------------------------------------------
 # Creating
@@ -39,40 +35,10 @@ def notify(store, kind: str, params: dict | None = None, *, link: tuple[str, obj
         raise ValueError(f"unknown notification kind {kind!r}")
     if template is not None and not template.is_active:
         return None
-    return StoreNotification.objects.create(
+    return Notification.objects.create(
         store_id=getattr(store, "pk", store), kind=kind, category=template.category if template else default[0], params=params or {},
         link_type=link[0] if link else "", link_id=str(link[1]) if link else "",
     )
-
-
-def _customer(order) -> str:
-    return f"{order.contact_first_name} {order.contact_last_name}".strip()
-
-
-def order_paid(order: Order) -> None:
-    """The order became visible to its sellers: tell each store, and spot first-time customers."""
-    store_ids = list(OrderItem.objects.filter(order=order).values_list("store_id", flat=True).distinct())
-    known = templates()
-    seen_before = set(
-        OrderItem.objects.filter(store_id__in=store_ids, order__payment_status__in=PAID_STATES).filter(
-            Q(order__user_id=order.user_id) if order.user_id else Q(order__contact_email__iexact=order.contact_email)
-        ).exclude(order=order).values_list("store_id", flat=True)
-    )
-    params = {"order": order.order_number, "customer": _customer(order)}
-    for store_id in store_ids:
-        notify(store_id, "order_received", params, link=("order", order.pk), known=known)
-        notify(store_id, "payment_received", params, link=("order", order.pk), known=known)
-        if store_id not in seen_before:
-            notify(store_id, "new_customer", params, link=("order", order.pk), known=known)
-
-
-def order_cancelled(order: Order, *, by: str) -> None:
-    """`by` is "customer" or "staff". A seller cancelling their own lines doesn't need telling."""
-    if order.payment_status not in PAID_STATES:
-        return                                  # sellers never saw an unpaid order, so there is nothing to retract
-    known = templates()
-    for store_id in OrderItem.objects.filter(order=order).values_list("store_id", flat=True).distinct():
-        notify(store_id, f"order_cancelled_{by}", {"order": order.order_number}, link=("order", order.pk), known=known)
 
 
 def stock_alert(product, status: str, qty: int) -> None:
@@ -87,28 +53,6 @@ def payout_processed(payout) -> None:
 def product_reviewed(product, *, approved: bool, reason: str = "") -> None:
     kind = "product_approved" if approved else "product_rejected"
     notify(product.store_id, kind, {"product": product.name, "reason": reason}, link=("product", product.pk))
-
-
-def _return_params(r) -> dict:
-    # `reason` is the label in every language: it is rendered in the reader's language, not the buyer's.
-    return {"order": r.order.order_number, "customer": _customer(r.order), "items": r.items.count(), "reason": r.reason.label or {"en": r.reason.code}}
-
-
-def return_requested(r) -> None:
-    notify(r.store_id, "return_requested", _return_params(r), link=("return", r.pk))
-
-
-def return_cancelled(r) -> None:
-    notify(r.store_id, "return_cancelled", _return_params(r), link=("return", r.pk))
-
-
-def return_escalated(r) -> None:
-    notify(r.store_id, "return_escalated", _return_params(r), link=("return", r.pk))
-
-
-def return_decided(r, outcome: dict) -> None:
-    """`outcome` is per language, like a template ({"en": "approved"})."""
-    notify(r.store_id, "return_decided", {**_return_params(r), "outcome": outcome}, link=("return", r.pk))
 
 
 def plan_changed(store) -> None:
@@ -132,7 +76,7 @@ def _fill(text: str, params: dict) -> str:
         return text                             # an admin's stray brace must not break the notification list
 
 
-def render(notification: StoreNotification, known: dict, country=None) -> tuple[str, str]:
+def render(notification: Notification, known: dict, country=None) -> tuple[str, str]:
     template, default = known.get(notification.kind), TEMPLATES.get(notification.kind)
     title_map = template.title if template else (default[1] if default else {})
     body_map = template.body if template else (default[2] if default else {})
@@ -143,7 +87,7 @@ def render(notification: StoreNotification, known: dict, country=None) -> tuple[
     return _fill(pick(title_map, country=country, default=notification.kind), params), _fill(pick(body_map, country=country), params)
 
 
-def group_of(notification: StoreNotification) -> str:
+def group_of(notification: Notification) -> str:
     today = timezone.localdate()
     day = timezone.localtime(notification.created_at).date()
     return "today" if day == today else "yesterday" if day == today - timedelta(days=1) else "earlier"
@@ -159,32 +103,79 @@ def visible_categories(access) -> list[str]:
     return [cat for cat, section in CATEGORY_SECTION.items() if section is None or access.allows(section, "view")]
 
 
-def feed(store, user, access, tab: str | None = None):
-    """The store's recent notifications this person may see, each with `is_read` for them."""
-    categories = visible_categories(access)
+# The tabs of the customer's and the staff member's bell (a seller's depend on their sections, above).
+CUSTOMER_CATEGORIES = ["orders", "returns"]
+STAFF_CATEGORIES = ["orders", "returns"]
+
+
+def _recent(qs, user, categories, tab=None):
     if tab and tab != "all":
         categories = [c for c in categories if c == tab]
     cutoff = timezone.now() - timedelta(days=config.get("notifications.recent_days"))
     reads = NotificationRead.objects.filter(notification=OuterRef("pk"), user=user)
-    return StoreNotification.objects.filter(store=store, category__in=categories, created_at__gte=cutoff).annotate(is_read=Exists(reads))
+    return qs.filter(category__in=categories, created_at__gte=cutoff).annotate(is_read=Exists(reads))
 
 
-def summary(store, user, access) -> dict:
-    rows = feed(store, user, access).order_by().values("category").annotate(total=Count("id"), unread=Count("id", filter=Q(is_read=False)))
+def feed(store, user, access, tab: str | None = None):
+    """The store's recent notifications this person may see, each with `is_read` for them."""
+    return _recent(Notification.objects.filter(audience=Notification.Audience.SELLER, store=store), user, visible_categories(access), tab)
+
+
+def customer_feed(user, tab: str | None = None):
+    return _recent(Notification.objects.filter(audience=Notification.Audience.CUSTOMER, user=user), user, CUSTOMER_CATEGORIES, tab)
+
+
+def staff_feed(user, staff, tab: str | None = None):
+    """What staff with these permissions see in their markets: lines for one of their markets or for every market."""
+    qs = Notification.objects.filter(audience=Notification.Audience.STAFF)
+    if not staff.is_superuser:
+        qs = qs.filter(permission__in=staff.permissions)
+    if staff.markets is not None:
+        qs = qs.filter(Q(market__isnull=True) | Q(market_id__in=staff.markets))
+    return _recent(qs, user, STAFF_CATEGORIES, tab)
+
+
+def summary_of(qs, categories) -> dict:
+    rows = qs.order_by().values("category").annotate(total=Count("id"), unread=Count("id", filter=Q(is_read=False)))
     by = {row["category"]: row for row in rows}
-    tabs = {cat: {"total": by.get(cat, {}).get("total", 0), "unread": by.get(cat, {}).get("unread", 0)} for cat in visible_categories(access)}
+    tabs = {cat: {"total": by.get(cat, {}).get("total", 0), "unread": by.get(cat, {}).get("unread", 0)} for cat in categories}
     tabs["all"] = {"total": sum(t["total"] for t in tabs.values()), "unread": sum(t["unread"] for t in tabs.values())}
     return {"unread": tabs["all"]["unread"], "tabs": tabs}
 
 
-def mark_read(store, user, access, notification_id) -> None:
-    notification = feed(store, user, access).filter(pk=notification_id).first()
+def summary(store, user, access) -> dict:
+    return summary_of(feed(store, user, access), visible_categories(access))
+
+
+def mark_read_in(qs, user, notification_id) -> None:
+    notification = qs.filter(pk=notification_id).first()
     if notification is None:
         raise HttpError(404, "Notification not found")
     NotificationRead.objects.get_or_create(notification=notification, user=user)
 
 
-def mark_all_read(store, user, access, tab: str | None = None) -> int:
-    ids = list(feed(store, user, access, tab).filter(is_read=False).values_list("pk", flat=True))
+def mark_all_read_in(qs, user) -> int:
+    ids = list(qs.filter(is_read=False).values_list("pk", flat=True))
     NotificationRead.objects.bulk_create([NotificationRead(notification_id=pk, user=user) for pk in ids], ignore_conflicts=True)
     return len(ids)
+
+
+def mark_read(store, user, access, notification_id) -> None:
+    mark_read_in(feed(store, user, access), user, notification_id)
+
+
+def mark_all_read(store, user, access, tab: str | None = None) -> int:
+    return mark_all_read_in(feed(store, user, access, tab), user)
+
+
+def rows(qs, country=None) -> list[dict]:
+    """The feed as the API shows it: wording rendered in the reader's language."""
+    known = templates()
+    out = []
+    for n in qs:
+        title, body = render(n, known, country)
+        out.append({
+            "id": n.pk, "category": n.category, "kind": n.kind, "title": title, "body": body, "link_type": n.link_type, "link_id": n.link_id,
+            "created_at": n.created_at, "group": group_of(n), "is_read": n.is_read,
+        })
+    return out

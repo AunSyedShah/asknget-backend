@@ -22,6 +22,8 @@
             T: $54.99
       [I:Button | State=Default]
         T: Leave Review
+      [I:Button | State=Secondary]
+        T: Return Order
         T: Completed
         T: Order #ORD-00120
           T: Black Earbuds
@@ -30,6 +32,8 @@
             T: $20.99
       [I:Button | State=Default]
         T: Leave Review
+      [I:Button | State=Secondary]
+        T: Return Order
   [I:Orders Tabs | State=Completed]
     T: All Orders
     T: Ongoing

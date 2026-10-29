@@ -1,0 +1,14 @@
+[Unit]
+Description=asknget: embed new or changed products for search
+After=postgresql.service
+ConditionPathExists=/opt/asknget/backend/current
+
+[Service]
+Type=oneshot
+User=asknget
+Group=asknget
+WorkingDirectory=/opt/asknget/backend/current/asknget
+Environment=DJANGO_SETTINGS_MODULE=asknget.settings
+ExecStart=/opt/asknget/backend/venv/bin/python manage.py embed_products
+Nice=10
+MemoryMax=300M

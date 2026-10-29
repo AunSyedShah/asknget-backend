@@ -22,8 +22,6 @@ AccountTypeLit = Literal["individual", "sole_proprietor", "registered_company"]
 BusinessTypeLit = Literal["private_limited", "public_limited", "partnership", "sole_proprietorship", "ngo", "other"]
 RoleLit = Literal["owner", "director", "partner", "manager", "authorised_signatory", "other"]
 BankAccountTypeLit = Literal["business", "personal", "savings", "current"]
-DocumentTypeLit = Literal["id_passport", "company_registration", "bank_confirmation", "proof_of_address", "tax_registration", "business_licence", "other"]
-
 # --------------------------------------------------------------------------- #
 # Step payloads (seller)
 # --------------------------------------------------------------------------- #
@@ -192,7 +190,7 @@ class BasicInfoOut(Schema):
     residential_province: str
 
 
-class CategoryRefOut(Schema):
+class ApplicationCategoryOut(Schema):
     id: UUID
     name: str
     slug: str
@@ -215,7 +213,7 @@ class BusinessInfoOut(Schema):
     returns_same_as_business: bool
     returns_address: str
     store_description: str
-    categories: list[CategoryRefOut]
+    categories: list[ApplicationCategoryOut]
 
 
 class RepresentativeOut(Schema):
@@ -288,6 +286,11 @@ class RequiredDocumentOut(Schema):
     type: str
     label: str = Field(description="Country-specific, in the request language")
     step: int
+    required: bool = Field(description="False = offered, but the application can be submitted without it")
+    help: str = Field(description="What a good copy looks like (may be empty)")
+    instructions: str = Field(description="This market's note for this document (may be empty)")
+    accepted_types: list[str] = Field(description="MIME types this document may be")
+    max_mb: int
 
 
 class KycPolicyOut(Schema):
@@ -336,7 +339,7 @@ class ApplicationOut(Schema):
     updated_at: datetime
 
 
-class TimelineStageOut(Schema):
+class ApplicationTimelineStageOut(Schema):
     stage: str
     state: Literal["done", "current", "pending", "skipped"]
     at: Optional[datetime]
@@ -358,7 +361,7 @@ class ApplicationStatusOut(Schema):
     account_type: str
     store_display_name: str
     submitted_at: Optional[datetime]
-    timeline: list[TimelineStageOut]
+    timeline: list[ApplicationTimelineStageOut]
     events: list[StatusEventOut]
     open_info_request: Optional[InfoRequestOut]
     reviewer_message: str
@@ -458,7 +461,12 @@ class InfoRequestItemIn(Schema):
 
     @model_validator(mode="after")
     def _target_known(self):
-        valid = set(rules.DocType.values) if self.kind == "document" else set(rules.FIELD_GROUPS)
+        if self.kind == "document":
+            from markets.models import DocumentType
+
+            valid = set(DocumentType.objects.filter(is_active=True).values_list("code", flat=True))
+        else:
+            valid = set(rules.FIELD_GROUPS)
         if self.target not in valid:
             raise ValueError(f"target must be one of: {', '.join(sorted(valid))}")
         return self
@@ -471,7 +479,7 @@ class RequestInfoIn(Schema):
     items: list[InfoRequestItemIn] = Field(min_length=1, max_length=20)
 
 
-class RejectIn(Schema):
+class ApplicationRejectIn(Schema):
     reason: NonEmptyStr = Field(max_length=2000)
 
 

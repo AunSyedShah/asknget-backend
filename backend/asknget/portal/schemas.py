@@ -123,7 +123,7 @@ class ProductPatchIn(Schema):
     compare_at_price_cents: Optional[int] = Field(None, ge=0, description="Send 0 to clear")
     cost_price_cents: Optional[int] = Field(None, ge=0, description="Wizard 'Cost Price' — seller-only, never shown to buyers")
     barcode: Optional[str] = Field(None, max_length=64)
-    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+    currency: Optional[str] = Field(None, min_length=3, max_length=3, description="Always the currency of the store's market; any other value is a 422")
     low_stock_threshold: Optional[int] = Field(None, ge=0)
     preorder: Optional[bool] = Field(None, description="Manual 'Pre-order' flag; otherwise stock status is derived")
     weight_grams: Optional[int] = Field(None, ge=0)
@@ -132,8 +132,6 @@ class ProductPatchIn(Schema):
     height_mm: Optional[int] = Field(None, ge=0)
     ships_from: Optional[str] = Field(None, max_length=120)
     handling_days: Optional[int] = Field(None, ge=0, le=30)
-    is_featured: Optional[bool] = None
-    is_new_arrival: Optional[bool] = None
 
     @field_validator("tags")
     @classmethod
@@ -210,7 +208,7 @@ class ContentIn(Schema):
     sections: list[ContentSectionIn] = Field([], max_length=20)
 
 
-class OptionTypeOut(Schema):
+class SellerOptionTypeOut(Schema):
     name: str
     values: list[OptionValueIn]
 
@@ -259,7 +257,7 @@ class SellerProductOut(Schema):
     is_featured: bool
     is_new_arrival: bool
     images: list[SellerImageOut]
-    option_types: list[OptionTypeOut]
+    option_types: list[SellerOptionTypeOut]
     variants: list[SellerVariantOut]
     key_benefits: list[ContentSectionIn]
     usage_steps: list[ContentSectionIn]
@@ -292,7 +290,7 @@ class ProductAnalyticsOut(Schema):
     daily: list[SeriesPoint] = Field(..., description="last 30 days: views, sold")
 
 
-class RejectIn(Schema):
+class ProductRejectIn(Schema):
     reason: NonEmptyStr = Field(max_length=1000)
 
 
@@ -307,6 +305,9 @@ class AdminProductRowOut(Schema):
     status: str
     submitted_at: Optional[datetime] = None
     image_url: Optional[str] = None
+    edited: bool = Field(False, description="Live, but changed after it was approved: waits for staff (`?status=edited`)")
+    review_source: str = Field("", description="staff | system: who last decided; empty if never reviewed")
+    reviewed_at: Optional[datetime] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -445,7 +446,7 @@ class SellerOrdersOverviewOut(Schema):
     tabs: OrderTabsOut
 
 
-class TimelineStageOut(Schema):
+class SellerOrderTimelineStageOut(Schema):
     key: str
     label: str
     at: Optional[datetime] = None
@@ -504,7 +505,7 @@ class SellerOrderDetailOut(Schema):
     delivery_method: Optional[dict] = None
     special_note: str
     payment: OrderPaymentOut
-    timeline: list[TimelineStageOut]
+    timeline: list[SellerOrderTimelineStageOut]
     items: list[SellerOrderItemOut]
     summary: OrderSummaryBlockOut
     cancel_reason: str
@@ -641,7 +642,7 @@ class DeliveryOptionIn(Schema):
 
     name: NonEmptyStr = Field(max_length=60, description='e.g. "Express Delivery"')
     eta_label: str = Field("", max_length=60, description='Free text, e.g. "1-3 business days"')
-    price_cents: int = Field(0, ge=0)
+    price_cents: Optional[int] = Field(0, ge=0, description="A fixed price. null = follow the delivery rule (free over a threshold, otherwise a fee); not for pickup")
     kind: Literal["delivery", "pickup"] = "delivery"
     is_active: bool = True
     sort_order: int = Field(0, ge=0)
@@ -650,7 +651,7 @@ class DeliveryOptionIn(Schema):
 class DeliveryOptionPatchIn(Schema):
     name: Optional[NonEmptyStr] = Field(None, max_length=60)
     eta_label: Optional[str] = Field(None, max_length=60)
-    price_cents: Optional[int] = Field(None, ge=0)
+    price_cents: Optional[int] = Field(None, ge=0, description="Send null to follow the delivery rule")
     kind: Optional[Literal["delivery", "pickup"]] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = Field(None, ge=0)
@@ -660,11 +661,35 @@ class DeliveryOptionOut(Schema):
     id: UUID
     name: str
     eta_label: str
-    price_cents: int
+    price_cents: Optional[int] = Field(description="null = follows the delivery rule")
     kind: str
     is_active: bool
     sort_order: int
     products_count: int = Field(0, description="Products that explicitly selected this option")
+
+
+class DeliveryRuleSourceOut(Schema):
+    free_over: str = Field(description="store | country | global | default")
+    fee: str
+
+
+class DeliveryRuleOwnOut(Schema):
+    free_over_cents: Optional[int] = Field(description="This store's own value; null = not set")
+    fee_cents: Optional[int]
+
+
+class DeliveryRuleOut(Schema):
+    free_over_cents: int = Field(description="Free at or above this (0 = no threshold), what applies now")
+    fee_cents: int = Field(description="Charged below the threshold, what applies now")
+    locked: bool = Field(description="The admin fixed the numbers for this market; the store's own values are ignored")
+    source: DeliveryRuleSourceOut
+    own: DeliveryRuleOwnOut
+    currency: str
+
+
+class DeliveryRuleIn(Schema):
+    free_over_cents: Optional[int] = Field(None, ge=0, description="0 = no free-delivery threshold")
+    fee_cents: Optional[int] = Field(None, ge=0)
 
 
 class ProductDeliveryIn(Schema):

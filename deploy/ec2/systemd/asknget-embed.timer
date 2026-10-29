@@ -1,0 +1,10 @@
+[Unit]
+Description=asknget: embed products every 2 minutes (replaces the worker container, uses no memory while idle)
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

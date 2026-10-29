@@ -39,7 +39,7 @@ Status = SellerApplication.ApplicationStatus
 def get_application(user) -> SellerApplication:
     app = (
         SellerApplication.objects.select_related("bank", "user", "reviewer", "country__kyc_policy")
-        .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events")
+        .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events", "country__document_requirements")
         .filter(user=user)
         .first()
     )
@@ -322,17 +322,24 @@ def upload_document(app: SellerApplication, *, doc_type: str, file) -> SellerDoc
     """Upload or replace. A replacement gets version+1 and supersedes the old row."""
     _assert_editable(app)
     original_name = file.name                 # shown to people; the stored file gets a server-chosen name below
-    if file.content_type not in rules.DOCUMENT_ALLOWED_TYPES:
-        raise HttpError(422, "Document must be PDF, JPG or PNG")
-    if file.size > settings.SELLER_DOCUMENT_MAX_BYTES:
-        raise HttpError(422, "Document must be 10 MB or smaller")
+    kyc = policy.policy_for(app)
+    kind = kyc.types.get(doc_type)
+    if kind is None:
+        raise HttpError(422, f"Unknown document type: {doc_type}")
+    allowed = set(kind.accepted_types) & rules.DOCUMENT_ALLOWED_TYPES
+    if file.content_type not in allowed:
+        names = {"application/pdf": "PDF", "image/jpeg": "JPG", "image/png": "PNG"}
+        raise HttpError(422, f"{kyc.label(doc_type)} must be {' or '.join(names[t] for t in sorted(allowed))}")
+    max_bytes = min(kind.max_mb * 1024 * 1024, settings.SELLER_DOCUMENT_MAX_BYTES)
+    if file.size > max_bytes:
+        raise HttpError(422, f"{kyc.label(doc_type)} must be {max_bytes // (1024 * 1024)} MB or smaller")
     if file.content_type == "application/pdf":
         if not file.read(5).startswith(b"%PDF-"):
             raise HttpError(422, "That file is not a PDF")
         file.seek(0)
         content, content.name = file, safe_name("application/pdf", {"application/pdf": "pdf"})
     else:
-        content = safe_image(file, max_bytes=settings.SELLER_DOCUMENT_MAX_BYTES, formats=("JPEG", "PNG"), label="Document")
+        content = safe_image(file, max_bytes=max_bytes, formats=("JPEG", "PNG"), label="Document")
 
     with transaction.atomic():
         previous = latest_documents(app).get(doc_type)
@@ -468,7 +475,7 @@ def activate_store(app: SellerApplication, *, display_name: str | None, slug: st
 def admin_get(application_id) -> SellerApplication:
     app = (
         SellerApplication.objects.select_related("bank", "user", "reviewer", "country__kyc_policy")
-        .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events")
+        .prefetch_related("categories", "directors", "documents", "info_requests__items", "status_events", "country__document_requirements")
         .filter(pk=application_id)
         .first()
     )

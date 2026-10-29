@@ -228,6 +228,7 @@ class ReviewOut(Schema):
     id: UUID
     reviewer_name: str = Field(description="Abbreviated: 'Ayesha K.'")
     rating: int
+    title: str = Field("", description="Optional headline the reviewer wrote; empty when they wrote none")
     body: str
     is_verified_purchase: bool
     media: list[ReviewMediaOut]
@@ -246,6 +247,7 @@ class ReviewIn(Schema):
     name: Optional[NonEmptyStr] = Field(None, max_length=120, description="Required for guests; defaults to your profile name")
     email: Optional[EmailStr] = Field(None, description="Required for guests; never published")
     rating: int = Field(ge=1, le=5)
+    title: str = Field("", max_length=120, description="'Review Title' (optional)")
     body: NonEmptyStr = Field(max_length=4000)
 
 
@@ -263,3 +265,69 @@ class ReviewCreatedOut(Schema):
 class WishlistItemOut(Schema):
     product: ProductCardOut
     added_at: datetime
+
+
+
+# --------------------------------------------------------------------------- #
+# Category requests (seller asks, staff decide)
+# --------------------------------------------------------------------------- #
+
+
+class RequestedParentOut(Schema):
+    id: UUID
+    name: str
+
+
+class CategoryLinkOut(Schema):
+    id: UUID
+    name: str
+    slug: str
+
+
+class CategoryRequestIn(Schema):
+    name: str = Field(min_length=2, max_length=100, description="'Category Name'")
+    reason: str = Field(min_length=3, max_length=250, description="'Why do you need this category?' (0/250)")
+    parent_id: Optional[UUID] = Field(None, description="'Parent Category' (a top-level one); empty asks for a new top-level category")
+
+
+class CategoryRequestOut(Schema):
+    id: UUID
+    name: str
+    reason: str
+    status: str = Field(description="pending | approved | rejected | withdrawn")
+    parent: Optional[RequestedParentOut]
+    category: Optional[CategoryLinkOut] = Field(description="Once approved: the category to use (new, or one that already existed)")
+    created_category: bool
+    review_note: str = Field(description="Why it was rejected, or the reviewer's note")
+    document_url: Optional[str] = Field(description="Signed link to the supporting image; expires, fetch the request again for a new one")
+    document_name: str
+    created_at: datetime
+    reviewed_at: Optional[datetime]
+
+
+class CategoryRequestStoreOut(Schema):
+    id: UUID
+    name: str
+
+
+class CategoryRequestAdminOut(CategoryRequestOut):
+    store: CategoryRequestStoreOut
+    requested_by: str
+    existing_category: Optional[CategoryLinkOut] = Field(description="While pending: a category that already has this name, to approve onto")
+
+
+class CategoryExistsOut(Schema):
+    detail: str = Field(description="category_exists")
+    category: CategoryLinkOut
+    is_active: bool
+
+
+class CategoryApproveIn(Schema):
+    name: Optional[str] = Field(None, min_length=2, max_length=100, description="Create it under this name instead of the requested one")
+    parent_id: Optional[UUID] = Field(None, description="Put it under this top-level category instead (send it, even null, only to change the parent)")
+    use_category_id: Optional[UUID] = Field(None, description="Do not create anything: give the seller this existing category")
+    note: str = Field("", max_length=500)
+
+
+class CategoryRejectIn(Schema):
+    reason: str = Field(min_length=3, max_length=500, description="Shown to the seller")

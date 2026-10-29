@@ -13,7 +13,7 @@ from .rules import MAX_BODY
 SellerTabLit = Literal["all", "unread", "open", "closed"]
 
 
-class MessageOut(Schema):
+class ChatMessageOut(Schema):
     id: UUID
     sender_role: str = Field(description="customer | seller | system")
     sender_name: str
@@ -26,7 +26,7 @@ class MessageIn(Schema):
     body: NonEmptyStr = Field(max_length=MAX_BODY)
 
 
-class StoreRefOut(Schema):
+class ChatStoreRefOut(Schema):
     id: UUID
     name: str
     slug: str
@@ -42,7 +42,7 @@ class CustomerConversationOut(Schema):
     """Buyer's list row."""
 
     id: UUID
-    store: StoreRefOut
+    store: ChatStoreRefOut
     order_number: Optional[str] = None
     subject: str
     last_message_at: Optional[datetime]
@@ -53,7 +53,7 @@ class CustomerConversationOut(Schema):
 
 
 class CustomerThreadOut(CustomerConversationOut):
-    messages: list[MessageOut]
+    messages: list[ChatMessageOut]
 
 
 class SellerConversationOut(Schema):
@@ -70,7 +70,7 @@ class SellerConversationOut(Schema):
 
 
 class SellerThreadOut(SellerConversationOut):
-    messages: list[MessageOut]
+    messages: list[ChatMessageOut]
 
 
 class ConversationOpenIn(Schema):
@@ -105,7 +105,7 @@ class CloseIn(Schema):
 class FlaggedMessageOut(Schema):
     id: UUID
     conversation_id: UUID
-    store: StoreRefOut
+    store: ChatStoreRefOut
     customer: CustomerRefOut
     sender_role: str
     body: str

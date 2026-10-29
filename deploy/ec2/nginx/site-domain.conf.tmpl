@@ -1,0 +1,43 @@
+# Installed as /etc/nginx/sites-available/asknget-domain by setup.sh --domain, with __DOMAIN__ replaced. One block per market domain;
+# the shared application rules live in snippets/asknget-app.conf.
+
+# Port 80 for the domain: serve the site, or redirect to HTTPS (snippets/asknget-http80.conf decides). The certificate check also comes here.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__ www.__DOMAIN__;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    include /etc/nginx/snippets/asknget-http80.conf;
+}
+
+# www → the bare domain, over HTTPS.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name www.__DOMAIN__;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    include /etc/nginx/snippets/asknget-tls.conf;
+
+    return 301 https://__DOMAIN__$request_uri;
+}
+
+# The site.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name __DOMAIN__;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    include /etc/nginx/snippets/asknget-tls.conf;
+
+    include /etc/nginx/snippets/asknget-app.conf;
+}

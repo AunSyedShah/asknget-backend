@@ -1,7 +1,7 @@
 {
   "fetched_at": {
-    "version": "2408376029043747207",
-    "lastModified": "2026-10-09T15:13:07Z",
+    "version": "2410119034151911988",
+    "lastModified": "2026-10-14T07:33:07Z",
     "by": "Asma Choudhary"
   },
   "frames": [
@@ -33,11 +33,6 @@
     {
       "name": "Cart",
       "node_id": "237:1063",
-      "type": "FRAME"
-    },
-    {
-      "name": "Track Order",
-      "node_id": "256:5097",
       "type": "FRAME"
     },
     {
@@ -96,8 +91,28 @@
       "type": "FRAME"
     },
     {
+      "name": "Order Cancel ",
+      "node_id": "1221:18153",
+      "type": "FRAME"
+    },
+    {
+      "name": "View Details",
+      "node_id": "1201:14380",
+      "type": "FRAME"
+    },
+    {
       "name": "My Account - Completed Orders",
       "node_id": "284:7773",
+      "type": "FRAME"
+    },
+    {
+      "name": "Leave Review",
+      "node_id": "1246:19417",
+      "type": "FRAME"
+    },
+    {
+      "name": "Return Order",
+      "node_id": "1223:18810",
       "type": "FRAME"
     },
     {
@@ -112,8 +127,18 @@
     },
     {
       "name": "Order Placed",
-      "node_id": "256:5077",
-      "type": "INSTANCE"
+      "node_id": "1201:15224",
+      "type": "FRAME"
+    },
+    {
+      "name": "Track order",
+      "node_id": "1201:15783",
+      "type": "FRAME"
+    },
+    {
+      "name": "Live Track Order",
+      "node_id": "1201:17027",
+      "type": "FRAME"
     },
     {
       "name": "Logout Popup",
@@ -356,8 +381,53 @@
       "type": "FRAME"
     },
     {
+      "name": "Customers",
+      "node_id": "1185:10068",
+      "type": "FRAME"
+    },
+    {
+      "name": "Transactions",
+      "node_id": "1197:13963",
+      "type": "FRAME"
+    },
+    {
+      "name": "Applications",
+      "node_id": "1249:19951",
+      "type": "FRAME"
+    },
+    {
+      "name": "Returns & Refunds",
+      "node_id": "1258:20684",
+      "type": "FRAME"
+    },
+    {
       "name": "Seller Details",
       "node_id": "1166:14620",
+      "type": "FRAME"
+    },
+    {
+      "name": "Application Details",
+      "node_id": "1258:21105",
+      "type": "FRAME"
+    },
+    {
+      "name": "Return Details",
+      "node_id": "1271:12266",
+      "type": "FRAME"
+    },
+    {
+      "name": "Account Information",
+      "node_id": "1271:12351",
+      "type": "GROUP"
+    },
+    {
+      "name": "Recent Activity",
+      "node_id": "1271:12412",
+      "type": "GROUP"
+    },
+    {
+      "name": "Customer Detail",
+      "node_id": "1195:13329",
       "type": "FRAME"
     },
     {

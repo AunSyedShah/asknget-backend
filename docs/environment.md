@@ -63,6 +63,13 @@ this project sets `name: asknget` in `compose.yaml` instead.
 | `BEHIND_PROXY` | *(unset)* | `1` makes Django trust `X-Forwarded-Proto`/`Host` from nginx. Set by `compose.yaml` for the `web` service. |
 | `MEDIA_ROOT` | `backend/asknget/media` | Where uploads land. Compose sets `/app/asknget/media`. |
 | `SERVE_MEDIA` | `1` when `DEBUG` else `0` | Whether Django serves `/media/`. In the full stack **nginx** does, so compose sets `0`. Seller documents are never served from `/media/` either way. |
+| `FILE_STORAGE` | `database` on Vercel, `filesystem` elsewhere | Where uploads live: `filesystem` (MEDIA_ROOT), `database` (rows in `core_storedfile`, served by Django at `/media/`; for hosts with a read-only disk) or `s3` (AWS S3 / R2 / MinIO). Product pictures, avatars, banners, review media and return photos use the public backend; seller documents and category-request files use the private one. See `core/storage_config.py`. |
+| `UPLOAD_CAP_BYTES` | 4 MB on Vercel, none elsewhere | Vercel rejects request bodies over 4.5 MB before Django sees them, so on Vercel seller documents, review media and return photos are capped at 4 MB. `0` lifts the cap (AWS, or once uploads go straight to a bucket). |
+| `DJANGO_ADMIN_URL` | `django-admin/` | Where the Django admin is served. It is **not** `/admin/`, which belongs to the frontend app's own staff screens (nginx sends `/admin/` to the app). The staff API `/api/v1/admin/...` is a different thing and does not move. |
+| `PRODUCT_EDIT_POLICY` | `flag` | What happens to a **live** product whose words, category, pictures or price band were changed after approval (`catalog/review.py`): `flag` keeps it live and lists it for staff (`GET /admin/products?status=edited`); `hold` hides it (`pending`) until a person approves it. |
+| `AWS_STORAGE_BUCKET_NAME` | | `FILE_STORAGE=s3`: the public media bucket. |
+| `AWS_PRIVATE_BUCKET_NAME` | the public bucket | `FILE_STORAGE=s3`: a **separate** bucket (all public access blocked) for seller documents and category-request files, served through expiring links. Do not leave it unset in production. |
+| `AWS_S3_REGION_NAME` / `AWS_S3_ENDPOINT_URL` / `AWS_S3_CUSTOM_DOMAIN` | | Region; endpoint (only for R2 / MinIO); a CloudFront domain in front of the public bucket (recommended). On ECS the task role is used, so no access keys; on Vercel set `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. `django-storages[s3]` must be installed in that image. |
 | `SIGNED_FILE_TTL_SECONDS` | `3600` | How long a signed link to a private file (seller documents) works. |
 | `STOREFRONT_URL` | *(empty)* | Public buyer site, used to build "View Product" links in the seller portal. |
 | `PORTAL_URL` | *(empty)* | The seller portal's address, used to build **team-invitation links** (`<PORTAL_URL>/accept-invite?token=…`). Falls back to `STOREFRONT_URL`; with neither, the e-mailed link has no host. |
@@ -119,6 +126,13 @@ that default does not apply.
 | `JWT_REFRESH_TTL_DAYS` | `30` |
 | `OTP_TTL_MINUTES` | `10` |
 | `OTP_RESEND_COOLDOWN_SECONDS` | `45` (the design's "Resend code in 00:45") |
+| `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | empty | SMTP login (Gmail: the address and an **App Password**). Empty means mail is printed to the log, not sent. Read into Django's `MAILERS`. |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` | `smtp.gmail.com`, `587`, `1` | SMTP server. |
+| `TWILIO_AUTH_TOKEN` | empty | Checks the signature on Twilio's WhatsApp webhook. Empty: the webhook answers 503 and nothing can be verified that way. |
+| `TWILIO_WHATSAPP_NUMBER` | empty | The WhatsApp number people message (sandbox or your own sender); digits are kept, so `+1 415 523 8886` is fine. Empty: `/auth/whatsapp/start` answers 503. |
+| `TWILIO_WEBHOOK_URL` | empty | Only when the URL Twilio calls differs from the one Django sees (a proxy or a rewritten host). It must equal what is set in the Twilio console. |
+| `WHATSAPP_CHALLENGE_TTL_MINUTES` | `10` | How long the QR / link works. |
+| `DEFAULT_FROM_EMAIL` | `asknget <EMAIL_HOST_USER>` | Gmail rewrites the sender to the logged-in account whatever this says. |
 | `OTP_MAX_ATTEMPTS` | `5` |
 
 ### Performance and serving
@@ -259,3 +273,26 @@ DATABASE_URL=<hosted url> uv run python manage.py seed_lookups
 - A leading double slash (`https://api//api/v1/...`, from a frontend base URL ending in `/`) is served as
   `/api/v1/...`. `APPEND_SLASH` does nothing for it: `//api/...` is a 404 with the setting on or off.
 
+
+### 6a. Two environments on Vercel: Production and Preview
+
+| | Production (`main`) | Preview (`develop`, pull requests) |
+|---|---|---|
+| Neon branch | `main` | `staging` (own role password) |
+| Variables | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `SECRET_KEY`, `FIELD_ENCRYPTION_KEY` | the same four, with the staging database and different keys |
+| Data | real | demo data from `seed_demo` (fake accounts, shared with QA) |
+
+- Create the two databases in the **Neon console** (a project with a `main` branch and a `staging` branch, auto-delete **Never**), not through
+  Vercel's Storage integration: the integration offers one database to every environment and keeps the same login on every branch it copies.
+  Reset the `neondb_owner` password on `staging` (a branch copies the parent's role).
+- Set each variable for **one** environment only (`vercel env add NAME production|preview`, as Sensitive). `ALLOWED_HOSTS` is not needed
+  for `*.vercel.app` (see `settings.VERCEL_HOSTS`); `CORS_ALLOWED_ORIGINS` is set per environment to that environment's frontend.
+- `SECRET_KEY` and `FIELD_ENCRYPTION_KEY` differ per environment. Keep a copy of each outside Vercel (a Sensitive value cannot be read back, and
+  losing the encryption key makes encrypted columns unreadable).
+- A deployment missing any of the first three variables answers every request with `503 server_not_configured` naming what is missing.
+- The database is not touched by a deploy: run `migrate` and `seed_lookups` yourself against the **direct** URL (`DATABASE_URL_UNPOOLED`)
+  of each database. On the free tier a long run can lose its connection (the compute scales to zero); run `migrate` again, it resumes.
+  `seed_demo` refuses `DEBUG=0`; run it against staging only, and wrap it in a transaction so a dropped connection leaves nothing half-seeded.
+- Preview deployments sit behind Vercel Authentication by default. For a QA team without Vercel seats, set Settings > Deployment Protection >
+  Vercel Authentication to **Only Production Deployments**; the `develop` branch then has a stable URL
+  (`asknget-backend-git-develop-<team>.vercel.app`) to share.

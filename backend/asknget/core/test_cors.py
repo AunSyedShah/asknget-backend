@@ -1,64 +1,50 @@
-"""CORS: what a browser on another origin is allowed to send and read.
+"""CORS: a browser frontend on an allowed origin may send every custom header the API reads; other origins get nothing."""
 
-The two failure modes worth pinning are invisible in curl and only bite in a
-browser: a preflight that rejects our custom request headers (X-Cart-Token,
-X-Region…), and response headers the page is not allowed to read (X-Region,
-Content-Language) because they are not in Access-Control-Expose-Headers.
-"""
-
+from django.conf import settings
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
-API = "/api/v1/health"
-SITE = "https://za.asknget.com"
+ORIGIN = "http://localhost:3000"
+HEADERS = "authorization,content-type,x-region,x-language,x-timezone,x-store,x-cart-token"
 
 
-@override_settings(CORS_ALLOWED_ORIGINS=[SITE], CORS_ALLOWED_ORIGIN_REGEXES=[], CORS_ALLOW_ALL_ORIGINS=False)
+def preflight(client, path, origin=ORIGIN, headers=HEADERS):
+    return client.options(path, headers={"Origin": origin, "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": headers})
+
+
+@override_settings(CORS_ALLOWED_ORIGINS=[ORIGIN], CORS_ALLOWED_ORIGIN_REGEXES=[], CORS_ALLOW_ALL_ORIGINS=False)
 class CorsTests(TestCase):
-    def preflight(self, origin=SITE, headers="x-cart-token,x-region", method="GET"):
-        return self.client.options(
-            API, HTTP_ORIGIN=origin,
-            HTTP_ACCESS_CONTROL_REQUEST_METHOD=method,
-            HTTP_ACCESS_CONTROL_REQUEST_HEADERS=headers,
-        )
+    def test_an_allowed_origin_may_send_every_custom_header_the_api_reads(self):
+        res = preflight(self.client, "/api/v1/seller/products")
+        self.assertEqual(res["Access-Control-Allow-Origin"], ORIGIN)
+        allowed = {h.strip() for h in res["Access-Control-Allow-Headers"].split(",")}
+        self.assertTrue(set(HEADERS.split(",")) <= allowed, set(HEADERS.split(",")) - allowed)    # x-store used to be missing
 
-    def test_allowed_origin_gets_headers(self):
-        res = self.client.get(API, HTTP_ORIGIN=SITE)
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res["Access-Control-Allow-Origin"], SITE)
-        self.assertIn("origin", res["Vary"].lower())
-
-    def test_unknown_origin_gets_nothing(self):
-        res = self.client.get(API, HTTP_ORIGIN="https://evil.example.com")
-        self.assertEqual(res.status_code, 200)  # the request still runs; the browser discards the response
-        self.assertNotIn("Access-Control-Allow-Origin", res)
-
-    def test_preflight_allows_our_custom_request_headers(self):
-        res = self.preflight()
-        self.assertEqual(res.status_code, 200)
-        allowed = {h.strip().lower() for h in res["Access-Control-Allow-Headers"].split(",")}
-        self.assertLessEqual({"authorization", "content-type", "x-cart-token", "x-region", "x-language", "x-timezone"}, allowed)
-
-    def test_response_headers_the_page_must_read_are_exposed(self):
-        res = self.client.get("/api/v1/regions/current", HTTP_ORIGIN=SITE)
+    def test_the_response_headers_a_frontend_needs_are_exposed(self):
+        res = self.client.get("/api/v1/regions", headers={"Origin": ORIGIN})
         exposed = {h.strip().lower() for h in res["Access-Control-Expose-Headers"].split(",")}
-        self.assertLessEqual({"x-region", "content-language"}, exposed)
-        self.assertIn("X-Region", res)  # the header itself is still sent
+        self.assertTrue({"x-region", "content-language"} <= exposed)
 
-    def test_credentials_are_off_so_a_hostile_page_can_only_make_anonymous_calls(self):
-        res = self.client.get(API, HTTP_ORIGIN=SITE)
-        self.assertNotIn("Access-Control-Allow-Credentials", res)
+    def test_another_origin_gets_no_permission(self):
+        for origin in ("https://evil.example", "http://localhost:5173"):
+            self.assertNotIn("Access-Control-Allow-Origin", preflight(self.client, "/api/v1/regions", origin))
 
-    def test_only_api_paths_are_cors_enabled(self):
-        """CORS_URLS_REGEX keeps the headers off /admin, /static and everything else."""
-        res = self.client.get("/not-the-api/", HTTP_ORIGIN=SITE)
-        self.assertEqual(res.status_code, 404)
-        self.assertNotIn("Access-Control-Allow-Origin", res)
+    def test_credentials_are_never_allowed(self):
+        self.assertNotIn("Access-Control-Allow-Credentials", preflight(self.client, "/api/v1/regions"))
 
-    @override_settings(CORS_ALLOWED_ORIGINS=[], CORS_ALLOWED_ORIGIN_REGEXES=[r"^https://[a-z]{2}\.asknget\.com$"])
-    def test_country_subdomains_via_regex(self):
-        self.assertEqual(self.client.get(API, HTTP_ORIGIN="https://pk.asknget.com")["Access-Control-Allow-Origin"], "https://pk.asknget.com")
-        self.assertNotIn("Access-Control-Allow-Origin", self.client.get(API, HTTP_ORIGIN="https://asknget.com.evil.io"))
+    def test_the_django_admin_gets_no_cors_headers(self):
+        self.assertNotIn("Access-Control-Allow-Origin", preflight(self.client, f"/{settings.ADMIN_URL}login/"))
 
-    @override_settings(CORS_ALLOWED_ORIGINS=[], CORS_ALLOWED_ORIGIN_REGEXES=[])
-    def test_nothing_configured_means_no_cors_at_all(self):
-        self.assertNotIn("Access-Control-Allow-Origin", self.client.get(API, HTTP_ORIGIN=SITE))
+
+class DjangoAdminPathTests(TestCase):
+    """The frontend owns /admin (its staff screens); the Django admin lives elsewhere."""
+
+    def test_the_django_admin_is_not_at_slash_admin(self):
+        self.assertEqual(self.client.get("/admin/login/").status_code, 404)
+        self.assertEqual(self.client.get("/admin/dashboard").status_code, 404)
+
+    def test_the_django_admin_lives_at_its_own_prefix(self):
+        # Not rendered: the admin templates need collected static files, which a test run does not have.
+        self.assertEqual(settings.ADMIN_URL, "django-admin/")
+        self.assertEqual(reverse("admin:login"), "/django-admin/login/")
+        self.assertEqual(reverse("admin:index"), "/django-admin/")

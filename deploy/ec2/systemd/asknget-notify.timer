@@ -1,0 +1,10 @@
+[Unit]
+Description=asknget: deliver notifications every minute (replaces the notifier container)
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

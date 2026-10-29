@@ -11,7 +11,7 @@ from core.schemas import ErrorOut, MessageOut
 from markets.context import get_country
 
 from .models import Banner, ContactMessage, NewsletterSubscriber
-from .schemas import BannerOut, ContactCreatedOut, ContactIn, NewsletterSubscribeIn, PlacementLit, SiteInfoOut
+from .schemas import BannerOut, ContactCreatedOut, ContactFormIn, NewsletterSubscribeIn, PlacementLit, SiteInfoOut
 
 marketing_router = Router(tags=["marketing"])
 
@@ -43,7 +43,7 @@ def newsletter_subscribe(request, payload: NewsletterSubscribeIn):
 
 
 @marketing_router.post("/contact", response={201: ContactCreatedOut, 422: ErrorOut}, auth=OptionalJWTAuth(), summary="'Send a Message'")
-def contact(request, payload: ContactIn):
+def contact(request, payload: ContactFormIn):
     user = request.auth if getattr(request.auth, "pk", None) else None
     application = None
     if user is not None and payload.subject == "seller_support":
@@ -66,5 +66,8 @@ def contact(request, payload: ContactIn):
 def site_info(request):
     keys = ("contact_phone", "contact_email", "address", "social", "accepted_payments")
     values = {s.key: s.value for s in SiteSetting.objects.filter(key__in=keys)}
+    country = get_country()
+    if country is not None:                                   # this market's own details win over the platform-wide ones
+        values.update({k: v for k, v in (country.site_info or {}).items() if k in keys and v not in (None, "", {})})
     values["contact_subjects"] = [{"value": v, "label": l} for v, l in ContactMessage.ContactSubject.choices]
     return values

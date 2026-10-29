@@ -255,21 +255,21 @@ class AdminPagesTests(TestCase):
 
     def test_the_pages_render(self):
         for name in ("setting_changelist", "setting_add", "commissionrule_changelist", "commissionrule_add"):
-            res = self.client.get(f"/admin/config/{name.split('_')[0]}/" + ("add/" if name.endswith("add") else ""))
+            res = self.client.get(f"/django-admin/config/{name.split('_')[0]}/" + ("add/" if name.endswith("add") else ""))
             self.assertEqual(res.status_code, 200, name)
 
     def test_saving_a_setting_through_admin_records_who_and_validates(self):
         data = {"key": "payouts.hold_days", "scope": "global", "value": "14", "note": "agreed with finance"}
-        res = self.client.post("/admin/config/setting/add/", data)
+        res = self.client.post("/django-admin/config/setting/add/", data)
         self.assertEqual(res.status_code, 302, getattr(res, "context", None) and res.context["adminform"].form.errors)
         row = Setting.objects.get(key="payouts.hold_days")
         self.assertEqual((row.value, row.updated_by_id), (14, self.staff.pk))
-        bad = self.client.post("/admin/config/setting/add/", {**data, "scope": "store", "value": "14"})
+        bad = self.client.post("/django-admin/config/setting/add/", {**data, "scope": "store", "value": "14"})
         self.assertEqual(bad.status_code, 200)                                  # form re-shown with an error
         self.assertEqual(Setting.objects.filter(key="payouts.hold_days").count(), 1)
 
     def test_adding_a_commission_rule_through_admin(self):
-        res = self.client.post("/admin/config/commissionrule/add/", {
+        res = self.client.post("/django-admin/config/commissionrule/add/", {
             "scope": "store", "store": self.store.pk, "rate_bps": 250,
             "effective_from_0": "2026-10-01", "effective_from_1": "00:00:00", "is_active": "on", "note": "premium deal",
         })

@@ -1,0 +1,151 @@
+[Review Detail]
+  [Top Header]
+    [Bread Crums]
+      T: Reviews
+      T: Dashboard  / Reviews
+          T: Sirosh Bashir
+          T: Admin
+            T: 2
+    [Search Bar]
+        T: Search anything...
+  [Content Frame]
+      T: Reviews
+      T: Monitor customer reviews and maintain product quality.
+    [I:Button | State=Default]
+      T: Export
+    [KPI - 1]
+          T: All submissions
+              T: 312
+              T: All
+    [KPI - 5]
+          T: Accepted
+              T: 186
+              T: Approved
+    [KPI - 7]
+          T: Need action
+              T: 32
+              T: Flagged
+    [KPI - 8]
+          T: Not approved
+              T: 76
+              T: Hidden
+    [Tabs]
+        T: Approved (186
+        T: Flagged (32)
+        T: Hidden (76)
+          T: All Reviews (312)
+    [All Sellers]
+        [Filters]
+            [Search Bar]
+                T: Search by seller name, seller ID, email...
+              [Brand]
+                  T: Seller
+              [Brand]
+                  T: Business Type
+              [Brand]
+                  T: Category
+              [Brand]
+                  T: Status
+              [Brand]
+                  T: Filters
+          T: All Reviews
+          [Rows]
+            [Row 1]
+                T: REV-2026-008871
+                T: Olivia Martin
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+            [Row 6]
+                T: REV-2026-008871
+                T: Sophia Lee
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+            [Row 2]
+                T: REV-2026-008871
+                T: Emma Roberts
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+            [Row 3]
+                T: REV-2026-008871
+                T: Noah WIlliams
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+            [Row 4]
+                T: REV-2026-008871
+                T: James Wilson
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+            [Row 5]
+                T: REV-2026-008871
+                T: Daniel Smith
+                [Ratings]
+                T: Sep 14, 2026
+                T: R 4,286,520
+                T: Approved
+                  T: Smart Watch
+    [Pagination]
+      T: Showing 6 of 312  reviews
+      [Paginatio]
+        [I:Pagination | State=pagination control (Back)]
+          T: Back
+        [I:Pagination | State=Default 1]
+          T: 1
+        [I:Pagination | State=Default 2]
+          T: 2
+        [I:Pagination | State=Default 3]
+          T: 3
+        [I:Pagination | State=Default 4]
+          T: 4
+        [I:Pagination | State=Default 5]
+          T: 5
+        [I:Pagination | State=pagination control (Next)]
+          T: Next
+  [I:Admin Sidebar]
+      [I:Admin Sidebar | State=Dashboard]
+          T: Dashboard
+      [I:Admin Sidebar | State=Orders]
+          T: Orders
+      [I:Admin Sidebar | State=Products]
+          T: Products
+      [I:Admin Sidebar | State=Categories]
+          T: Categories
+      [I:Admin Sidebar | State=Sellers]
+          T: Sellers
+      [I:Admin Sidebar | State=Customers]
+          T: Customers
+      [I:Admin Sidebar | State=Transactions]
+          T: Transactions
+      [I:Admin Sidebar | State=Applications]
+          T: Applications
+      [I:Admin Sidebar | State=Returns]
+          T: Returns
+      [I:Admin Sidebar | State=Reviews Active]
+          T: Reviews
+      [I:Admin Sidebar | State=Analytics]
+          T: Analytics
+      [I:Admin Sidebar | State=Notifications]
+          T: Notifications
+      [I:Admin Sidebar | State=Team & Admins]
+          T: Team & Admins
+      [I:Admin Sidebar | State=Settings]
+          T: Settings
+        [Profile]
+            T: Sirosh Bashir
+            T: Admin
+        [I:Admin Sidebar | State=Logout]
+            T: Logout

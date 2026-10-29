@@ -3,6 +3,7 @@
 import tempfile
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
@@ -25,6 +26,7 @@ class SellerTestCase(TestCase):
         self.cat_beauty = Category.objects.create(name="Beauty", slug="beauty")
         self.cat_fashion = Category.objects.create(name="Fashion", slug="fashion")
         self.staff = User.objects.create_user(email="admin@asknget.com", password="Str0ngPassw0rd!", is_staff=True)
+        self.staff.groups.add(Group.objects.get(name="Administrator"))
         self.staff_token = self.login("admin@asknget.com")
 
     # --- http helpers ---------------------------------------------------------
@@ -290,6 +292,17 @@ class ReviewTests(SellerTestCase):
         self.assertEqual(self.get(ADMIN, self.staff_token, status="approved").json()["count"], 0)
         self.assertEqual(self.get(ADMIN, self.staff_token, q="huda").json()["count"], 1)
 
+    def test_the_review_queue_uses_the_standard_list_shape_and_still_answers_limit_offset(self):
+        body = self.get(ADMIN, self.staff_token).json()
+        self.assertEqual(sorted(body), ["count", "items", "page", "pages", "per_page", "total"])
+        self.assertEqual((body["count"], body["page"], body["pages"]), (body["total"], 1, 1))
+        paged = self.get(ADMIN, self.staff_token, page=1, per_page=1).json()
+        self.assertEqual((paged["per_page"], len(paged["items"]), paged["page"]), (1, min(1, body["total"]), 1))
+        old = self.get(ADMIN, self.staff_token, limit=1, offset=0).json()
+        self.assertEqual((old["per_page"], old["page"], old["total"]), (1, 1, body["total"]))
+        self.assertEqual(self.get(ADMIN, self.staff_token, page=0).status_code, 422)
+        self.assertEqual(self.get(ADMIN, self.staff_token, per_page=101).status_code, 422)
+
     def test_admin_sees_decrypted_identifiers(self):
         _, app_id = self.submitted()
         body = self.get(f"{ADMIN}/{app_id}", self.staff_token).json()
@@ -419,9 +432,12 @@ class CountryPolicyTests(SellerTestCase):
         from core.testing import make_country
 
         self.pk = make_country("PK")
+        from markets.models import DocumentRequirement
+
+        labels = {"id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"}, "tax_registration": {"en": "NTN certificate"}}
+        for order, code in enumerate(["id_passport", "proof_of_address", "tax_registration"]):      # individuals in PK
+            DocumentRequirement.objects.create(market=self.pk, account_type="individual", document_type_id=code, label=labels.get(code, {}), sort_order=order)
         kyc = self.pk.kyc_policy
-        kyc.required_documents = {"individual": ["id_passport", "proof_of_address", "tax_registration"]}
-        kyc.document_labels = {"id_passport": {"en": "CNIC / Passport", "ur": "شناختی کارڈ / پاسپورٹ"}, "tax_registration": {"en": "NTN certificate"}}
         kyc.id_number_label = "CNIC / Passport number"
         kyc.id_number_regex = r"^(\d{13}|[A-Z]{2}\d{7})$"
         kyc.tax_id_label = "NTN"
@@ -445,7 +461,8 @@ class CountryPolicyTests(SellerTestCase):
         self.assertEqual([d["type"] for d in policy["required_documents"]], ["id_passport", "proof_of_address", "tax_registration"])
         self.assertEqual(policy["required_documents"][0]["label"], "CNIC / Passport")
         # an individual skips the Representative step, so the NTN certificate is collected on Banking
-        self.assertEqual(policy["required_documents"][2], {"type": "tax_registration", "label": "NTN certificate", "step": 4})
+        self.assertEqual({k: policy["required_documents"][2][k] for k in ("type", "label", "step", "required")},
+                         {"type": "tax_registration", "label": "NTN certificate", "step": 4, "required": True})
         self.assertEqual((policy["id_number_label"], policy["tax_id_label"]), ("CNIC / Passport number", "NTN"))
         # the policy is the application's, whatever domain the seller uses
         body = self.client.get(f"{SELLER}/application", headers={**self._h(token), "X-Region": settings.DEFAULT_COUNTRY}).json()

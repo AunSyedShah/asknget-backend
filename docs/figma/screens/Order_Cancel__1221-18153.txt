@@ -1,0 +1,56 @@
+[Order Cancel ]
+  [Tabs]
+    [I:Account Tabs | State=Personal Info Default]
+        T: Personal Information
+    [I:Account Tabs | State=My Orders Active]
+        T: My Orders
+    [I:Account Tabs | State=Wishlist Default]
+        T: Wishlist
+    [I:Account Tabs | State=Manage Addresses Default]
+        T: Manage Addresses
+    [I:Account Tabs | State=Payment Methods Default]
+        T: Payments Methods
+    [I:Account Tabs | State=Password Manager Default]
+        T: Password Manager
+    [I:Account Tabs | State=Logout Default]
+        T: Logout
+  [I:Orders Tabs | State=Ongoing]
+    T: All Orders
+      T: Ongoing
+    T: Completd
+    T: Cancelled
+        T: Ongoing
+        T: Order #ORD-00123
+          T: NARS BB Cream
+          T: QTY: 1 |  Size: 30 ml  |  Shade: Natural
+            T: $25.99
+            T: $40.99
+        [I:Button | State=TErtiory Button]
+          T: Cancel
+        [I:Button | State=Secondary]
+          T: View Detail
+        [I:Button | State=Default]
+          T: Track Order
+        T: Ongoing
+        T: Order #ORD-00122
+          T: Black Earbuds
+          T: QTY: 1 |  Color: Black
+            T: $12.99
+            T: $20.99
+        [I:Button | State=TErtiory Button]
+          T: Cancel
+        [I:Button | State=Secondary]
+          T: View Detail
+        [I:Button | State=Default]
+          T: Track Order
+  [I:Cancel Order Popup]
+          [I:Button | State=Default]
+            T: Cancel Order
+          [I:Button | State=TErtiory Button]
+            T: Keep Order
+          T: Are you sure you want to cancel this order?
+            T: Please select an reason for cancellation:
+                T: Ordered by mistake.
+                T: Fount better price.
+                T: Delivery too late.
+                T: Change of mind.

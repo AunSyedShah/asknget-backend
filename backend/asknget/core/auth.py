@@ -137,11 +137,26 @@ class SellerAuth(JWTAuth):
 
 
 class StaffAuth(JWTAuth):
-    """Admin endpoints (KYC review, moderation). Admin has all access, so this is
-    the only gate until sub-roles exist."""
+    """Admin endpoints. `StaffAuth("orders.view")` also requires that permission from the staff
+    catalogue (staff/permissions.py), granted through the person's roles. Sets `request.staff`
+    (permissions + markets, see staff/access.py) for the view's market filtering.
+
+    Every /admin operation names its permission; the bare `StaffAuth()` on a router is only the
+    fallback, and a test fails if an operation relies on it."""
+
+    def __init__(self, permission: str | None = None):
+        super().__init__()
+        self.permission = permission
 
     def authenticate(self, request, token: str):
         user = super().authenticate(request, token)
-        if user is not None and not user.is_staff:
+        if user is None:
+            return None
+        if not user.is_staff:
             raise HttpError(403, "Staff access required")
+        from staff.access import access_for
+
+        request.staff = access_for(user)
+        if self.permission and not request.staff.can(self.permission):
+            raise HttpError(403, f"Missing permission: {self.permission}")
         return user

@@ -6,10 +6,10 @@ from datetime import timedelta
 from django.utils import timezone
 
 from config.models import Setting
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from ledger import services as ledger
 from markets.models import Country
-from notifications.models import NotificationRead, NotificationTemplate, StoreNotification
+from notifications.models import NotificationRead, NotificationTemplate, Notification as StoreNotification
 from orders.models import Order
 from team.models import StoreMember
 
@@ -27,7 +27,7 @@ class NotificationTestCase(ApiTestCase):
         cls.beauty = make_category("Beauty")
         cls.bb = make_product(cls.store_a, cls.beauty, "BB Cream", 10000, None, stock=50)
         cls.watch = make_product(cls.store_b, cls.beauty, "Smart Watch", 20000, None, stock=50)
-        cls.staff = make_user(is_staff=True)
+        cls.staff = make_staff()
 
     def setUp(self):
         self.token_a, self.token_b = self.token_for(self.owner_a), self.token_for(self.owner_b)
@@ -65,10 +65,10 @@ class NotificationTestCase(ApiTestCase):
 
 
 class EmitterTests(NotificationTestCase):
-    def test_an_unpaid_order_tells_no_one(self):
+    def test_an_unpaid_order_tells_no_seller(self):
         _, token = self.buyer()
         self.order(token, self.bb)
-        self.assertEqual(StoreNotification.objects.count(), 0)
+        self.assertEqual(StoreNotification.objects.filter(audience="seller").count(), 0)      # the customer is told (sprint 9)
 
     def test_a_paid_order_reaches_every_store_in_it(self):
         _, token = self.buyer()

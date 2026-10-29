@@ -71,6 +71,22 @@ asknget is a **multi-vendor marketplace**: a buyer storefront (catalog → cart 
 ### `roles` / `user_roles`
 `enum(customer, seller, admin)`; a user can hold several (a seller can also buy). The "Seller Portal" navbar implies a separately gated area.
 
+**Staff roles (sprint 9):** a staff role is a Django `auth_group` an admin creates; its permissions come from the staff catalogue
+(`staff/permissions.py`, stored as `auth_permission` rows `staff.<section>.<action>`). `staff_staffprofile` (1:1 user, optional):
+`markets` M2M `markets_country` (empty = every market). Starter roles (Administrator, KYC reviewer, Catalogue, Support, Finance) come
+from migration `staff 0002`. See `docs/sprint-9-plan.md`.
+
+**Notifications (sprint 9):** `notifications_event` (name, actor, market, subject type + id, payload): every notification's
+source, and the activity log. `notifications_notification` (was `storenotification`): `audience` customer | seller | staff, with
+`user` / `store` / `market` + `permission`. `notifications_notificationrule` (event x audience x market: channels, opt-out,
+staff permission, min amount) with `notifications_rulechange` (audit). `notifications_notificationpreference` (user x category x
+channel). `notifications_delivery` (the e-mail outbox: unique key, status, attempts, next attempt, last error).
+
+**Seller documents (sprint 9):** `markets_documenttype` (code PK, name/help i18n, accepted types, max MB, default step, active)
+and `markets_documentrequirement` (market x account type x document type: required, step, label/instructions i18n). They replace
+`markets_kycpolicy.required_documents` / `document_labels`. `sellers_sellerdocument.type` holds a document type code (no fixed
+choices any more).
+
 ### `otp_verifications`
 | field | type | notes |
 |---|---|---|
@@ -173,9 +189,12 @@ Values seen: Fashion, Beauty, Electronics, Groceries/Food, Jewellery, Sports, Ho
 | stock_status | enum(in_stock, out_of_stock, preorder) | derived from variant stock; "In Stock" badge, availability filter |
 | rating_avg | numeric(2,1) cached | "4.9" |
 | rating_count | int cached | "320 Reviews" |
-| is_featured / is_best_seller / is_new_arrival | boolean | landing sections. ❓ manual flags vs computed |
-| status | enum(draft, active, archived) | |
+| is_featured / is_best_seller / is_new_arrival | boolean | landing sections. ❓ manual flags vs computed. **Set by staff only** (a seller's `PATCH` ignores `is_featured` / `is_new_arrival`) |
+| status | enum(draft, pending, active, rejected, archived) | `draft → pending → active \| rejected`; `active ↔ archived` |
 | published_at | timestamp, nullable | |
+| reviewed_hash | char(64), blank | fingerprint of what a reviewer approved (`catalog/review.py`: words, category, brand, barcode, options, benefits, picture names, price band). Blank on products published before this existed: the first edit adopts the content as it was |
+| edited_since_review | boolean, indexed | the product no longer matches `reviewed_hash`; a live one is listed for staff (`?status=edited`), an archived one returns through review when unarchived |
+| review_source / reviewed_by / reviewed_at | enum(staff, system), user, timestamp | who last decided (approve or reject) and when; empty for a product never reviewed |
 
 `discount_percent` ("40% Off" badge) is derived: `1 - price / compare_at_price`.
 
@@ -923,3 +942,15 @@ REST-style JSON; auth via access + refresh JWT.
     refund may take the balance below zero, payouts are refused until later sales cover it. Confirm.
 98. **Seller documents are private.** They are served only through signed links that expire (`SIGNED_FILE_TTL_SECONDS`, 1 hour); nginx refuses
     `/media/seller_documents/`. Documents uploaded before keep their old file names on disk but are reachable only the same way.
+99. **Delivery fee rule (`docs/sprint-8-plan.md`).** Free delivery from a threshold, otherwise a fee, both set by the admin (platform or market) and by the seller
+    (`shipping.*` settings, most specific wins, admin can lock a market). It applies to delivery options with no price; an option with a price is fixed. Judged per
+    seller. **Defaults taken, reversible: confirm.** A waived fee is the seller's cost (shipping stays the seller's income, Q63).
+100. **Which options follow the rule:** only those with a blank price (default), or every delivery option including Express?
+101. **Rule basis:** the seller's items **before** the voucher (default). A voucher is cart-level, so counting it per seller needs an allocation rule; using the whole
+     cart instead would make the platform pay the shipping.
+102. **Admin API for the rule:** Django admin only for now; a dashboard screen would need `/admin/...` endpoints.
+103. **Category requests (`catalog.CategoryRequest`, `docs/sprint-8-plan.md` §8).** Sellers ask, staff approve or reject. **Defaults taken, reversible: confirm.**
+     An approved category is live for every seller at once; the parent is optional (a new top-level category can be asked for) and must be top-level (the tree is
+     two levels); the seller is told in the portal only (no e-mail); nothing can be listed under a category until it is approved; at most 5 waiting requests per store.
+104. **The admin portal has no screen for category requests** in the 2026-10-14 design (Category Management, Add Category, Category Details and Subcategories only):
+     where should the queue live (a tab on Category Management?), and should it show how many stores asked for the same name?

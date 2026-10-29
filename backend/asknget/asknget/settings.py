@@ -11,10 +11,12 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -74,16 +76,46 @@ if TESTING:
 ZEAL_ENABLED = TESTING or os.environ.get('ZEAL') == '1'
 ZEAL_RAISE = True
 
+# Redis (optional): the shared cache and the WebSocket channel layer (the live bell, notifications/realtime.py).
+# Without it the cache is per process and, outside development and tests, nothing is pushed live (Vercel: clients poll).
+REDIS_URL = os.environ.get('REDIS_URL', '').strip()
+if REDIS_URL:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}}
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer', 'CONFIG': {'hosts': [REDIS_URL]}}}
+elif DEBUG or TESTING:
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}    # one process only
+
 # Auth / OTP knobs (asknget.core.auth, accounts.services)
 JWT_ACCESS_TTL_MINUTES = int(os.environ.get('JWT_ACCESS_TTL_MINUTES', 15))
 JWT_REFRESH_TTL_DAYS = int(os.environ.get('JWT_REFRESH_TTL_DAYS', 30))
 OTP_TTL_MINUTES = int(os.environ.get('OTP_TTL_MINUTES', 10))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('OTP_RESEND_COOLDOWN_SECONDS', 45))  # design: "Resend code in 00:45"
 OTP_MAX_ATTEMPTS = int(os.environ.get('OTP_MAX_ATTEMPTS', 5))
+
+# WhatsApp verification through Twilio (accounts.whatsapp). The user messages the number below; Twilio calls our webhook.
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')   # checks the webhook signature; without it the webhook answers 503
+TWILIO_WHATSAPP_NUMBER = re.sub(r'\D', '', os.environ.get('TWILIO_WHATSAPP_NUMBER', ''))   # the number people message, digits only
+TWILIO_WEBHOOK_URL = os.environ.get('TWILIO_WEBHOOK_URL', '')   # only if the URL Twilio calls differs from the one Django sees
+WHATSAPP_CHALLENGE_TTL_MINUTES = int(os.environ.get('WHATSAPP_CHALLENGE_TTL_MINUTES', 10))
+# Vercel rejects a request body over 4.5 MB before Django sees it, so on Vercel no upload can be bigger than this until files go straight to a bucket.
+# UPLOAD_CAP_BYTES=0 lifts the cap (an AWS deployment, or direct-to-bucket uploads). Smaller limits below are unaffected.
+UPLOAD_CAP_BYTES = int(os.environ.get('UPLOAD_CAP_BYTES', 4 * 1024 * 1024 if ON_VERCEL else 0))
+
+
+def _capped(limit):
+    return min(limit, UPLOAD_CAP_BYTES) if UPLOAD_CAP_BYTES else limit
+
+
 AVATAR_MAX_BYTES = 2 * 1024 * 1024  # design: "PNG, JPG or GIF. Max size 2MB."
-SELLER_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024  # design: 'PDF, JPG or PNG · Max 10 MB'
-REVIEW_MEDIA_MAX_BYTES = 25 * 1024 * 1024  # review 'Photo / Video (Optional)'
+SELLER_DOCUMENT_MAX_BYTES = _capped(10 * 1024 * 1024)  # design: 'PDF, JPG or PNG · Max 10 MB'
+REVIEW_MEDIA_MAX_BYTES = _capped(25 * 1024 * 1024)  # review 'Photo / Video (Optional)'
+RETURN_PHOTO_MAX_BYTES = _capped(5 * 1024 * 1024)
 PRODUCT_IMAGE_MAX_BYTES = 1 * 1024 * 1024  # seller wizard Media popup: 'PNG, JPG upto 1-MB'
+# A live product whose words, category, pictures or price band were changed after approval (catalog/review.py):
+# "flag" keeps it live and lists it for staff (status=edited); "hold" hides it (pending) until a person approves it.
+PRODUCT_EDIT_POLICY = os.environ.get('PRODUCT_EDIT_POLICY', 'flag').strip().lower()
+if PRODUCT_EDIT_POLICY not in ('flag', 'hold'):
+    raise ImproperlyConfigured(f"PRODUCT_EDIT_POLICY must be flag or hold (got {PRODUCT_EDIT_POLICY!r}).")
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
 PORTAL_URL = os.environ.get('PORTAL_URL', '').rstrip('/')  # seller portal, for team-invitation links (falls back to STOREFRONT_URL)
 
@@ -138,6 +170,7 @@ INSTALLED_APPS = [
     'ledger',
     'notifications',
     'returns',
+    'staff',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -258,10 +291,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STORAGES = {
-    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
-    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
-}
+# Uploaded files: FILE_STORAGE = filesystem | database | s3 (default: database on Vercel, whose disk is read-only; filesystem elsewhere).
+# See core/storage.py and core/storage_config.py (the S3 / R2 variables).
+from core.storage_config import build_storages, file_storage_name  # noqa: E402
+
+FILE_STORAGE = file_storage_name(os.environ, ON_VERCEL)
+STORAGES = build_storages(os.environ, ON_VERCEL, signed_ttl=int(os.environ.get('SIGNED_FILE_TTL_SECONDS', 3600)))
+DB_STORAGE_MAX_BYTES = 8 * 1024 * 1024  # a file kept in the database is read whole into memory
 
 # User uploads (avatars, product images, seller KYC documents)
 MEDIA_URL = 'media/'
@@ -269,6 +305,9 @@ MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 # Let Django serve uploads itself. On by default in DEBUG; set SERVE_MEDIA=1 in the
 # container until uploads move to object storage / a reverse proxy.
 SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
+# Where the Django admin lives. Not /admin/: the frontend app has its own screens under /admin (staff login, dashboard), and
+# nginx sends /admin/ to the app. The staff API (/api/v1/admin/...) is unaffected.
+ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'django-admin/').strip().strip('/') + '/'
 # How long a signed link to a private file (seller documents) works.
 SIGNED_FILE_TTL_SECONDS = int(os.environ.get('SIGNED_FILE_TTL_SECONDS', 3600))
 
@@ -311,6 +350,7 @@ CORS_ALLOW_HEADERS = (
     'x-requested-with', 'x-csrftoken',
     'x-cart-token',   # guest carts (orders.services.CART_TOKEN_HEADER)
     'x-region', 'x-language', 'x-timezone',  # markets.middleware
+    'x-store',        # seller calls when a person belongs to several stores (portal.auth.StoreAuth)
 )
 # ...and these response headers must be exposed, or JS cannot read them cross-origin.
 CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
@@ -319,8 +359,24 @@ CORS_EXPOSE_HEADERS = ('content-language', 'x-region', 'content-disposition')
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+# Outgoing mail (OTP codes, order and return e-mails), Django 6.1 MAILERS (the EMAIL_* settings are deprecated and refused
+# next to it). With EMAIL_HOST_USER set it goes out over SMTP, Gmail by default: use an App Password, never the account
+# password. Without it nothing is sent: the message is printed to the log, so a preview without credentials still shows the code
+# in its logs. Tests always use the in-memory backend.
+_EMAIL_USER = os.environ.get('EMAIL_HOST_USER', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or (f'asknget <{_EMAIL_USER}>' if _EMAIL_USER else 'asknget <noreply@asknget.local>')
 MAILERS = {
     'default': {
+        'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+        'OPTIONS': {
+            'host': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
+            'port': int(os.environ.get('EMAIL_PORT', 587)),
+            'username': _EMAIL_USER,
+            'password': os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', ''),   # Google shows app passwords in groups of four
+            'use_tls': os.environ.get('EMAIL_USE_TLS', '1') == '1',
+            'timeout': 10,   # never hold a serverless request on a mail server
+        },
+    } if _EMAIL_USER else {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }

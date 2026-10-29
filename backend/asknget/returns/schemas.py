@@ -339,7 +339,7 @@ class EscalateIn(Schema):
     note: str = Field("", max_length=500)
 
 
-class RejectIn(Schema):
+class ReturnRejectIn(Schema):
     reason: str = Field(min_length=3, max_length=500, description="Shown to the buyer")
 
 

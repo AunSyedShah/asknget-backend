@@ -261,7 +261,7 @@ class Command(BaseCommand):
         from ledger import services as ledger
         from ledger.models import LedgerEntry, Payout
         from notifications import services as notifications
-        from notifications.models import StoreNotification
+        from notifications.models import Notification as StoreNotification
         from team.models import StoreMember, TeamRole
 
         now = timezone.now()
@@ -376,7 +376,7 @@ class Command(BaseCommand):
             placed_at = now - timedelta(days=days_ago, hours=n % 7)
             # The seller's own option, rotated so orders differ (sprint 6).
             option = options[n % len(options)] if options else None
-            shipping = option.price_cents if option else 0
+            shipping = (option.price_cents or 0) if option else 0
             order = Order.objects.create(
                 user=user, status=Order.OrderStatus.CONFIRMED, order_number=f"ASK-DEMO{n:03d}",
                 country=store.country, return_window_days=store.country.return_window_days,
@@ -388,7 +388,7 @@ class Command(BaseCommand):
             )
             if option is not None:
                 OrderDelivery.objects.create(order=order, store=store, option=option, name=option.name,
-                                             eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents)
+                                             eta_label=option.eta_label, kind=option.kind, price_cents=option.price_cents or 0)
             Order.objects.filter(pk=order.pk).update(placed_at=placed_at, created_at=placed_at)
             for p, q in items:
                 v = p.variants.first()

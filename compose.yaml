@@ -38,6 +38,7 @@ services:
       MEDIA_ROOT: /app/asknget/media
       SERVE_MEDIA: "0"                # the proxy serves uploads; Django never touches media requests
       BEHIND_PROXY: "1"               # trust X-Forwarded-Proto/Host from the proxy
+      REDIS_URL: redis://redis:6379/0 # shared cache + publishing to the live bell
       # gunicorn sizing: WEB_CONCURRENCY / GUNICORN_CMD_ARGS default in the Dockerfile; override in backend/.env
     volumes:
       - media:/app/asknget/media      # user uploads survive image rebuilds
@@ -45,6 +46,38 @@ services:
       - "8000"                        # reachable by the proxy only; compose.override.yaml publishes it for dev
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    # Shared cache and the WebSocket channel layer (live bell). Ephemeral by design: nothing here is the record.
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  realtime:
+    # WebSockets (/ws/notifications) under uvicorn, apart from gunicorn so long-lived sockets never hold an HTTP worker.
+    image: asknget-api:latest
+    env_file: backend/.env
+    environment:
+      SKIP_MIGRATE: "1"
+      REDIS_URL: redis://redis:6379/0
+      BEHIND_PROXY: "1"
+    command: ["uvicorn", "asknget.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--ws-ping-interval", "20", "--proxy-headers"]
+    expose:
+      - "8001"
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -60,6 +93,8 @@ services:
     depends_on:
       web:
         condition: service_healthy
+      realtime:
+        condition: service_started   # nginx resolves the upstream at start
     restart: unless-stopped
 
   worker:
@@ -73,6 +108,22 @@ services:
     command: ["python", "manage.py", "embed_products", "--watch", "--interval", "30"]
     healthcheck:
       disable: true                   # image healthcheck probes HTTP; the worker serves none
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notifier:
+    # Sends notification e-mail that did not go out right after its change was saved, and
+    # retries failures (notifications/bus.py). Several copies may run: each message is claimed first.
+    image: asknget-api:latest
+    env_file: backend/.env
+    environment:
+      SKIP_MIGRATE: "1"
+      REDIS_URL: redis://redis:6379/0
+    command: ["python", "manage.py", "deliver_notifications", "--watch", "--interval", "10"]
+    healthcheck:
+      disable: true
     depends_on:
       web:
         condition: service_healthy

@@ -20,6 +20,7 @@ from ninja.files import UploadedFile
 from ninja.pagination import paginate
 
 from core.auth import StaffAuth
+from staff.access import scope
 from sellers.models import Store
 from core.pagination import PagePagination
 from chat.schemas import MessageIn as CustomerMessageIn, SellerConversationOut
@@ -27,6 +28,7 @@ from core.schemas import ErrorOut, MessageOut
 
 from . import analytics, customers, dashboard, entitlements, inventory, orders, products
 from notifications import services as notifications
+from orders import shipping
 from team import services as team
 
 from .auth import StoreAuth
@@ -58,6 +60,8 @@ from .schemas import (
     ContentIn,
     DeliveryOptionIn,
     DeliveryOptionOut,
+    DeliveryRuleIn,
+    DeliveryRuleOut,
     DeliveryOptionPatchIn,
     ImageOrderIn,
     ProductDeliveryIn,
@@ -78,7 +82,7 @@ from .schemas import (
     ProductAnalyticsOut,
     ProductCreateIn,
     ProductPatchIn,
-    RejectIn,
+    ProductRejectIn,
     SellerImageOut,
     SellerProductKpisOut,
     SellerProductOut,
@@ -215,29 +219,27 @@ def product_analytics(request, product_id: UUID, period: PeriodLit = "month"):
 # --------------------------------------------------------------------------- #
 
 
-@admin_products_router.get("", response=list[AdminProductRowOut], summary="Review queue (default: pending)")
+@admin_products_router.get("", auth=StaffAuth("products.view"), response=list[AdminProductRowOut], summary="Review queue (default: pending)")
 @paginate(PagePagination)
-def admin_product_list(request, status: str = Query("pending", description="pending | active | rejected | archived | all")):
-    return [products.admin_row(p) for p in products.review_queue(None if status == "all" else status)]
+def admin_product_list(request, status: str = Query("pending", description="pending | edited (live, changed after approval) | active | rejected | archived | all")):
+    return [products.admin_row(p) for p in scope(request, products.review_queue(None if status == "all" else status))]
 
 
-@admin_products_router.post("/{product_id}/approve", response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
+@admin_products_router.post("/{product_id}/approve", auth=StaffAuth("products.review"), response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
 def admin_product_approve(request, product_id: UUID):
-    product = products.Product.objects.filter(pk=product_id).first()
+    product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
-    products.approve(product)
-    notifications.product_reviewed(product, approved=True)
+    products.approve(product, actor=request.auth)
     return {"detail": f"{product.name} is now live"}
 
 
-@admin_products_router.post("/{product_id}/reject", response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
-def admin_product_reject(request, product_id: UUID, payload: RejectIn):
-    product = products.Product.objects.filter(pk=product_id).first()
+@admin_products_router.post("/{product_id}/reject", auth=StaffAuth("products.review"), response={200: MessageOut, 404: ErrorOut, 409: ErrorOut})
+def admin_product_reject(request, product_id: UUID, payload: ProductRejectIn):
+    product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
-    products.reject(product, payload.reason)
-    notifications.product_reviewed(product, approved=False, reason=payload.reason)
+    products.reject(product, payload.reason, actor=request.auth)
     return {"detail": f"{product.name} rejected"}
 
 
@@ -394,6 +396,30 @@ def delivery_list(request):
     return [products.option_out(o) for o in products.delivery_options(request.store)]
 
 
+@delivery_router.get("/rule", response=DeliveryRuleOut, summary="Free delivery over an amount, otherwise a fee: what applies to my store")
+def delivery_rule(request):
+    return shipping.store_rule(request.store)
+
+
+@delivery_router.put("/rule", response={200: DeliveryRuleOut, 409: ErrorOut, 422: ErrorOut},
+                     summary="Set my own threshold and/or fee (409 rule_locked when the admin fixed them)")
+def delivery_rule_set(request, payload: DeliveryRuleIn):
+    values = payload.dict(exclude_unset=True)
+    values = {k: v for k, v in values.items() if v is not None}
+    if not values:
+        raise HttpError(422, "Send free_over_cents and/or fee_cents")
+    shipping.set_store_rule(request.store, request.auth, values)
+    team.log(request.store, request.auth, "update_delivery_rule", "Changed the free-delivery rule")
+    return shipping.store_rule(request.store)
+
+
+@delivery_router.delete("/rule", response={200: DeliveryRuleOut, 409: ErrorOut}, summary="Back to the platform's numbers")
+def delivery_rule_clear(request):
+    shipping.clear_store_rule(request.store)
+    team.log(request.store, request.auth, "update_delivery_rule", "Went back to the platform's free-delivery rule")
+    return shipping.store_rule(request.store)
+
+
 @delivery_router.post("", response={201: DeliveryOptionOut, 409: ErrorOut, 422: ErrorOut}, summary="Add a delivery option")
 def delivery_create(request, payload: DeliveryOptionIn):
     option = products.create_delivery_option(request.store, payload.dict())
@@ -484,9 +510,9 @@ def analytics_export(request, report: ReportLit = "overview", period: PeriodLit 
     return analytics.export(store, report, period)
 
 
-@admin_stores_router.post("/{store_id}/plan", response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
+@admin_stores_router.post("/{store_id}/plan", auth=StaffAuth("stores.manage"), response={200: PlanOut, 404: ErrorOut}, summary="Staff: put a store on the premium plan (same as the admin toggle)")
 def admin_set_plan(request, store_id: UUID, payload: PlanSetIn):
-    store = Store.objects.filter(pk=store_id).first()
+    store = scope(request, Store.objects.all()).filter(pk=store_id).first()
     if store is None:
         raise HttpError(404, "Store not found")
     if store.is_premium != payload.is_premium:

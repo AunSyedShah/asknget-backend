@@ -57,6 +57,10 @@ class Country(models.Model):
     is_active = models.BooleanField(default=True, help_text="Inactive countries are not resolvable from the API")
     is_default = models.BooleanField(default=False, help_text="Used when a request carries no region (bare domain, tests)")
     sort_order = models.PositiveSmallIntegerField(default=0)
+    site_info = models.JSONField(
+        default=dict, blank=True,
+        help_text='This market\'s footer / Contact Us details, over the platform-wide ones: {"contact_phone": "+27 11 555 0123", "contact_email": "...", '
+                  '"address": "...", "social": {"facebook": "https://..."}}. Leave a key out to use the platform-wide value.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -85,6 +89,11 @@ class Country(models.Model):
             raise ValidationError({"languages": f"Unknown language code(s): {', '.join(bad)}. Allowed: {', '.join(language_codes())}"})
         if self.default_language not in self.languages:
             raise ValidationError({"default_language": "Must be one of `languages`."})
+        allowed = {"contact_phone", "contact_email", "address", "social"}
+        if not isinstance(self.site_info, dict) or set(self.site_info) - allowed:
+            raise ValidationError({"site_info": f"An object with only these keys: {', '.join(sorted(allowed))}."})
+        if not isinstance(self.site_info.get("social", {}), dict):
+            raise ValidationError({"site_info": "social must be an object of name: link."})
         if self.postal_code_regex:
             try:
                 re.compile(self.postal_code_regex)
@@ -124,9 +133,8 @@ class Country(models.Model):
 
 
 class KycPolicy(models.Model):
-    """Which documents a seller in this country must upload and how the identity
-    fields are labelled / validated. Empty JSON = use the defaults in
-    `sellers.rules` (so a new country works before anyone customises it)."""
+    """How a seller's identity fields are labelled and validated in this country, and the text above the uploads. Which
+    documents are needed is `DocumentRequirement` (no rows = the defaults in `sellers.rules`)."""
 
     class Mode(models.TextChoices):
         MANUAL = "manual", "Manual review by staff"
@@ -134,15 +142,6 @@ class KycPolicy(models.Model):
 
     country = models.OneToOneField(Country, on_delete=models.CASCADE, primary_key=True, related_name="kyc_policy")
     mode = models.CharField(max_length=20, choices=Mode.choices, default=Mode.MANUAL)
-    required_documents = models.JSONField(
-        default=dict, blank=True,
-        help_text='Per account type, e.g. {"individual": ["id_passport", "proof_of_address"], "registered_company": [...]}. '
-                  "Empty = platform defaults.",
-    )
-    document_labels = models.JSONField(
-        default=dict, blank=True,
-        help_text='Per document type, i18n: {"id_passport": {"en": "SA ID / Passport"}}',
-    )
     id_number_label = models.CharField(max_length=60, blank=True, help_text='e.g. "SA ID / Passport number", "CNIC / Passport number"')
     id_number_regex = models.CharField(max_length=100, blank=True, help_text="Blank = not validated")
     tax_id_label = models.CharField(max_length=60, blank=True, help_text='e.g. "VAT number", "NTN"')
@@ -157,15 +156,6 @@ class KycPolicy(models.Model):
         return f"KYC policy – {self.country_id}"
 
     def clean(self):
-        if self.required_documents and not isinstance(self.required_documents, dict):
-            raise ValidationError({"required_documents": "Must be a JSON object keyed by account type."})
-        for key, docs in (self.required_documents or {}).items():
-            if not isinstance(docs, list) or any(not isinstance(d, str) for d in docs):
-                raise ValidationError({"required_documents": f"'{key}' must map to a list of document types."})
-        if self.document_labels and not isinstance(self.document_labels, dict):
-            raise ValidationError({"document_labels": "Must be a JSON object keyed by document type."})
-        for doc_type, mapping in (self.document_labels or {}).items():
-            validate_i18n(mapping, field="document_labels")
         validate_i18n(self.instructions, field="instructions")
         if self.id_number_regex:
             try:
@@ -204,3 +194,71 @@ class ReturnPolicy(models.Model):
         validate_i18n(self.terms, field="terms")
         if self.restocking_fee_bps > 10000:
             raise ValidationError({"restocking_fee_bps": "At most 10000 (100 %)."})
+
+
+# --------------------------------------------------------------------------------------
+# Seller documents: a catalogue admins extend, and what each market requires (sprint 9)
+# --------------------------------------------------------------------------------------
+
+FILE_TYPES = ("application/pdf", "image/jpeg", "image/png")      # what the upload code can check safely (PDF signature, re-encoded images)
+ACCOUNT_TYPES = [("individual", "Individual"), ("sole_proprietor", "Sole Proprietor"), ("registered_company", "Registered Company")]
+
+
+def _default_file_types():
+    return list(FILE_TYPES)
+
+
+class DocumentType(models.Model):
+    """A kind of document a seller can be asked for ("Tax Clearance Certificate"). Admins add new ones without a release; which
+    market needs which is `DocumentRequirement`. The code is stored on each upload, so it cannot change once used."""
+
+    code = models.SlugField(max_length=30, primary_key=True, help_text='Short and permanent, e.g. "tax_clearance"')
+    name = models.JSONField(help_text='Per language: {"en": "Tax Clearance Certificate"}')
+    help = models.JSONField(default=dict, blank=True, help_text="Per language: what a good copy looks like")
+    accepted_types = models.JSONField(default=_default_file_types, help_text=f"A subset of {list(FILE_TYPES)}")
+    max_mb = models.PositiveSmallIntegerField(default=10, help_text="At most the platform limit (SELLER_DOCUMENT_MAX_BYTES)")
+    default_step = models.PositiveSmallIntegerField(default=4, choices=[(1, "1 Identity"), (2, "2 Business"), (3, "3 Company"), (4, "4 Bank & address")],
+                                                    help_text="The wizard step that asks for it, unless a requirement says otherwise")
+    is_active = models.BooleanField(default=True, help_text="Off = no longer asked for or accepted (existing uploads stay)")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "code"]
+
+    def __str__(self):
+        return (self.name or {}).get("en") or self.code
+
+    def clean(self):
+        validate_i18n(self.name, field="name")
+        if not self.name:
+            raise ValidationError({"name": "Give it a name (at least in English)."})
+        validate_i18n(self.help, field="help")
+        if not isinstance(self.accepted_types, list) or not self.accepted_types or set(self.accepted_types) - set(FILE_TYPES):
+            raise ValidationError({"accepted_types": f"A non-empty list from {list(FILE_TYPES)}."})
+        if not 1 <= self.max_mb <= settings.SELLER_DOCUMENT_MAX_BYTES // (1024 * 1024):
+            raise ValidationError({"max_mb": f"Between 1 and {settings.SELLER_DOCUMENT_MAX_BYTES // (1024 * 1024)}."})
+
+
+class DocumentRequirement(models.Model):
+    """One document one kind of seller in one market uploads. A market (or an account type in it) with no rows uses the platform
+    defaults in sellers/rules.py. Changing these applies to applications not yet approved; approved sellers are not asked again."""
+
+    market = models.ForeignKey(Country, on_delete=models.CASCADE, related_name="document_requirements")
+    account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES)
+    document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT, related_name="requirements")
+    required = models.BooleanField(default=True, help_text="Off = offered, but the application can be submitted without it")
+    step = models.PositiveSmallIntegerField(null=True, blank=True, choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4")], help_text="Empty = the type's default step")
+    label = models.JSONField(default=dict, blank=True, help_text='This market\'s name for it, per language: {"en": "CNIC / Passport"}. Empty = the type\'s name')
+    instructions = models.JSONField(default=dict, blank=True, help_text="Per language, shown next to the upload")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["market", "account_type", "sort_order", "document_type"]
+        constraints = [models.UniqueConstraint(fields=["market", "account_type", "document_type"], name="uniq_document_requirement")]
+
+    def __str__(self):
+        return f"{self.market_id} {self.account_type}: {self.document_type_id}{'' if self.required else ' (optional)'}"
+
+    def clean(self):
+        validate_i18n(self.label, field="label")
+        validate_i18n(self.instructions, field="instructions")

@@ -5,9 +5,9 @@ from django.core import mail
 from django.utils import timezone
 
 from catalog.models import ProductVariant
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 
-from .models import Order, OrderDelivery, Voucher
+from .models import Cart, Order, OrderDelivery, Voucher
 
 CART = "/api/v1/cart"
 CHECKOUT = "/api/v1/checkout"
@@ -76,6 +76,42 @@ class CartTests(OrdersTestCase):
         # unknown token → fresh cart, new token
         fresh = self.client.get(CART, headers={"X-Cart-Token": "nope"}).json()
         self.assertNotEqual(fresh["cart_token"], token)
+
+    def test_a_brand_new_guests_first_add_answers_with_the_item_and_leaves_one_cart(self):
+        # No token, no sign-in: the very first call. It used to answer with a second, empty cart (and leave an orphan row).
+        body = self.cart_with()
+        self.assertTrue(body["cart_token"])
+        self.assertEqual([line["product_name"] for line in body["items"]], ["NARS BB Cream"])
+        self.assertTrue(body["can_checkout"])
+        self.assertEqual(Cart.objects.count(), 1)
+        again = self.client.get(CART, headers={"X-Cart-Token": body["cart_token"]}).json()
+        self.assertEqual((again["id"], len(again["items"])), (body["id"], 1))
+        self.assertEqual(Cart.objects.count(), 1)
+
+    def test_every_change_to_a_brand_new_guests_cart_answers_with_that_cart(self):
+        # A note and a voucher are changes a guest can make before adding anything.
+        Voucher.objects.create(code="SAVE10", type="percent", value=10, is_active=True)
+        note = self.client.patch(CART, {"order_note": "Leave at the gate"}, content_type="application/json").json()
+        self.assertEqual(note["order_note"], "Leave at the gate")
+        token = note["cart_token"]
+        self.assertEqual(Cart.objects.count(), 1)
+        for method, path, payload in (("post", f"{CART}/voucher", {"code": "SAVE10"}), ("delete", f"{CART}/voucher", None)):
+            res = getattr(self.client, method)(path, payload, content_type="application/json", headers={"X-Cart-Token": token}) if payload else \
+                getattr(self.client, method)(path, headers={"X-Cart-Token": token})
+            self.assertIn(res.status_code, (200, 409, 422), res.content)
+            if res.status_code == 200:
+                self.assertEqual((res.json()["id"], res.json()["order_note"]), (note["id"], "Leave at the gate"))
+        self.assertEqual(Cart.objects.count(), 1)
+
+    def test_a_members_changes_answer_with_their_own_cart_too(self):
+        first = self.cart_with(self.token)
+        second = self.cart_with(self.token, variant=self.buds_variant)
+        self.assertEqual(first["id"], second["id"])
+        self.assertEqual(len(second["items"]), 2)
+        line = second["items"][0]["id"]
+        changed = self.client.patch(f"{CART}/items/{line}", {"qty": 2}, content_type="application/json", headers=self._headers(self.token)).json()
+        self.assertEqual(changed["id"], first["id"])
+        self.assertEqual(Cart.objects.filter(user=self.user).count(), 1)
 
     def test_guest_cart_merges_into_member_cart_on_sign_in(self):
         token = self.client.get(CART).json()["cart_token"]
@@ -148,7 +184,8 @@ class CheckoutTests(OrdersTestCase):
         self.cart_with(self.token, variant=self.buds_variant)
         self.post(f"{CART}/voucher", {"code": "SAVE20"}, self.token)
         self.patch(CART, {"order_note": "Ring twice"}, self.token)
-        res = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token)
+        with self.captureOnCommitCallbacks(execute=True):                # the confirmation e-mail goes once the order is saved
+            res = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token)
         self.assertEqual(res.status_code, 201, res.content)
         body = res.json()
         self.assertIn("Thank You, John Ali", body["detail"])
@@ -273,7 +310,7 @@ class MyOrdersTests(OrdersTestCase):
 
 class AdminOrderTests(OrdersTestCase):
     def test_status_progression_writes_timeline(self):
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         staff_token = self.token_for(staff)
         self.cart_with(self.token)
         order = self.post(CHECKOUT, self.checkout_payload(payment_method_type="bank_transfer"), self.token).json()["order"]

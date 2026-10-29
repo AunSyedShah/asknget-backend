@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from catalog.models import Product
 from config.models import Setting
-from core.testing import ApiTestCase, make_category, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_product, make_store, make_user, make_staff
 from discovery.models import ProductEvent
 from orders.models import Order, OrderItem, OrderStatusEvent
 
@@ -160,6 +160,14 @@ class ReportTests(AnalyticsTestCase):
         self.assertEqual(body["store_queries"][0]["product_views"], 1)
         self.assertEqual([r["query"] for r in body["market_zero_result_queries"]], ["unicorn serum"])
         self.assertFalse(body["truncated"])
+
+    def test_events_with_the_same_timestamp_keep_the_order_they_were_recorded_in(self):
+        ProductEvent.objects.create(kind=ProductEvent.Kind.SEARCH, query="bb cream", result_count=3, user=self.sam)
+        ProductEvent.objects.create(kind=ProductEvent.Kind.VIEW, product=self.bb, user=self.sam)
+        ProductEvent.objects.create(kind=ProductEvent.Kind.SEARCH, query="unicorn serum", result_count=0, user=self.sam)
+        ProductEvent.objects.filter(user=self.sam).update(created_at=timezone.now())     # a coarse clock: all three in one tick
+        body = self.get(f"{A}/search", self.token).json()
+        self.assertEqual([r["query"] for r in body["store_queries"]], ["bb cream"])      # the search before the view, not the one after
 
     def test_search_ignores_a_view_that_is_too_late(self):
         old = timezone.now() - timedelta(hours=2)
@@ -316,7 +324,7 @@ class SalesAnalyticsTests(AnalyticsTestCase):
     def test_staff_adjustments_come_from_the_ledger_and_are_signed(self):
         from ledger import services as ledger
 
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         ledger.adjust(self.store, amount_cents=1500, note="Goodwill credit", by=staff)
         ledger.adjust(self.store, amount_cents=-400, note="Chargeback", by=staff)
         body = self.get(f"{A}/sales", self.token).json()
@@ -330,7 +338,7 @@ class SalesAnalyticsTests(AnalyticsTestCase):
     def test_the_chart_adds_up_to_the_cards(self):
         from ledger import services as ledger
 
-        ledger.adjust(self.store, amount_cents=700, note="Goodwill credit", by=make_user(is_staff=True))
+        ledger.adjust(self.store, amount_cents=700, note="Goodwill credit", by=make_staff())
         body = self.get(f"{A}/sales", self.token).json()
         gross = sum(p["values"]["gross"] for p in body["revenue_over_time"])
         net = sum(p["values"]["net"] for p in body["revenue_over_time"])

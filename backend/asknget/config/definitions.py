@@ -79,3 +79,23 @@ register(
     "returns.allow_escalation", "bool", True, "Buyers can dispute a rejection",
     help="On: a buyer whose return was rejected can ask staff to decide.", scopes=("global", "country"),
 )
+
+# --- Shipping: the free-delivery rule ---------------------------------------------------
+register(
+    "shipping.free_over_cents", "int", 0, "Free delivery from",
+    help="A seller's delivery that follows the rule (a delivery option with no fixed price) is free when that seller's "
+         "items in the cart add up to at least this much, before any voucher, in the market's minor units (cents). "
+         "0 = no free-delivery threshold. Set on a store, a market or globally; the most specific wins.",
+    min=0,
+)
+register(
+    "shipping.fee_cents", "int", 0, "Delivery fee",
+    help="What delivery costs below the free-delivery threshold, for options that follow the rule, in the market's "
+         "minor units (cents). Set on a store, a market or globally; the most specific wins.",
+    min=0,
+)
+register(
+    "shipping.rule_locked", "bool", False, "Lock the delivery rule",
+    help="When on, the threshold and fee set here apply to every seller in the market and a store's own values are ignored.",
+    scopes=("global", "country"),
+)

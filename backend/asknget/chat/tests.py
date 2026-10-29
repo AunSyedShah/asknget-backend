@@ -2,7 +2,7 @@
 
 from django.conf import settings
 
-from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user
+from core.testing import ApiTestCase, make_category, make_country, make_product, make_store, make_user, make_staff
 from orders.models import Order, OrderItem
 
 from .models import Conversation, Message
@@ -195,7 +195,7 @@ class ModerationTests(ChatTestCase):
 
     def test_staff_queue(self):
         self.open_thread("whatsapp me")
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         rows = self.get("/api/v1/admin/chat/flagged", self.token_for(staff)).json()["items"]
         self.assertEqual(len(rows), 1)
         self.assertEqual((rows[0]["flag_reason"], rows[0]["store"]["slug"]), ("off_platform", self.store.slug))
@@ -217,7 +217,7 @@ class PlanTests(ChatTestCase):
         self.assertEqual((body["plan"], body["is_premium"], body["features"]), ("free", False, []))
         self.assertEqual(sorted(body["locked_features"]), ["analytics_advanced", "chat_inbox"])
         self.assertEqual({f["key"]: f["included"] for f in body["catalogue"]}, {"analytics_advanced": False, "chat_inbox": False})
-        staff = make_user(is_staff=True)
+        staff = make_staff()
         res = self.post(f"/api/v1/admin/stores/{self.store.id}/plan", {"is_premium": True}, self.token_for(staff))
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(res.json()["plan"], "premium")

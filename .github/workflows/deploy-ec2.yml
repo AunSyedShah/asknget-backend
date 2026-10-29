@@ -1,0 +1,63 @@
+name: Deploy backend to EC2
+
+# Runs when `main` (production) moves. Never from a pull request, never from another branch.
+# Needs the GitHub Environment `ec2-test` with these secrets (docs/ec2-deploy.md):
+#   EC2_HOST         the server's public address
+#   EC2_SSH_KEY      the PRIVATE half of the backend deploy key (its public half is in deploy's authorized_keys, forced to deploy-backend)
+#   EC2_KNOWN_HOSTS  the server's host key line(s): `ssh-keyscan -t ed25519 <host>`, checked against the AWS console output
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-ec2
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    # Only `main` deploys, whatever started the run (a manual run from another branch must not).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ec2-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package the release
+        run: |
+          tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.sqlite3' \
+              --exclude='asknget/media' --exclude='asknget/staticfiles' \
+              -czf release.tgz -C backend pyproject.toml uv.lock asknget
+          ls -lh release.tgz
+
+      - name: Send it to the server
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The forced command on the server reads the sha from the "command" and the archive from stdin.
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              "deploy@$EC2_HOST" "$GITHUB_SHA" < release.tgz
+
+      - name: Smoke test
+        env:
+          # The public address people use: set the repository variable PUBLIC_URL (https://asknget.co.za) once HTTPS is on.
+          # Until then the server's own address over http is checked.
+          BASE: ${{ vars.PUBLIC_URL || format('http://{0}', secrets.EC2_HOST) }}
+        run: |
+          curl --fail --silent --show-error --location --retry 6 --retry-delay 5 --retry-all-errors "$BASE/api/v1/health"
+          echo
+          curl --fail --silent --show-error --location "$BASE/api/v1/regions" | tee /dev/stderr | grep -q '"code"'
+          echo "deployed $GITHUB_SHA to $BASE" >> "$GITHUB_STEP_SUMMARY"

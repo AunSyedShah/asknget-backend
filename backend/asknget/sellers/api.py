@@ -14,10 +14,13 @@ from django.shortcuts import get_object_or_404
 from ninja import File, Form, Query, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
-from ninja.pagination import LimitOffsetPagination, paginate
+from ninja.pagination import paginate
+
+from core.pagination import PageOrLimitPagination
 
 from accounts.services import client_ip
 from core.auth import SellerAuth, StaffAuth
+from staff.access import check_market, scope
 from core.models import Bank
 from core.schemas import ErrorOut, MessageOut
 from markets import services as markets
@@ -39,8 +42,7 @@ from .schemas import (
     DirectorOut,
     DocumentOut,
     DocumentReviewIn,
-    DocumentTypeLit,
-    RejectIn,
+    ApplicationRejectIn,
     RepresentativeIn,
     RequestInfoIn,
     ResubmitIn,
@@ -128,9 +130,10 @@ def director_delete(request, director_id: UUID):
 @seller_router.post(
     "/application/documents",
     response={201: DocumentOut, 409: ErrorOut, 422: ErrorOut},
-    summary="Upload or replace a KYC document (PDF/JPG/PNG ≤ 10 MB)",
+    summary="Upload or replace a KYC document (the type's accepted files and size: see `policy.required_documents`)",
 )
-def document_upload(request, type: DocumentTypeLit = Form(...), file: UploadedFile = File(...)):
+def document_upload(request, type: str = Form(..., max_length=30, description="A document type code: `policy.required_documents[].type`, or any in `document_types` (/lookups/seller); admins add types"),
+                    file: UploadedFile = File(...)):
     app = services.get_application(request.auth)
     return 201, services.upload_document(app, doc_type=type, file=file)
 
@@ -204,13 +207,14 @@ def lookups_seller(request, country: Optional[str] = Query(None, min_length=2, m
     market = markets.countries_qs().filter(pk=country.upper(), is_active=True).first() if country else getattr(request, "country", None)
     if country and market is None:
         raise HttpError(404, "Unknown country")
+    rules_for = policy.for_country(market, language=getattr(request, "language", None))
     return {
-        "policy": policy.for_country(market, language=getattr(request, "language", None)).as_payload(account_type),
+        "policy": rules_for.as_payload(account_type),
         "account_types": _choices(SellerApplication.AccountType.choices),
         "business_types": _choices(SellerApplication.BusinessType.choices),
         "representative_roles": _choices(SellerApplication.RepresentativeRole.choices),
         "bank_account_types": _choices(SellerApplication.BankAccountType.choices),
-        "document_types": _choices(SellerDocument.DocumentType.choices),
+        "document_types": [{"value": code, "label": label} for code, label in rules_for.document_labels.items() if code in rules_for.types],
         "field_groups": [{"value": k, "label": k.replace("_", " ").title()} for k in rules.FIELD_GROUPS],
         "document_max_bytes": settings.SELLER_DOCUMENT_MAX_BYTES,
         "document_allowed_types": sorted(rules.DOCUMENT_ALLOWED_TYPES),
@@ -230,11 +234,18 @@ def lookups_banks(request, country: Optional[str] = Query(None, min_length=2, ma
 # --------------------------------------------------------------------------- #
 
 
-@admin_sellers_router.get("", response=list[AdminApplicationListOut], summary="Review queue")
-@paginate(LimitOffsetPagination)
+def _admin_get(request, application_id):
+    """The application, if it is in one of the staff member's markets (otherwise 404, as if it did not exist)."""
+    app = services.admin_get(application_id)
+    check_market(request, app.country_id, "Application not found")
+    return app
+
+
+@admin_sellers_router.get("", auth=StaffAuth("sellers.view"), response=list[AdminApplicationListOut], summary="Review queue")
+@paginate(PageOrLimitPagination)
 def admin_list(request, status: Optional[str] = None, account_type: Optional[str] = None, q: Optional[str] = None,
                country: Optional[str] = Query(None, min_length=2, max_length=2)):
-    qs = SellerApplication.objects.select_related("user").exclude(status=SellerApplication.ApplicationStatus.DRAFT)
+    qs = scope(request, SellerApplication.objects.select_related("user").exclude(status=SellerApplication.ApplicationStatus.DRAFT))
     if status:
         qs = qs.filter(status=status)
     if country:
@@ -255,38 +266,39 @@ def admin_list(request, status: Optional[str] = None, account_type: Optional[str
     ) for a in qs.order_by("submitted_at")]
 
 
-@admin_sellers_router.get("/{application_id}", response={200: AdminApplicationOut, 404: ErrorOut})
+@admin_sellers_router.get("/{application_id}", auth=StaffAuth("sellers.view"), response={200: AdminApplicationOut, 404: ErrorOut})
 def admin_detail(request, application_id: UUID):
-    return services.serialize(services.admin_get(application_id), admin=True)
+    return services.serialize(_admin_get(request, application_id), admin=True)
 
 
-@admin_sellers_router.post("/{application_id}/start-review", response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
+@admin_sellers_router.post("/{application_id}/start-review", auth=StaffAuth("sellers.review"), response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
 def admin_start_review(request, application_id: UUID):
-    services.start_review(services.admin_get(application_id), reviewer=request.auth)
-    return services.serialize(services.admin_get(application_id), admin=True)
+    services.start_review(_admin_get(request, application_id), reviewer=request.auth)
+    return services.serialize(_admin_get(request, application_id), admin=True)
 
 
-@admin_sellers_router.post("/{application_id}/request-info", response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="'We Need More Information'")
+@admin_sellers_router.post("/{application_id}/request-info", auth=StaffAuth("sellers.review"), response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut, 422: ErrorOut}, summary="'We Need More Information'")
 def admin_request_info(request, application_id: UUID, payload: RequestInfoIn):
     services.request_info(
-        services.admin_get(application_id), reviewer=request.auth, message=payload.message, items=[i.dict() for i in payload.items]
+        _admin_get(request, application_id), reviewer=request.auth, message=payload.message, items=[i.dict() for i in payload.items]
     )
-    return services.serialize(services.admin_get(application_id), admin=True)
+    return services.serialize(_admin_get(request, application_id), admin=True)
 
 
-@admin_sellers_router.post("/{application_id}/approve", response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
+@admin_sellers_router.post("/{application_id}/approve", auth=StaffAuth("sellers.review"), response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
 def admin_approve(request, application_id: UUID, payload: ApproveIn = None):
-    services.approve(services.admin_get(application_id), reviewer=request.auth, note=payload.note if payload else "")
-    return services.serialize(services.admin_get(application_id), admin=True)
+    services.approve(_admin_get(request, application_id), reviewer=request.auth, note=payload.note if payload else "")
+    return services.serialize(_admin_get(request, application_id), admin=True)
 
 
-@admin_sellers_router.post("/{application_id}/reject", response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
-def admin_reject(request, application_id: UUID, payload: RejectIn):
-    services.reject(services.admin_get(application_id), reviewer=request.auth, reason=payload.reason)
-    return services.serialize(services.admin_get(application_id), admin=True)
+@admin_sellers_router.post("/{application_id}/reject", auth=StaffAuth("sellers.review"), response={200: AdminApplicationOut, 404: ErrorOut, 409: ErrorOut})
+def admin_reject(request, application_id: UUID, payload: ApplicationRejectIn):
+    services.reject(_admin_get(request, application_id), reviewer=request.auth, reason=payload.reason)
+    return services.serialize(_admin_get(request, application_id), admin=True)
 
 
-@admin_sellers_router.post("/{application_id}/documents/{document_id}/review", response={200: DocumentOut, 404: ErrorOut})
+@admin_sellers_router.post("/{application_id}/documents/{document_id}/review", auth=StaffAuth("sellers.review"), response={200: DocumentOut, 404: ErrorOut})
 def admin_review_document(request, application_id: UUID, document_id: UUID, payload: DocumentReviewIn):
-    doc = get_object_or_404(SellerDocument, pk=document_id, application_id=application_id)
+    doc = get_object_or_404(SellerDocument.objects.select_related("application"), pk=document_id, application_id=application_id)
+    check_market(request, doc.application.country_id, "Application not found")
     return services.review_document(doc, status=payload.status, note=payload.note)

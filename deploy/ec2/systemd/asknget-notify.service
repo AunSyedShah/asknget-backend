@@ -1,0 +1,14 @@
+[Unit]
+Description=asknget: send notification e-mail that is waiting and retry failures
+After=postgresql.service
+ConditionPathExists=/opt/asknget/backend/current
+
+[Service]
+Type=oneshot
+User=asknget
+Group=asknget
+WorkingDirectory=/opt/asknget/backend/current/asknget
+Environment=DJANGO_SETTINGS_MODULE=asknget.settings
+ExecStart=/opt/asknget/backend/venv/bin/python manage.py deliver_notifications
+Nice=10
+MemoryMax=300M
