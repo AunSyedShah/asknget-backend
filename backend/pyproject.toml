@@ -22,7 +22,7 @@ dependencies = [
     "pyjwt>=2.14.0",
     "python-dotenv>=1.2.3",
     "redis>=5.2",
-    "uvicorn[standard]>=0.32",
+    "uvicorn[standard]>=0.54.0",
     "whitenoise>=6.12.0",
 ]
 
