@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from ninja.errors import HttpError
 
+from catalog import review
 from catalog import services as catalog
 from catalog.models import (
     Brand,
@@ -187,11 +188,27 @@ def create(store, data: dict) -> Product:
     return product
 
 
+UNDER_REVIEW = "This product is under review; withdraw it (unpublish) to edit"
+SELLER_CANNOT_SET = ("is_featured", "is_new_arrival")   # landing-page placement is staff's call, not part of what a seller edits
+
+
+def _require_unlocked(product: Product) -> None:
+    """A product a reviewer is looking at must not change under their hands."""
+    if product.status == PStatus.PENDING:
+        raise HttpError(409, UNDER_REVIEW)
+
+
+@review.tracked_edit
 @transaction.atomic
 def patch(product: Product, data: dict) -> Product:
-    if product.status == PStatus.PENDING:
-        raise HttpError(409, "This product is under review; withdraw it (unpublish) to edit")
+    _require_unlocked(product)
     _validate_refs(data)
+    for field in SELLER_CANNOT_SET:
+        data.pop(field, None)
+    if "currency" in data:
+        market_currency = product.country.currency
+        if data["currency"].upper() != market_currency:
+            raise HttpError(422, f"Prices are in {market_currency}, the currency of your store's market")
     preorder = data.pop("preorder", None)
     if "compare_at_price_cents" in data and data["compare_at_price_cents"] == 0:
         data["compare_at_price_cents"] = None
@@ -216,6 +233,7 @@ def _combo_key(values) -> frozenset:
     return frozenset((v.option_type.name.lower(), v.value.lower()) for v in values)
 
 
+@review.tracked_edit
 @transaction.atomic
 def set_options(product: Product, options: list) -> Product:
     """Replace option types/values and regenerate variants for every combination.
@@ -266,11 +284,14 @@ def _unique_sku(product: Product, n: int) -> str:
     return sku
 
 
+@review.tracked_edit
 @transaction.atomic
 def patch_variant(product: Product, variant_id, data: dict, *, actor) -> ProductVariant:
     variant = product.variants.filter(pk=variant_id).first()
     if variant is None:
         raise HttpError(404, "Variant not found")
+    if "price_cents" in data or "compare_at_price_cents" in data:
+        _require_unlocked(product)         # stock, SKU and on/off stay editable: a review does not read them
     stock = data.pop("stock_qty", None)
     if "sku" in data and ProductVariant.objects.filter(sku=data["sku"]).exclude(pk=variant.pk).exists():
         raise HttpError(409, "SKU already in use")
@@ -291,7 +312,9 @@ def patch_variant(product: Product, variant_id, data: dict, *, actor) -> Product
     return variant
 
 
+@review.tracked_edit
 def add_image(product: Product, file, alt: str = "") -> ProductImage:
+    _require_unlocked(product)
     if file.content_type not in IMAGE_TYPES:
         raise HttpError(422, "Images must be JPEG, PNG, WebP or GIF")
     if file.size > settings.PRODUCT_IMAGE_MAX_BYTES:
@@ -307,6 +330,7 @@ def add_image(product: Product, file, alt: str = "") -> ProductImage:
 
 @transaction.atomic
 def reorder_images(product: Product, image_ids: list) -> None:
+    _require_unlocked(product)
     images = {i.pk: i for i in product.images.all()}
     if set(image_ids) != set(images):
         raise HttpError(422, "image_ids must list every image of this product exactly once")
@@ -315,8 +339,10 @@ def reorder_images(product: Product, image_ids: list) -> None:
         ProductImage.objects.filter(pk=pk).update(sort_order=n, is_primary=n == 0)
 
 
+@review.tracked_edit
 @transaction.atomic
 def delete_image(product: Product, image_id) -> None:
+    _require_unlocked(product)
     image = product.images.filter(pk=image_id).first()
     if image is None:
         raise HttpError(404, "Image not found")
@@ -329,8 +355,10 @@ def delete_image(product: Product, image_id) -> None:
             first.save(update_fields=["is_primary", "updated_at"])
 
 
+@review.tracked_edit
 @transaction.atomic
 def set_content(product: Product, sections: list) -> None:
+    _require_unlocked(product)
     product.content_sections.all().delete()
     counters = {"benefit": 0, "usage_step": 0}
     for s in sections:
@@ -369,9 +397,16 @@ def completion(product: Product) -> dict:
     }
 
 
+def _lock(product: Product) -> Product:
+    """The product row, locked and freshly read, so two requests (a double click, two team members) cannot both act on a stale status."""
+    return Product.objects.select_for_update().get(pk=product.pk)
+
+
 @transaction.atomic
 def change_status(product: Product, action: str) -> Product:
     now = timezone.now()
+    product = _lock(product)
+    was_live = product.status == PStatus.ACTIVE
     if action == "submit":
         if product.status not in (PStatus.DRAFT, PStatus.REJECTED):
             raise HttpError(409, f"Only draft or rejected products can be submitted (this one is {product.status})")
@@ -390,8 +425,16 @@ def change_status(product: Product, action: str) -> Product:
     elif action == "unarchive":
         if product.status != PStatus.ARCHIVED:
             raise HttpError(409, "Not archived")
-        product.status = PStatus.ACTIVE if product.published_at else PStatus.DRAFT
+        if not product.published_at:
+            product.status = PStatus.DRAFT
+        elif product.edited_since_review:
+            # Changed while archived: it comes back through review, not straight to the shop window.
+            product.status, product.submitted_at, product.rejection_reason = PStatus.PENDING, now, ""
+        else:
+            product.status = PStatus.ACTIVE
     product.save(update_fields=["status", "submitted_at", "rejection_reason", "updated_at"])
+    if was_live != (product.status == PStatus.ACTIVE):
+        catalog.refresh_category_counts()            # "128 items" follows every way in or out of the shop window
     return product
 
 
@@ -402,7 +445,9 @@ def duplicate(product: Product) -> Product:
         f.attname: getattr(product, f.attname) for f in Product._meta.fields  # attname → FK ids, no extra queries
         if f.name not in ("id", "slug", "name", "status", "published_at", "submitted_at", "rejection_reason",
                           "rating_avg", "rating_count", "created_at", "updated_at", "deleted_at", "stock_status",
-                          "is_featured", "is_best_seller", "is_new_arrival")
+                          "is_featured", "is_best_seller", "is_new_arrival",
+                          # a copy is a new product that nobody has reviewed
+                          "reviewed_hash", "edited_since_review", "review_source", "reviewed_by", "reviewed_at")
     }
     copy = Product.objects.create(name=name, slug=_unique_slug(name), status=PStatus.DRAFT, stock_status=Product.StockStatus.OUT_OF_STOCK, **fields)
     value_map = {}
@@ -579,6 +624,8 @@ def analytics(store, product: Product, period_name: str) -> dict:
 
 def review_queue(status: str | None):
     qs = Product.objects.select_related("store", "category").prefetch_related("images").order_by("submitted_at", "created_at")
+    if status == "edited":                      # live products changed after approval (catalog/review.py)
+        return qs.filter(status=PStatus.ACTIVE, edited_since_review=True)
     return qs.filter(status=status) if status else qs.exclude(status=PStatus.DRAFT)
 
 
@@ -589,25 +636,48 @@ def admin_row(p: Product) -> dict:
         "id": p.id, "name": p.name, "slug": p.slug, "store": p.store.display_name, "store_slug": p.store.slug,
         "category": p.category.name if p.category_id else None, "price_cents": p.price_cents, "status": p.status,
         "submitted_at": p.submitted_at, "image_url": primary.image.url if primary else None,
+        "edited": review.is_edited_live(p), "review_source": p.review_source, "reviewed_at": p.reviewed_at,
     }
 
 
+_REVIEW_FIELDS = ["status", "published_at", "rejection_reason", "reviewed_hash", "edited_since_review", "review_source", "reviewed_by", "reviewed_at", "updated_at"]
+
+
 @transaction.atomic
-def approve(product: Product) -> Product:
-    if product.status != PStatus.PENDING:
+def approve(product: Product, *, actor=None) -> Product:
+    """`actor` is the staff user who decided (None = the system). A live product that was edited after approval can be approved again."""
+    from notifications import services as notifications
+
+    product = _lock(product)
+    again = review.is_edited_live(product)
+    if product.status != PStatus.PENDING and not again:
         raise HttpError(409, f"Product is {product.status}, not pending")
     product.status = PStatus.ACTIVE
     product.published_at = product.published_at or timezone.now()
     product.rejection_reason = ""
-    product.save(update_fields=["status", "published_at", "rejection_reason", "updated_at"])
+    review.stamp(product, actor=actor)
+    product.save(update_fields=_REVIEW_FIELDS)
     catalog.refresh_category_counts()
+    if not again:                                # already live: nothing new to tell the seller
+        notifications.product_reviewed(product, approved=True)
     return product
 
 
 @transaction.atomic
-def reject(product: Product, reason: str) -> Product:
-    if product.status != PStatus.PENDING:
+def reject(product: Product, reason: str, *, actor=None) -> Product:
+    """Pending products are turned down; a live product that was edited after approval is taken down."""
+    from notifications import services as notifications
+
+    product = _lock(product)
+    was_live = product.status == PStatus.ACTIVE
+    if product.status != PStatus.PENDING and not review.is_edited_live(product):
         raise HttpError(409, f"Product is {product.status}, not pending")
     product.status, product.rejection_reason = PStatus.REJECTED, reason
-    product.save(update_fields=["status", "rejection_reason", "updated_at"])
+    product.edited_since_review = False
+    product.review_source = Product.ReviewSource.STAFF if actor is not None else Product.ReviewSource.SYSTEM
+    product.reviewed_by, product.reviewed_at = actor, timezone.now()
+    product.save(update_fields=["status", "rejection_reason", "edited_since_review", "review_source", "reviewed_by", "reviewed_at", "updated_at"])
+    if was_live:
+        catalog.refresh_category_counts()
+    notifications.product_reviewed(product, approved=False, reason=reason)
     return product

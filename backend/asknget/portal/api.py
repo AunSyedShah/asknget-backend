@@ -221,7 +221,7 @@ def product_analytics(request, product_id: UUID, period: PeriodLit = "month"):
 
 @admin_products_router.get("", auth=StaffAuth("products.view"), response=list[AdminProductRowOut], summary="Review queue (default: pending)")
 @paginate(PagePagination)
-def admin_product_list(request, status: str = Query("pending", description="pending | active | rejected | archived | all")):
+def admin_product_list(request, status: str = Query("pending", description="pending | edited (live, changed after approval) | active | rejected | archived | all")):
     return [products.admin_row(p) for p in scope(request, products.review_queue(None if status == "all" else status))]
 
 
@@ -230,8 +230,7 @@ def admin_product_approve(request, product_id: UUID):
     product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
-    products.approve(product)
-    notifications.product_reviewed(product, approved=True)
+    products.approve(product, actor=request.auth)
     return {"detail": f"{product.name} is now live"}
 
 
@@ -240,8 +239,7 @@ def admin_product_reject(request, product_id: UUID, payload: ProductRejectIn):
     product = scope(request, products.Product.objects.all()).filter(pk=product_id).first()
     if product is None:
         return 404, {"detail": "Product not found"}
-    products.reject(product, payload.reason)
-    notifications.product_reviewed(product, approved=False, reason=payload.reason)
+    products.reject(product, payload.reason, actor=request.auth)
     return {"detail": f"{product.name} rejected"}
 
 

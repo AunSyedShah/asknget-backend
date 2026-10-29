@@ -203,7 +203,7 @@ story += [
     table([
         ["Area", "Status", "Notes"],
         ["Data model (38 tables) + migrations", "Implemented", "Derived from all 38 Figma screens; see docs/data-model.md"],
-        ["Django admin for every model", "Implemented", "http://127.0.0.1:8000/admin/"],
+        ["Django admin for every model", "Implemented", "http://127.0.0.1:8000/django-admin/"],
         ["Auth: register, login, JWT, refresh, logout", "Implemented", "/api/v1/auth/*"],
         ["OTP verification (email, SMS), password change/reset", "Implemented", "SMS provider is a console stub until an SMS gateway is chosen"],
         ["Profile, avatar, addresses, payment methods", "Implemented", "/api/v1/me/*"],
@@ -351,7 +351,7 @@ uv run python manage.py runserver        # http://127.0.0.1:8000
         ["http://127.0.0.1:8000/api/v1/docs", "Swagger UI - try every endpoint in the browser (use Authorize with a Bearer token)"],
         ["http://127.0.0.1:8000/api/v1/openapi.json", "OpenAPI 3 spec - feed it to a client generator (openapi-typescript, orval, etc.)"],
         ["http://127.0.0.1:8000/api/v1/health", "Liveness probe"],
-        ["http://127.0.0.1:8000/admin/", "Django admin - inspect and edit any table"],
+        ["http://127.0.0.1:8000/django-admin/", "Django admin - inspect and edit any table"],
     ], (62 * mm, 110 * mm)),
     P("Everyday commands", "h2"),
     CODE("""

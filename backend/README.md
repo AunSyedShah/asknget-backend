@@ -44,7 +44,7 @@ uv run poe dev                  # http://127.0.0.1:8000
 ```
 
 - API docs (Swagger): http://127.0.0.1:8000/api/v1/docs · OpenAPI JSON: /api/v1/openapi.json
-- Admin: http://127.0.0.1:8000/admin/
+- Django admin: http://127.0.0.1:8000/django-admin/ (not `/admin/`: that path belongs to the frontend app; set `DJANGO_ADMIN_URL` to change it)
 
 ### Tasks (`uv run poe …`)
 

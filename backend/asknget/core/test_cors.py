@@ -1,6 +1,8 @@
 """CORS: a browser frontend on an allowed origin may send every custom header the API reads; other origins get nothing."""
 
+from django.conf import settings
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 ORIGIN = "http://localhost:3000"
 HEADERS = "authorization,content-type,x-region,x-language,x-timezone,x-store,x-cart-token"
@@ -31,4 +33,18 @@ class CorsTests(TestCase):
         self.assertNotIn("Access-Control-Allow-Credentials", preflight(self.client, "/api/v1/regions"))
 
     def test_the_django_admin_gets_no_cors_headers(self):
-        self.assertNotIn("Access-Control-Allow-Origin", preflight(self.client, "/admin/login/"))
+        self.assertNotIn("Access-Control-Allow-Origin", preflight(self.client, f"/{settings.ADMIN_URL}login/"))
+
+
+class DjangoAdminPathTests(TestCase):
+    """The frontend owns /admin (its staff screens); the Django admin lives elsewhere."""
+
+    def test_the_django_admin_is_not_at_slash_admin(self):
+        self.assertEqual(self.client.get("/admin/login/").status_code, 404)
+        self.assertEqual(self.client.get("/admin/dashboard").status_code, 404)
+
+    def test_the_django_admin_lives_at_its_own_prefix(self):
+        # Not rendered: the admin templates need collected static files, which a test run does not have.
+        self.assertEqual(settings.ADMIN_URL, "django-admin/")
+        self.assertEqual(reverse("admin:login"), "/django-admin/login/")
+        self.assertEqual(reverse("admin:index"), "/django-admin/")

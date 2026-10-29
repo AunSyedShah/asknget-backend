@@ -571,36 +571,36 @@ class AdminTests(LedgerTestCase):
         self.client.force_login(self.admin_user)
 
     def test_pages_render(self):
-        for url in ("/admin/ledger/ledgerentry/", "/admin/ledger/ledgerentry/add/", "/admin/ledger/payout/", "/admin/ledger/payout/add/"):
+        for url in ("/django-admin/ledger/ledgerentry/", "/django-admin/ledger/ledgerentry/add/", "/django-admin/ledger/payout/", "/django-admin/ledger/payout/add/"):
             self.assertEqual(self.client.get(url).status_code, 200, url)
 
     def test_an_adjustment_through_admin_goes_through_the_same_rules(self):
-        res = self.client.post("/admin/ledger/ledgerentry/add/", {"store": self.store_a.pk, "amount_cents": 3000, "description": "Goodwill"})
+        res = self.client.post("/django-admin/ledger/ledgerentry/add/", {"store": self.store_a.pk, "amount_cents": 3000, "description": "Goodwill"})
         self.assertEqual(res.status_code, 302, getattr(res, "context", None) and res.context["adminform"].form.errors)
         entry = LedgerEntry.objects.get()
         self.assertEqual((entry.type, entry.amount_cents, entry.created_by_id), (T.ADJUSTMENT, 3000, self.admin_user.pk))
         self.assertRegex(entry.reference, r"TXN-\d{8}-\d+")
-        self.assertEqual(self.client.post("/admin/ledger/ledgerentry/add/", {"store": self.store_a.pk, "amount_cents": 0, "description": "x"}).status_code, 200)
+        self.assertEqual(self.client.post("/django-admin/ledger/ledgerentry/add/", {"store": self.store_a.pk, "amount_cents": 0, "description": "x"}).status_code, 200)
 
     def test_a_payout_through_admin_cannot_exceed_the_available_balance(self):
-        too_much = self.client.post("/admin/ledger/payout/add/", {"store": self.store_a.pk, "amount_cents": 5000, "note": ""})
+        too_much = self.client.post("/django-admin/ledger/payout/add/", {"store": self.store_a.pk, "amount_cents": 5000, "note": ""})
         self.assertEqual(too_much.status_code, 200)                                  # form re-shown with the reason
         self.assertEqual(Payout.objects.count(), 0)
         services.adjust(self.store_a, amount_cents=9000, note="Seed funds", by=self.admin_user)
-        ok = self.client.post("/admin/ledger/payout/add/", {"store": self.store_a.pk, "amount_cents": 5000, "note": "Weekly"})
+        ok = self.client.post("/django-admin/ledger/payout/add/", {"store": self.store_a.pk, "amount_cents": 5000, "note": "Weekly"})
         self.assertEqual(ok.status_code, 302, getattr(ok, "context", None) and ok.context["adminform"].form.errors)
         self.assertEqual(Payout.objects.get().status, "processing")
         self.assertEqual(self.balances(self.store_a)["available_cents"], 4000)
 
     def test_entries_cannot_be_edited_or_deleted_in_admin(self):
         entry = services.adjust(self.store_a, amount_cents=100, note="x", by=self.admin_user)
-        page = self.client.get(f"/admin/ledger/ledgerentry/{entry.pk}/change/")
+        page = self.client.get(f"/django-admin/ledger/ledgerentry/{entry.pk}/change/")
         self.assertNotContains(page, 'name="_save"')                                  # no Save button: read-only
-        self.assertEqual(self.client.post(f"/admin/ledger/ledgerentry/{entry.pk}/delete/", {"post": "yes"}).status_code, 403)
+        self.assertEqual(self.client.post(f"/django-admin/ledger/ledgerentry/{entry.pk}/delete/", {"post": "yes"}).status_code, 403)
 
     def test_payout_actions(self):
         services.adjust(self.store_a, amount_cents=9000, note="Seed funds", by=self.admin_user)
         payout = services.create_payout(self.store_a, amount_cents=5000, note="", by=self.admin_user)
-        self.client.post("/admin/ledger/payout/", {"action": "mark_completed", "_selected_action": [payout.pk]})
+        self.client.post("/django-admin/ledger/payout/", {"action": "mark_completed", "_selected_action": [payout.pk]})
         payout.refresh_from_db()
         self.assertEqual(payout.status, "completed")

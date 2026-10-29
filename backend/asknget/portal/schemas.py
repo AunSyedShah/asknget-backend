@@ -123,7 +123,7 @@ class ProductPatchIn(Schema):
     compare_at_price_cents: Optional[int] = Field(None, ge=0, description="Send 0 to clear")
     cost_price_cents: Optional[int] = Field(None, ge=0, description="Wizard 'Cost Price' — seller-only, never shown to buyers")
     barcode: Optional[str] = Field(None, max_length=64)
-    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+    currency: Optional[str] = Field(None, min_length=3, max_length=3, description="Always the currency of the store's market; any other value is a 422")
     low_stock_threshold: Optional[int] = Field(None, ge=0)
     preorder: Optional[bool] = Field(None, description="Manual 'Pre-order' flag; otherwise stock status is derived")
     weight_grams: Optional[int] = Field(None, ge=0)
@@ -132,8 +132,6 @@ class ProductPatchIn(Schema):
     height_mm: Optional[int] = Field(None, ge=0)
     ships_from: Optional[str] = Field(None, max_length=120)
     handling_days: Optional[int] = Field(None, ge=0, le=30)
-    is_featured: Optional[bool] = None
-    is_new_arrival: Optional[bool] = None
 
     @field_validator("tags")
     @classmethod
@@ -307,6 +305,9 @@ class AdminProductRowOut(Schema):
     status: str
     submitted_at: Optional[datetime] = None
     image_url: Optional[str] = None
+    edited: bool = Field(False, description="Live, but changed after it was approved: waits for staff (`?status=edited`)")
+    review_source: str = Field("", description="staff | system: who last decided; empty if never reviewed")
+    reviewed_at: Optional[datetime] = None
 
 
 # --------------------------------------------------------------------------- #

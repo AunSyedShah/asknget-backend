@@ -115,6 +115,18 @@ class Product(SoftDeleteModel):
     rejection_reason = models.TextField(blank=True)
     low_stock_threshold = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Overrides the store default")
 
+    # What a reviewer approved (see catalog/review.py). `reviewed_hash` is empty for products published before this existed:
+    # the first edit adopts the content as it was then.
+    class ReviewSource(models.TextChoices):
+        STAFF = "staff", "Staff"
+        SYSTEM = "system", "Automatic"
+
+    reviewed_hash = models.CharField(max_length=64, blank=True)
+    edited_since_review = models.BooleanField(default=False, db_index=True, help_text="Changed after approval: waits for a person to approve it again")
+    review_source = models.CharField(max_length=10, choices=ReviewSource.choices, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
     # Wizard step 4 "Shipping" (nothing drawn; the minimum a carrier quote needs)
     weight_grams = models.PositiveIntegerField(null=True, blank=True)
     length_mm = models.PositiveIntegerField(null=True, blank=True)

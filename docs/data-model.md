@@ -189,9 +189,12 @@ Values seen: Fashion, Beauty, Electronics, Groceries/Food, Jewellery, Sports, Ho
 | stock_status | enum(in_stock, out_of_stock, preorder) | derived from variant stock; "In Stock" badge, availability filter |
 | rating_avg | numeric(2,1) cached | "4.9" |
 | rating_count | int cached | "320 Reviews" |
-| is_featured / is_best_seller / is_new_arrival | boolean | landing sections. ❓ manual flags vs computed |
-| status | enum(draft, active, archived) | |
+| is_featured / is_best_seller / is_new_arrival | boolean | landing sections. ❓ manual flags vs computed. **Set by staff only** (a seller's `PATCH` ignores `is_featured` / `is_new_arrival`) |
+| status | enum(draft, pending, active, rejected, archived) | `draft → pending → active \| rejected`; `active ↔ archived` |
 | published_at | timestamp, nullable | |
+| reviewed_hash | char(64), blank | fingerprint of what a reviewer approved (`catalog/review.py`: words, category, brand, barcode, options, benefits, picture names, price band). Blank on products published before this existed: the first edit adopts the content as it was |
+| edited_since_review | boolean, indexed | the product no longer matches `reviewed_hash`; a live one is listed for staff (`?status=edited`), an archived one returns through review when unarchived |
+| review_source / reviewed_by / reviewed_at | enum(staff, system), user, timestamp | who last decided (approve or reject) and when; empty for a product never reviewed |
 
 `discount_percent` ("40% Off" badge) is derived: `1 - price / compare_at_price`.
 

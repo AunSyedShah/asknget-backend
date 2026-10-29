@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -110,6 +111,11 @@ SELLER_DOCUMENT_MAX_BYTES = _capped(10 * 1024 * 1024)  # design: 'PDF, JPG or PN
 REVIEW_MEDIA_MAX_BYTES = _capped(25 * 1024 * 1024)  # review 'Photo / Video (Optional)'
 RETURN_PHOTO_MAX_BYTES = _capped(5 * 1024 * 1024)
 PRODUCT_IMAGE_MAX_BYTES = 1 * 1024 * 1024  # seller wizard Media popup: 'PNG, JPG upto 1-MB'
+# A live product whose words, category, pictures or price band were changed after approval (catalog/review.py):
+# "flag" keeps it live and lists it for staff (status=edited); "hold" hides it (pending) until a person approves it.
+PRODUCT_EDIT_POLICY = os.environ.get('PRODUCT_EDIT_POLICY', 'flag').strip().lower()
+if PRODUCT_EDIT_POLICY not in ('flag', 'hold'):
+    raise ImproperlyConfigured(f"PRODUCT_EDIT_POLICY must be flag or hold (got {PRODUCT_EDIT_POLICY!r}).")
 STOREFRONT_URL = os.environ.get('STOREFRONT_URL', '').rstrip('/')  # buyer site, for 'View Product' links
 PORTAL_URL = os.environ.get('PORTAL_URL', '').rstrip('/')  # seller portal, for team-invitation links (falls back to STOREFRONT_URL)
 
@@ -299,6 +305,9 @@ MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT', BASE_DIR / 'media'))
 # Let Django serve uploads itself. On by default in DEBUG; set SERVE_MEDIA=1 in the
 # container until uploads move to object storage / a reverse proxy.
 SERVE_MEDIA = os.environ.get('SERVE_MEDIA', '1' if DEBUG else '0') == '1'
+# Where the Django admin lives. Not /admin/: the frontend app has its own screens under /admin (staff login, dashboard), and
+# nginx sends /admin/ to the app. The staff API (/api/v1/admin/...) is unaffected.
+ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'django-admin/').strip().strip('/') + '/'
 # How long a signed link to a private file (seller documents) works.
 SIGNED_FILE_TTL_SECONDS = int(os.environ.get('SIGNED_FILE_TTL_SECONDS', 3600))
 

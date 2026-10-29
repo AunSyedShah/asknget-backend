@@ -136,7 +136,7 @@ class RuleTests(EventTestCase):
     def test_rule_changes_made_in_django_admin_are_recorded(self):
         admin = make_user(is_staff=True, is_superuser=True)
         self.client.force_login(admin)
-        res = self.client.post("/admin/notifications/notificationrule/add/", {
+        res = self.client.post("/django-admin/notifications/notificationrule/add/", {
             "event": "order.placed", "audience": "staff", "is_active": "on", "in_app": "on", "email": "on", "realtime": "on",
             "user_can_opt_out": "on", "default_on": "on", "staff_permission": "", "min_amount_cents": "50000",
         })
@@ -144,7 +144,7 @@ class RuleTests(EventTestCase):
         rule = NotificationRule.objects.get()
         change = RuleChange.objects.get(rule=rule)
         self.assertEqual((change.user, change.changes["min_amount_cents"]), (admin, [None, 50000]))
-        res = self.client.post(f"/admin/notifications/notificationrule/{rule.pk}/change/", {
+        res = self.client.post(f"/django-admin/notifications/notificationrule/{rule.pk}/change/", {
             "event": "order.placed", "audience": "staff", "is_active": "on", "in_app": "on", "realtime": "on",
             "user_can_opt_out": "on", "default_on": "on", "staff_permission": "", "min_amount_cents": "50000",
         })

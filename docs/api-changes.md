@@ -5,6 +5,29 @@
 > Everything before 2026-10-14 is described in [`frontend-handoff.md`](frontend-handoff.md) sections 4 to 5a. Regenerate your API types from
 > `openapi.json` on Preview whenever there is a new entry. Last endpoint count: **234 operations**.
 
+## 2026-10-27
+
+- **A product is live only as staff approved it** (product review flow, phase 0). **Not deployed yet** (the entry becomes "Live on Preview since ..." when it is).
+  - **Behaviour change, no new fields in the seller payload.** While a product is **under review** (`status: "pending"`) the seller can no
+    longer change it in ways a reviewer reads: adding, deleting or reordering pictures, the Key Benefits / How-to-Use content, and a
+    variant's price now answer **`409 "This product is under review; withdraw it (unpublish) to edit"`**, like the name and options already did.
+    Stock, SKU and the on/off switch of a variant stay editable. Show the same "under review" state on those screens.
+  - **Editing a live product** (`status: "active"`) still saves and the product stays live, but a change to the name, descriptions, tags,
+    category, brand, barcode, options, benefits, pictures, or a price that doubles or halves (or a jump in the discount) now marks it
+    "edited after approval" for staff (see below). Stock, SKU, shipping, delivery options, cost price and small price changes do not.
+    The server can be set to hide such a product until staff approve it (`PRODUCT_EDIT_POLICY=hold`); then the `PATCH` answer shows `status: "pending"`.
+    Handle a status that changes after a save.
+  - **Unarchive** of a product that was edited while archived now returns **`status: "pending"`** (review) instead of `active`.
+  - **`is_featured` and `is_new_arrival` are no longer accepted in `PATCH /seller/products/{id}`** (staff decide landing-page placement).
+    They are still returned. A request that sends them succeeds and the values are ignored.
+  - **`currency` in `PATCH /seller/products/{id}`** must be the currency of the store's market (`product.currency`); any other value is
+    `422 "Prices are in ZAR, the currency of your store's market"`. Do not offer a currency picker.
+  - Admin: `GET /admin/products?status=edited` lists live products changed after approval; rows gained `edited` (boolean),
+    `review_source` (`staff` or `system`, empty if never reviewed) and `reviewed_at`. Approving an edited live product approves the edit
+    (the seller is not told it is "now live" again); rejecting one takes it down with the reason and the seller is notified.
+    Approve and reject now record who decided; the seller notification is sent by every path that decides.
+  - Product category counts ("128 items") now update when a live product is archived, unarchived, unpublished or taken down (before: only on approval).
+
 ## 2026-10-20
 
 - **Uploads work on Vercel Preview** (additive). **Live on Preview since 2026-10-20** (verified: `/lookups/seller` shows the 4 MB limit and the 7 document types, a file stored in the database is served at `/media/`, private paths answer 404, and the CORS preflight from `http://localhost:3000` is allowed).

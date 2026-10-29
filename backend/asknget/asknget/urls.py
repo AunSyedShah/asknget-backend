@@ -9,7 +9,7 @@ from core.storage import PRIVATE_PREFIXES, media_from_db
 from .api import api
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path("api/v1/", api.urls),
 ]
 
