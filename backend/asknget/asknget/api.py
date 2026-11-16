@@ -45,7 +45,7 @@ api = DocumentedAPI(
     description=(
         "Multi-vendor marketplace: buyer storefront, seller portal, admin.\n\n"
         "**Base URL: every path in this document already starts with `/api/v1`, so a client's base URL is the origin only** "
-        "(for example `https://asknget-backend.vercel.app`), never `.../api/v1`.\n\n"
+        "(for example `https://asknget.co.za`), never `.../api/v1`.\n\n"
         "Auth is `Authorization: Bearer <access_token>`. Money is integer minor units (`*_cents`). Lists return `{items, total, page, per_page, pages}`. "
         "Every error is `{\"detail\": \"...\"}` (422 adds `errors[]`). `X-Region`, `X-Language`, `X-Timezone` (all calls), `X-Store` (seller calls) and "
         "`X-Cart-Token` (cart and checkout) are declared on the operations that use them."
