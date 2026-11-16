@@ -5,11 +5,17 @@
 
 Idempotent (keyed on emails / slugs / codes). Never run against production.
 
-Accounts (password for all: DemoPass123!):
+Accounts (one shared password, random on every run and printed at the end; set SEED_DEMO_PASSWORD to choose it yourself):
   admin@asknget.demo    staff — Django admin + /admin/* endpoints
   seller@asknget.demo   active seller with a store and products
   customer@asknget.demo customer with an address and an order
+
+There is deliberately no fixed password in this file: the repository is public, and a staff account with a published password on any
+reachable server is an open door. Never run this against a server people can reach; if you must, disable these passwords afterwards.
 """
+
+import os
+import secrets
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -28,7 +34,7 @@ from orders.models import Order, OrderDelivery, OrderItem, OrderStatusEvent, Vou
 from sellers import services as seller_services
 from sellers.models import SellerApplication, Store
 
-PASSWORD = "DemoPass123!"
+PASSWORD = os.environ.get("SEED_DEMO_PASSWORD") or secrets.token_urlsafe(12)
 
 # (name, category slug, brand, price, compare_at, flags, options, short description)
 PRODUCTS = [
