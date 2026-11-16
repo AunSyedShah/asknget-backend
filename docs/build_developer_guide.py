@@ -362,7 +362,7 @@ uv run python manage.py migrate
 uv add <package>                             # add a dependency (updates pyproject + uv.lock)
 python ../docs/figma/snapshot.py --check     # has the Figma design changed since we last looked?
 """),
-    P("Demo accounts (after seed_demo; password DemoPass123!)", "h2"),
+    P("Demo accounts (after seed_demo; the password is random and printed at the end, or set SEED_DEMO_PASSWORD)", "h2"),
     table([
         ["Email", "Role", "Use it for"],
         ["customer@asknget.demo", "Customer", "Browse, cart, checkout, My Orders, wishlist (has a saved address)"],

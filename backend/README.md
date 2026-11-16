@@ -39,7 +39,7 @@ backend/
 ```bash
 uv sync
 cp .env.example .env            # includes the shared dev FIELD_ENCRYPTION_KEY; keep it
-uv run poe seed                 # migrate + seed_lookups + seed_demo (password DemoPass123!)
+uv run poe seed                 # migrate + seed_lookups + seed_demo (the demo password is random and printed at the end; or set SEED_DEMO_PASSWORD)
 uv run poe dev                  # http://127.0.0.1:8000
 ```
 
