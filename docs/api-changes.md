@@ -3,11 +3,14 @@
 > Maintained by the **backend session**. Newest first. One entry per change that touches the contract (`openapi.json`).
 > **additive** = a new endpoint or field; adopt it when you like. **BREAKING** = an existing shape changed; the entry says what to do.
 > Everything before 2026-10-14 is described in [`frontend-handoff.md`](frontend-handoff.md) sections 4 to 5a. Regenerate your API types from
-> `openapi.json` on Preview whenever there is a new entry. Last endpoint count: **234 operations**.
+> `openapi.json` on the test server (`https://asknget.co.za/api/v1/openapi.json`; the old Vercel "Preview" no longer exists) whenever there is a new entry.
+> Endpoint count on 2026-11-16: **244 operations in 213 paths** (the earlier "234" was written in early October and never updated; the
+> ten extra operations are the ones the entries from 2026-10-14 to 2026-10-27 describe). **The live `openapi.json` is the source of truth;
+> take your snapshot from it.** There has been no contract change after the 2026-10-27 entry.
 
 ## 2026-10-27
 
-- **A product is live only as staff approved it** (product review flow, phase 0). **Not deployed yet** (the entry becomes "Live on Preview since ..." when it is).
+- **A product is live only as staff approved it** (product review flow, phase 0). **Live on the test server since 2026-10-29.** Seller and admin endpoints only: nothing in it changes a customer (storefront, cart, checkout, orders, chat, account) response.
   - **Behaviour change, no new fields in the seller payload.** While a product is **under review** (`status: "pending"`) the seller can no
     longer change it in ways a reviewer reads: adding, deleting or reordering pictures, the Key Benefits / How-to-Use content, and a
     variant's price now answer **`409 "This product is under review; withdraw it (unpublish) to edit"`**, like the name and options already did.
