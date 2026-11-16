@@ -11,7 +11,7 @@ The repository is a fresh `create-next-app` scaffold in JavaScript on branch `ma
 
 Hard rules:
 - Stack and order of work are decided (brief, section 8): Next.js (App Router) + TypeScript + Tailwind, a client generated from the live OpenAPI document, TanStack Query, Playwright; storefront, then seller portal, then admin portal.
-- Build against the **backend Preview** only; never Production. Do not call the backend from the browser: proxy through a Next.js rewrite and always send `X-Region` (brief, section 3).
+- (Status 2026-11-16: the old Preview and Production backends no longer exist; the only backend is the EC2 test server `https://asknget.co.za`. Read the status note at the top of `docs/backend/README.md` first.) Build against the **backend Preview** only; never Production. Do not call the backend from the browser: proxy through a Next.js rewrite and always send `X-Region` (brief, section 3).
 - **Never edit `docs/backend/` or `design/`**: the owner regenerates them. Your notes go in `DESIGN_NOTES.md` and `BACKEND_ASKS.md` (create them on day one).
 - The pictures in `design/frames` are the design; the outlines in `design/outlines` give the exact copy. Treat the design as a hypothesis: where it contradicts the API or itself, write it in `DESIGN_NOTES.md` and ask; never guess.
 - When you need something from the backend (a missing field, a wrong shape, a bug), write it in `BACKEND_ASKS.md`: the request you sent, the response you got, what you expected. Do not work around backend bugs silently.

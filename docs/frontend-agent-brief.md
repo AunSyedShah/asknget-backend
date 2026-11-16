@@ -1,5 +1,8 @@
 # asknget: brief for the agent that builds the frontend
 
+> **Status 2026-11-16: the environments in this file are outdated.** Vercel was removed; the only backend is the EC2 test server, `https://asknget.co.za` (API at `/api/v1`, Swagger at `/api/v1/docs`),
+> deployed by GitHub Actions from `main`. Wherever this file says Preview or Production, read "the test server"; see `docs/ec2-deploy.md` and the status note at the top of `docs/frontend-pack/brief.md`.
+>
 > **The frontend session does not read this file.** It gets a self-contained, regenerated copy of the instructions and the design pictures in its own folder: `python docs/make_frontend_pack.py <frontend folder>` (see `frontend-kickoff-prompt.md`), built from `docs/frontend-pack/brief.md` (the frontend-facing brief), this repository's `frontend-handoff.md`, `api-changes.md` and `Figma/frames`. This file stays as the backend session's own record; **when the contract, the environments or the design change, update `docs/frontend-pack/brief.md` too**, then regenerate the pack.
 
 > **Approved by the owner 2026-10-16** (the decisions are recorded in section 8). Written by the backend session so that a fresh Claude

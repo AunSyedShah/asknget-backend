@@ -5,6 +5,16 @@
 > **Everything you need about the backend is in this folder tree. You have no access to the backend repository and must not ask for it**; ask the owner
 > for anything that is not here (section 6).
 
+> **Status update 2026-11-16: read this before sections 2, 3 and 7.** Vercel is gone and so are "Preview" and "Production" as separate backends.
+> There is **one environment, the EC2 test server, `https://asknget.co.za`** (HTTPS; one market, `ZA`). The API is at `https://asknget.co.za/api/v1`,
+> Swagger UI at `/api/v1/docs`, the contract at `/api/v1/openapi.json`. Pushing to `main` in each repository deploys it (backend and web frontend each have
+> a GitHub Actions deploy; see `docs/ec2-deploy.md` in the backend repository). The **web frontend** that was actually built is **React + Vite + Bun**
+> (repository `asknget-frontend`), not the Next.js plan in this file; it calls `/api/v1` on the **same origin**, so it needs no CORS and no `API_ORIGIN`.
+> A **native mobile app** (Expo) is a separate project and calls the absolute URL `https://asknget.co.za/api/v1`; native clients are not subject to CORS.
+> The test server's database holds **only reference data** (categories, brands, banks, delivery methods): **no products, stores or demo accounts yet**.
+> Payments are not integrated and e-mail/OTP delivery is not configured. Where this file says "Preview" or "Production", read "the test server".
+> The conventions in the rest of this file (headers, errors, money, pagination, how to ask the backend for changes) are unchanged and still apply.
+
 ## 0. What is where
 
 | Path | What | Who changes it |
@@ -45,9 +55,10 @@ stores, private documents), **portal** (everything the seller portal calls, unde
 Rules the UI must respect: premium-only areas answer `403 premium_required`; seller work is scoped by store (`X-Store`); a seller cannot create categories, they request them and staff decide;
 an order keeps a snapshot of what it was charged; refunds go to the original payment only.
 
-## 2. Responsive design (there is no mobile design)
+## 2. Responsive design for the web
 
-The Figma file has **desktop frames only** (1920 px wide). Until the designer delivers mobile frames, use these defaults and say so in the pull request:
+The Figma page "Web UI Design" has **desktop frames only** (1920 px wide). (A separate Figma page, "Mobile App", now holds the native app design; it is built as an Expo app,
+exported under `docs/figma/mobile/` in the backend repository, and is not the web frontend's job.) For the web, use these defaults and say so in the pull request:
 
 - Breakpoints **360 / 768 / 1024 / 1280 px**, mobile-first, built flexibly so a mobile design can replace them.
 - Navigation collapses to a drawer below 1024 px. Product and category grids: 4, 3, 2, then 1 columns.
@@ -58,10 +69,11 @@ The Figma file has **desktop frames only** (1920 px wide). Until the designer de
 
 | Where | Base | Use it for |
 |---|---|---|
-| **Backend Preview** (pre-production, staging data) | origin `https://asknget-backend-git-develop-aun-syed-shahs-projects.vercel.app` | **everything you build and test**; Swagger UI at `<origin>/api/v1/docs` |
-| Backend Production | origin `https://asknget-backend.vercel.app` | **never**; the owner promotes to it |
+| **The test server** (EC2, the only backend environment) | origin `https://asknget.co.za` | **everything you build and test**; Swagger UI at `<origin>/api/v1/docs` |
 
-- **The contract is the live OpenAPI document**: `https://asknget-backend-git-develop-aun-syed-shahs-projects.vercel.app/api/v1/openapi.json`. Generate typed clients from it
+There is no separate production backend yet: treat the test server's data as disposable (it can be reset), do not store anything on it you cannot recreate, and do not create real customer data.
+
+- **The contract is the live OpenAPI document**: `https://asknget.co.za/api/v1/openapi.json`. Generate typed clients from it
   (for example `openapi-typescript`); do not hand-write response types. Re-fetch it at the start of every session (section 6). Facts a generator trips over:
   - **Every path already starts with `/api/v1`** and the document has no `servers` entry: set the client's base URL to the **origin only** (`API_ORIGIN`), never to `.../api/v1`.
   - 234 operations at the time of writing, each with a unique but long `operationId`; rename them in the generator's configuration if you like.
@@ -69,15 +81,19 @@ The Figma file has **desktop frames only** (1920 px wide). Until the designer de
     shows a header named `x_cart_token` with underscores, it is an old copy: re-fetch.
   - Every operation has a `default` error response typed `ErrorResponse` (`{detail, errors?}`); many also list specific 4xx codes. Model errors once, globally.
   - The security schemes (`JWTAuth`, `OptionalJWTAuth`, `StaffAuth`, `SellerAuth`, `StoreAuth`) are all `Authorization: Bearer <access_token>`; they differ only in who is let in.
-- **Test logins are already set up for you, in `.env.local`** (git-ignored): `E2E_CUSTOMER_EMAIL` / `E2E_CUSTOMER_PASSWORD`, `E2E_SELLER_*`, `E2E_ADMIN_*`, next to `API_ORIGIN`. They exist **only on Preview**:
+- **Test logins: none exist on the test server yet** (checked 2026-11-16: it has no products, stores or demo accounts). The backend has the commands to create a demo catalogue
+  (`seed_demo`, `seed_demo_media`) and the three test logins described below (`seed_frontend_accounts`, which writes the passwords to a git-ignored env file and never prints them);
+  ask the owner to have the backend session run them on the test server, and say so in `BACKEND_ASKS.md`. Until then you can register a customer through the API yourself.
+  What follows was written for the old Preview backend and describes the accounts those commands create:
+  `E2E_CUSTOMER_EMAIL` / `E2E_CUSTOMER_PASSWORD`, `E2E_SELLER_*`, `E2E_ADMIN_*`, next to `API_ORIGIN` in a git-ignored `.env.local`. They would exist **only on the test server**:
   a **buyer**; a **seller** who is a member of the demo store (Huda Beauty, with orders, products and analytics) with `manage` on every section, so the whole seller portal works with real data (team management
   and plan changes are owner-only, so those screens answer 403 for this seller: build them from the design and tell the owner if you need to see them live); and a **staff admin** (`is_staff`, not a superuser; the `/admin/*` APIs).
   Use them for development and for the Playwright tests: read them from the environment, **never print, log, commit or paste them**, and never write a password into any other file. If they stop working or you
   need a different kind of account, say so in `BACKEND_ASKS.md` and tell the owner: the backend session recreates them (which also rotates the passwords) and rewrites `.env.local`. Other demo accounts exist on Preview;
   their password is deliberately not given to you.
-- **Free-tier infrastructure:** keep test traffic light; no loops, no load tests.
-- **File uploads do not work on Preview yet** (the server's disk is read-only; object storage is not set up): avatar, product images, review and return photos, KYC documents and the category-request image
-  all fail. Build the upload UI, but expect an error there and note it in `BACKEND_ASKS.md`.
+- **Small server:** the test server is one small machine (about 900 MB of memory): keep test traffic light; no loops, no load tests.
+- **File uploads** (avatar, product images, review and return photos, KYC documents, the category-request image) are stored on the test server's disk and served at `/media/`.
+  This has **not been tested end to end yet**: build the upload UI, and if an upload fails, note it in `BACKEND_ASKS.md`.
 - **Never** put credentials, tokens or `.env` contents in code, logs, commits or chat.
 
 **Prefer not to call the backend straight from the browser.** Preview does allow the exact origins `http://localhost:3000` and `http://127.0.0.1:3000` (nothing else, and Production allows none), so a quick direct call from those two works: no `credentials: 'include'`, and only the headers `Authorization`, `Content-Type`, `Accept-Language`, `X-Region`, `X-Language`, `X-Timezone`, `X-Cart-Token`, `X-Store`. But a deployed frontend, another port, or Production would all be refused, and with the proxy below none of that matters. In `next.config.mjs` add a `rewrites()` entry (check the bundled Next docs for its current form) that forwards
@@ -127,12 +143,16 @@ The backend is built by another Claude session you cannot see or reach. The owne
 3. **Start of every session:** (a) fetch the live `openapi.json`; (b) diff it against `api/openapi.snapshot.json`, which is exactly "what changed since last time"; (c) read the top of `docs/backend/api-changes.md`;
    (d) regenerate the API client; (e) replace the snapshot. If `api-changes.md` says something the diff does not show, or the reverse, tell the owner.
 4. **Backend changes are additive where possible.** A breaking change is flagged `BREAKING` in `api-changes.md` with what to do; the old shape stays until you confirm.
-5. **Never call Production**, and never create demo data there. Staging (Preview) can be reset: store nothing on it you cannot recreate.
+5. **There is one backend, the test server.** It can be reset: store nothing on it you cannot recreate, and never put real customer data on it.
 6. **No secrets cross the boundary.** Tokens, passwords and keys are set by the owner in each platform's settings or a git-ignored `.env`.
 
-## 7. Deploying the frontend: two environments that mirror the backend's
+## 7. Deploying the frontend (current setup, replaces the old two-environment Vercel plan)
 
-Its own GitHub repository and its own Vercel project, wired to the backend's environments like this:
+The web frontend (`asknget-frontend`) and the backend each deploy themselves to the EC2 test server through GitHub Actions when `main` changes; pull requests only run CI.
+The web site and the API share one origin (`https://asknget.co.za`), so there is no `API_ORIGIN` to set. Branches in the frontend repository: feature branches, then `pre-prod`, then `main` (the live site).
+There are no Vercel projects any more. A native app (Expo) talks to the same API at its absolute URL.
+
+> The rest of this section is the **old Vercel plan, kept for history only; do not follow it.**
 
 | Frontend branch | Frontend site | Talks to | `API_ORIGIN` (server-side variable in the frontend's Vercel project) |
 |---|---|---|---|

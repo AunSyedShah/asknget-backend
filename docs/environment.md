@@ -232,6 +232,9 @@ came from the store, the market, the platform or the code default.
 
 ## 6. Deploying the API on Vercel
 
+> **No longer used (2026-11-16).** The Vercel projects were removed. The API runs on the EC2 test server without Docker, deployed by GitHub Actions: see `docs/ec2-deploy.md`.
+> This section is kept because the Vercel code path (`FILE_STORAGE`, `VERCEL_HOSTS`) still exists in the settings, and for a possible later hosting change.
+
 `main` deploys as it is: there is no separate Vercel branch to maintain. Vercel's Python runtime is 3.12,
 so the project supports `>=3.12` (Docker still builds on 3.13), and `uv.lock` is kept.
 
