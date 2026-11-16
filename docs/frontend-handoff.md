@@ -1,5 +1,7 @@
 # Frontend handoff — what the backend guarantees, and how to read the design
 
+> **Status 2026-11-16: any Vercel host in this file is outdated.** The only backend is the EC2 test server, `https://asknget.co.za` (API at `/api/v1`); see `docs/ec2-deploy.md`.
+>
 > For whoever works in the **frontend repository** (a Claude session or an engineer). Written 2026-10-12 from the
 > code, not from memory: the endpoint index at the end is generated from the OpenAPI schema. If this file and the
 > running API disagree, the API wins; `GET /api/v1/openapi.json` is the contract and `/api/v1/docs` is its UI.
